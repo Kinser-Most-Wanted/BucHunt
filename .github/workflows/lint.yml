@@ -1,33 +1,20 @@
-name: Lint Code Base
+name: Lint
 
-# Trigger the workflow on push or pull request events for the main branch
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_call:
 
 jobs:
   lint:
-    name: Run Linter
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Check out the repository code so the workflow can access it
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Step 2: Set up Node.js environment
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: pnpm
 
-      # Step 3: Install project dependencies safely
-      - name: Install Dependencies
-        run: npm ci
-
-      # Step 4: Run the lint test script
-      - name: Run Lint Test
-        run: npm run lint
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint

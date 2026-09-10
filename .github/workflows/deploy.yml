@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  workflow_call:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Determine stack name
+        id: stack
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "stack_name=bucstop-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "stack_name=bucstop" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == "stage" ]]; then
+            echo "stack_name=bucstop-stage" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported ref/event"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ vars.DEPLOY_ROLE }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"

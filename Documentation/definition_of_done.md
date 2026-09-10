@@ -63,7 +63,7 @@ The feature must be tested in a real environment, not just assumed correct from 
 This means:
 - it is run in the actual project environment
 - behavior is checked through the real application flow
-- Docker-based local testing or another agreed actual environment is used
+- An agreed upon environment is used
 - major intended paths are verified
 
 A feature is not done if it only appears correct on paper but has not been exercised in a real environment.

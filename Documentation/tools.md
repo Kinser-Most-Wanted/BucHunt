@@ -26,21 +26,8 @@ GitHub is the center of the team workflow.
 
 ---
 
-### Docker
-Docker will be used for testing environments.
-
-Docker is important because it:
-- keeps local testing consistent across machines
-- helps reduce environment-specific issues
-- aligns with the AWS environment mindset
-- provides a repeatable way to run and validate the project
-
-The team should prefer testing in Docker-based environments rather than assuming local machine behavior is enough.
-
----
-
-### Excalidraw
-Excalidraw will be used for diagrams and lightweight design communication.
+### LucidChart
+LucidChart will be used for diagrams and lightweight design communication.
 
 It can be used for:
 - architecture sketches
@@ -100,8 +87,7 @@ This includes:
 The core team tools are:
 
 - **GitHub** for source control, issues, pull requests, and project boards
-- **Docker** for testing environments
-- **Excalidraw** for design diagrams
+- **LucidChart** for design diagrams
 - **TypeScript** for implementation
 - **Prettier** for formatting
 - **ESLint** for linting

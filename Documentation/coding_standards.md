@@ -9,7 +9,6 @@ The team will use:
 - TypeScript for application logic
 - Prettier for formatting
 - ESLint for linting
-- Docker for consistent local testing
 - a `src/`-based project structure
 
 ---

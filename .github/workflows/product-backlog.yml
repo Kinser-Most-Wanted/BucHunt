@@ -2,7 +2,7 @@ name: Create PBI issues
 
 on:
   push:
-    branches: [main]
+    branches: [main, automate-pbis]
     paths:
       - 'pbis/*.md'
 

@@ -1,0 +1,18 @@
+description: This template will be used by the PO to place PBIs into the github product backlog.
+
+pbi:
+  Title: < Title of PBI >
+
+  priority: <Low | Medium | High >
+
+  user_story: |
+    As a <role>,
+    I want <feature>,
+    so that <benefit>.
+
+  acceptance_criteria:
+    - <criterion 1>
+    - <criterion 2>
+    - <criterion 3>
+    - <criterion 4>
+    - <criterion 5>

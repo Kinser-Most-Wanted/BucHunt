@@ -147,7 +147,4 @@ project/
 │   ├── css/
 │   ├── ts/
 │   └── assets/
-├── Dockerfile
-├── compose.yml
-├── README.md
 └── docs/

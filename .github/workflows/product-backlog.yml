@@ -1,0 +1,28 @@
+name: Create PBI issues
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pbis/*.md'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  create-pbis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Create issues from added or modified PBI files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: node scripts/parseAndCreatePBIs.cjs

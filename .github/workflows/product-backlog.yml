@@ -1,8 +1,8 @@
-name: Create PBI issues
+name: Create and route PBI issues
 
 on:
   push:
-    branches: [main, automate-pbis]
+    branches: [main]
     paths:
       - 'pbis/*.md'
 
@@ -23,6 +23,10 @@ jobs:
       - name: Create issues from added or modified PBI files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A token with project read/write access to both organization projects.
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PRODUCT_BACKLOG_NAME: Product Backlog
+          SPRINT_BACKLOG_NAME: Sprint Backlog
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
         run: node scripts/parseAndCreatePBIs.cjs

@@ -1,3 +1,4 @@
+```yaml
 name: Deploy
 
 on:
@@ -64,4 +65,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Deploy
-        run: ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+        run: |
+          chmod +x ./deploy/deploy.sh
+          ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+```

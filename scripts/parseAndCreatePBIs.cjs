@@ -189,8 +189,9 @@ async function main() {
   const files = changedFiles().filter(file => /^pbis\/[^/]+\.md$/i.test(file) && fs.existsSync(file));
   const pbis = files.flatMap(file => parsePbis(fs.readFileSync(file, 'utf8'), file));
   if (!pbis.length) { console.log('No PBIs in changed Markdown files.'); return; }
-  if (!projectsToken) throw new Error('Set the PROJECTS_TOKEN Actions secret with access to both organization projects');
-  const projects = await findProjects();
+  // Issue creation must still work before the Projects token is configured.
+  const projects = projectsToken ? await findProjects() : null;
+  if (!projects) console.warn('PROJECTS_TOKEN is not set: creating issues without adding them to Projects');
   await ensureLabel('PBI', '5319E7');
   for (const pbi of pbis) {
     const sprintLabel = `Sprint ${pbi.sprint}`;
@@ -201,6 +202,7 @@ async function main() {
       body: JSON.stringify({ title: pbi.title, body: pbi.body, labels: ['PBI', sprintLabel] }),
     });
     console.log(`${existing ? 'Found' : 'Created'} #${issue.number}: ${pbi.title}`);
+    if (!projects) continue;
     const items = await linkedItems(issue.node_id);
     const productItem = await addToProject(projects.product, issue.node_id, items);
     // A new issue may have been auto-added before this step. Leave manually sorted issues alone.

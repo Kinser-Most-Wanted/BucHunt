@@ -54,7 +54,6 @@ async function findProjects() {
             pageInfo { hasNextPage }
             nodes {
               ... on ProjectV2SingleSelectField { id name options { id name } }
-              ... on ProjectV2IterationField { id name configuration { iterations { id title } completedIterations { id title } } }
             }
           }
         }
@@ -74,21 +73,10 @@ async function findProjects() {
   if (product.id === sprint.id) throw new Error('Product and Sprint Backlog must be different projects');
   const sprintStatus = sprint.fields.nodes.find(f => f?.name === 'Status');
   if (!sprintStatus) throw new Error('Sprint Backlog needs a Status field for the No Status column');
-  return { product, sprint, sprintStatus };
-}
-
-function sprintOption(project, sprintNumber) {
-  const name = `Sprint ${sprintNumber}`;
-  const fields = project.fields.nodes.filter(f => f && (f.name === 'Sprint' || f.name === 'Status'));
-  const matches = fields.flatMap(field => {
-    const values = field.options || field.configuration?.iterations || [];
-    return values.filter(v => v.name?.toLowerCase() === name.toLowerCase() || v.title?.toLowerCase() === name.toLowerCase())
-      .map(value => ({ fieldId: field.id, optionId: value.id, iteration: Boolean(field.configuration) }));
-  });
-  const preferred = fields.find(f => f.name === 'Sprint');
-  const option = matches.find(v => v.fieldId === preferred?.id) || matches[0];
-  if (!option) throw new Error(`${project.title} needs a Sprint or Status column option named "${name}"`);
-  return option;
+  const productStatus = product.fields.nodes.find(f => f?.name === 'Status');
+  const catchAll = productStatus?.options?.find(option => option.name === 'Catch All PBI');
+  if (!catchAll) throw new Error('Product Backlog needs a Status option named "Catch All PBI"');
+  return { product, sprint, sprintStatus, productStatus, catchAll };
 }
 
 async function linkedItems(issueNodeId) {
@@ -116,13 +104,12 @@ async function addToProject(project, issueNodeId, existingItems) {
   return { id: data.addProjectV2ItemById.item.id, added: true };
 }
 
-async function putInSprint(project, itemId, option) {
-  const value = option.iteration ? { iterationId: option.optionId } : { singleSelectOptionId: option.optionId };
+async function setProductCatchAll(project, itemId, fieldId, optionId) {
   await graphql(`mutation($project: ID!, $item: ID!, $field: ID!, $value: ProjectV2FieldValue!) {
     updateProjectV2ItemFieldValue(input: {
       projectId: $project, itemId: $item, fieldId: $field, value: $value
     }) { projectV2Item { id } }
-  }`, { project: project.id, item: itemId, field: option.fieldId, value });
+  }`, { project: project.id, item: itemId, field: fieldId, value: { singleSelectOptionId: optionId } });
 }
 
 async function clearStatus(project, itemId, fieldId) {
@@ -204,10 +191,8 @@ async function main() {
   if (!pbis.length) { console.log('No PBIs in changed Markdown files.'); return; }
   if (!projectsToken) throw new Error('Set the PROJECTS_TOKEN Actions secret with access to both organization projects');
   const projects = await findProjects();
-  // Validate every destination before creating any issues.
-  const destinations = pbis.map(pbi => sprintOption(projects.product, pbi.sprint));
   await ensureLabel('PBI', '5319E7');
-  for (const [index, pbi] of pbis.entries()) {
+  for (const pbi of pbis) {
     const sprintLabel = `Sprint ${pbi.sprint}`;
     await ensureLabel(sprintLabel, '0E8A16');
     const existing = await existingIssue(pbi.title);
@@ -218,14 +203,17 @@ async function main() {
     console.log(`${existing ? 'Found' : 'Created'} #${issue.number}: ${pbi.title}`);
     const items = await linkedItems(issue.node_id);
     const productItem = await addToProject(projects.product, issue.node_id, items);
-    await putInSprint(projects.product, productItem.id, destinations[index]);
+    // A new issue may have been auto-added before this step. Leave manually sorted issues alone.
+    if (productItem.added || !existing) {
+      await setProductCatchAll(projects.product, productItem.id, projects.productStatus.id, projects.catchAll.id);
+    }
     const sprintItem = await addToProject(projects.sprint, issue.node_id, items);
     // No Status is an unset Status value. Preserve an existing issue's manually managed status.
     // A project auto-add workflow may have added a newly created issue before this step.
     if (sprintItem.added || !existing) await clearStatus(projects.sprint, sprintItem.id, projects.sprintStatus.id);
-    console.log(`Routed #${issue.number} to ${sprintLabel} in Product Backlog and No Status in Sprint Backlog`);
+    console.log(`Added #${issue.number} to Product Backlog and Sprint Backlog`);
   }
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { parsePbis, sprintOption };
+module.exports = { parsePbis };

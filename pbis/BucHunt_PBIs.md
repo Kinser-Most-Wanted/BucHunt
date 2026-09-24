@@ -13,7 +13,9 @@ TypeScript development, source-control collaboration, automated testing,
 and continuous integration while producing a demonstrable working
 increment.
 
-## PBI 1 --- Initial BucHunt application interaction
+## PBI 1: Initial BucHunt application interaction
+
+### Priority: Medium
 
 ### User Story
 
@@ -38,7 +40,9 @@ through its intended client-server architecture.
 
 ------------------------------------------------------------------------
 
-## PBI 2 --- Continuous Delivery Quality Gate
+## PBI 2: Continuous Delivery Quality Gate
+
+### Priority: Medium
 
 ### User Story
 
@@ -62,7 +66,9 @@ before considering a release ready.
 
 ------------------------------------------------------------------------
 
-## PBI 3 --- Automated tests for the first vertical slice
+## PBI 3: Automated tests for the first vertical slice
+
+### Priority: Medium
 
 ### User Story
 
@@ -86,7 +92,9 @@ evolves.
 
 ------------------------------------------------------------------------
 
-## PBI 4 --- Continuous Integration quality gate
+## PBI 4: Continuous Integration quality gate
+
+### Priority: Medium
 
 ### User Story
 
@@ -108,7 +116,9 @@ integrated.
 
 ------------------------------------------------------------------------
 
-## PBI 5 --- Shared BucHunt development understanding
+## PBI 5: Shared BucHunt development understanding
+
+### Priority: Medium
 
 ### User Story
 
@@ -143,7 +153,9 @@ administrator to create a hunt and define its tasks, while practicing
 validation, file-based persistence, automated testing, and integration
 with the existing CI/CD workflow.
 
-## PBI 1 --- Create a Hunt
+## PBI 1: Create a Hunt
+
+### Priority: Medium
 
 ### User Story
 
@@ -169,7 +181,9 @@ eventually participate in.
 
 ------------------------------------------------------------------------
 
-## PBI 2 --- Create and Define a Hunt Task
+## PBI 2: Create and Define a Hunt Task
+
+### Priority: Medium
 
 ### User Story
 
@@ -194,7 +208,9 @@ participants to eventually complete it.
 
 ------------------------------------------------------------------------
 
-## PBI 3 --- Validate Hunt and Task Definitions
+## PBI 3: Validate Hunt and Task Definitions
+
+### Priority: Medium
 
 ### User Story
 
@@ -219,7 +235,9 @@ become part of a hunt.
 
 ------------------------------------------------------------------------
 
-## PBI 4 --- Persist and Retrieve Hunt Configuration
+## PBI 4: Persist and Retrieve Hunt Configuration
+
+### Priority: Medium
 
 ### User Story
 
@@ -244,7 +262,9 @@ retrieves it again.
 
 ------------------------------------------------------------------------
 
-## PBI 5 --- Automated Verification of Hunt Configuration
+## PBI 5: Automated Verification of Hunt Configuration
+
+### Priority: Medium
 
 ### User Story
 
@@ -268,7 +288,9 @@ evolves.
 
 ------------------------------------------------------------------------
 
-## PBI 6 --- Deploy and Verify Hunt Configuration
+## PBI 6: Deploy and Verify Hunt Configuration
+
+### Priority: Medium
 
 ### User Story
 
@@ -302,9 +324,9 @@ that a player can join a configured hunt using an access code, view
 assigned tasks, submit a valid task answer, and have completion state
 persisted and restored.
 
-## PBI 1 --- Join a Hunt Using an Access Code
+## PBI 1: Join a Hunt Using an Access Code
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -328,9 +350,9 @@ participate in the intended BucHunt experience.
 
 ------------------------------------------------------------------------
 
-## PBI 2 --- Display Hunt Tasks to a Player
+## PBI 2: Display Hunt Tasks to a Player
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -351,9 +373,9 @@ what activities I need to complete.
 
 ------------------------------------------------------------------------
 
-## PBI 3 --- Submit a Hunt Task Answer
+## PBI 3: Submit a Hunt Task Answer
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -377,9 +399,9 @@ demonstrate that I completed the task.
 
 ------------------------------------------------------------------------
 
-## PBI 4 --- Persist Player Hunt Progress
+## PBI 4: Persist Player Hunt Progress
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -403,9 +425,9 @@ tasks are not lost between interactions with BucHunt.
 
 ------------------------------------------------------------------------
 
-## PBI 5 --- Verify the Player Hunt Workflow Automatically
+## PBI 5: Verify the Player Hunt Workflow Automatically
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -429,9 +451,9 @@ vertical slice.
 
 ------------------------------------------------------------------------
 
-## PBI 6 --- Deploy and Verify the Player Vertical Slice
+## PBI 6: Deploy and Verify the Player Vertical Slice
 
-**Priority:** Medium
+### Priority: Medium
 
 ### User Story
 
@@ -466,9 +488,9 @@ supporting additional task types and administrative task management
 while maintaining validated player behavior, secure administrative
 access, and reliable automated delivery.
 
-## PBI 1 --- Secure Administrative Access
+## PBI 1: Secure Administrative Access
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -493,9 +515,9 @@ capabilities, so that only authorized users can manage hunts and tasks.
 
 ------------------------------------------------------------------------
 
-## PBI 2 --- Edit and Delete Hunt Tasks
+## PBI 2: Edit and Delete Hunt Tasks
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -519,9 +541,9 @@ maintain the configuration of a hunt as its requirements change.
 
 ------------------------------------------------------------------------
 
-## PBI 3 --- Support Multiple Choice Hunt Tasks
+## PBI 3: Support Multiple Choice Hunt Tasks
 
-**Priority:** High
+### Priority: High
 
 ### User Story
 
@@ -544,9 +566,9 @@ BucHunt can support more than free-text task responses.
 
 ------------------------------------------------------------------------
 
-## PBI 4 --- Support Single Word Trivia Tasks
+## PBI 4: Support Single Word Trivia Tasks
 
-**Priority:** Medium
+### Priority: Medium
 
 ### User Story
 
@@ -570,9 +592,9 @@ can support trivia-based challenges.
 
 ------------------------------------------------------------------------
 
-## PBI 5 --- Configure Hunt Task Presentation
+## PBI 5: Configure Hunt Task Presentation
 
-**Priority:** Medium
+### Priority: Medium
 
 ### User Story
 
@@ -596,9 +618,9 @@ so that a hunt can use the intended task progression.
 
 ------------------------------------------------------------------------
 
-## PBI 6 --- Verify Expanded Hunt Behavior Through Automated Delivery
+## PBI 6: Verify Expanded Hunt Behavior Through Automated Delivery
 
-**Priority:** Medium
+### Priority: Medium
 
 ### User Story
 

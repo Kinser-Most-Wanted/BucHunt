@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Create issues from added or modified PBI files
+      - name: Create PBIs in both backlog intake columns
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # A token with project read/write access to both organization projects.

@@ -2,7 +2,7 @@ name: Create and route sprint goals and PBI issues
 
 on:
   push:
-    branches: [main]
+    branches: [main, automate-pbis]
     paths:
       - 'pbis/*.md'
 

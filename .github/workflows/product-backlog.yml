@@ -1,8 +1,8 @@
-name: Create and route PBI issues
+name: Create and route sprint goals and PBI issues
 
 on:
   push:
-    branches: [main, automate-pbis]
+    branches: [main]
     paths:
       - 'pbis/*.md'
 
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Create PBIs in both backlog intake columns
+      - name: Create sprint goals and PBIs in both backlog intake columns
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # A token with project read/write access to both organization projects.

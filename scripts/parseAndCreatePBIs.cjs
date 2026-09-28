@@ -164,6 +164,26 @@ function parsePbis(markdown, filename) {
   return pbis;
 }
 
+function parseSprintGoals(markdown, filename) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const goals = [];
+  for (let i = 0; i < lines.length; i++) {
+    const heading = lines[i].match(/^#\s+Sprint\s+#?(\d+)\s*$/i);
+    if (!heading) continue;
+    const sprint = heading[1];
+    const section = [];
+    for (let j = i + 1; j < lines.length && !/^#{1,2}\s+(?:Sprint\s+#?\d+|PBI\s+\d+)\b/i.test(lines[j]); j++) {
+      section.push(lines[j]);
+    }
+    const marker = section.findIndex(line => /^(?:\*\*Sprint Goal\*\*|#{2,3}\s+Sprint Goal\s*:?|Sprint Goal:)\s*$/i.test(line.trim()));
+    if (marker < 0) continue;
+    const goal = section.slice(marker + 1).join('\n').trim().replace(/\n(?:-{3,}|\*{3,})\s*$/, '').trim();
+    if (!goal) throw new Error(`${filename}: Sprint ${sprint} has an empty Sprint Goal`);
+    goals.push({ sprint, title: `Sprint ${sprint} Goal`, body: `SPRINT GOAL:\n\n${goal}`, labels: ['Sprint Goal', `Sprint ${sprint}`] });
+  }
+  return goals;
+}
+
 async function ensureLabel(name, color) {
   try {
     await api(`/labels/${encodeURIComponent(name)}`);
@@ -187,22 +207,35 @@ async function existingIssue(title) {
 async function main() {
   if (!token || !owner || !repo) throw new Error('GITHUB_TOKEN and GITHUB_REPOSITORY are required');
   const files = changedFiles().filter(file => /^pbis\/[^/]+\.md$/i.test(file) && fs.existsSync(file));
-  const pbis = files.flatMap(file => parsePbis(fs.readFileSync(file, 'utf8'), file));
-  if (!pbis.length) { console.log('No PBIs in changed Markdown files.'); return; }
-  // Issue creation must still work before the Projects token is configured.
-  const projects = projectsToken ? await findProjects() : null;
-  if (!projects) console.warn('PROJECTS_TOKEN is not set: creating issues without adding them to Projects');
+  const entries = files.flatMap(file => {
+    const markdown = fs.readFileSync(file, 'utf8');
+    const goals = parseSprintGoals(markdown, file);
+    const pbis = parsePbis(markdown, file).map(pbi => ({
+      ...pbi, labels: ['PBI', `Sprint ${pbi.sprint}`],
+    }));
+    return [...goals, ...pbis];
+  });
+  if (!entries.length) { console.log('No sprint goals or PBIs in changed Markdown files.'); return; }
   await ensureLabel('PBI', '5319E7');
-  for (const pbi of pbis) {
-    const sprintLabel = `Sprint ${pbi.sprint}`;
-    await ensureLabel(sprintLabel, '0E8A16');
-    const existing = await existingIssue(pbi.title);
+  await ensureLabel('Sprint Goal', 'D93F0B');
+  const createdItems = [];
+  for (const entry of entries) {
+    await ensureLabel(`Sprint ${entry.sprint}`, '0E8A16');
+    const existing = await existingIssue(entry.title);
     const issue = existing || await api('/issues', {
       method: 'POST',
-      body: JSON.stringify({ title: pbi.title, body: pbi.body, labels: ['PBI', sprintLabel] }),
+      body: JSON.stringify({ title: entry.title, body: entry.body, labels: entry.labels }),
     });
-    console.log(`${existing ? 'Found' : 'Created'} #${issue.number}: ${pbi.title}`);
-    if (!projects) continue;
+    console.log(`${existing ? 'Found' : 'Created'} #${issue.number}: ${entry.title}`);
+    createdItems.push({ issue, existing });
+  }
+  // Project access must not prevent the issues from being created. Report routing failure afterward.
+  if (!projectsToken) {
+    console.warn('PROJECTS_TOKEN is not set: created issues without adding them to Projects');
+    return;
+  }
+  const projects = await findProjects();
+  for (const { issue, existing } of createdItems) {
     const items = await linkedItems(issue.node_id);
     const productItem = await addToProject(projects.product, issue.node_id, items);
     // A new issue may have been auto-added before this step. Leave manually sorted issues alone.
@@ -218,4 +251,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { parsePbis };
+module.exports = { parsePbis, parseSprintGoals };

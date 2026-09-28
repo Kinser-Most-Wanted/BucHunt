@@ -1,6 +1,6 @@
 # PBI issue routing
 
-The workflow at `.github/workflows/product-backlog.yml` processes changed `pbis/*.md` files on `main`. Each `# Sprint N` heading supplies an informational sprint label for the PBIs beneath it. Each PBI requires a `### Priority: High`, `Medium`, or `Low` line. The Product Owner sorts project cards into their final columns manually.
+The workflow at `.github/workflows/product-backlog.yml` processes changed `pbis/*.md` files on `main` and `automate-pbis`. Each `# Sprint N` heading supplies an informational sprint label for the PBIs beneath it. A `**Sprint Goal**`, `### Sprint Goal`, or `SPRINT GOAL:` line followed by goal text before the first PBI creates a separate `Sprint N Goal` issue. Its body begins `SPRINT GOAL:` and it receives `Sprint Goal` and `Sprint N` labels. Each PBI requires a `### Priority: High`, `Medium`, or `Low` line. The Product Owner sorts project cards into their final columns manually.
 
 ## One-time GitHub setup
 
@@ -9,6 +9,6 @@ The workflow at `.github/workflows/product-backlog.yml` processes changed `pbis/
 3. Set the Product Backlog board's column field to a single-select **Status** field with a **Catch All PBI** option. New issues start there, regardless of their sprint label.
 4. Set the Sprint Backlog board's column field to **Status**. Leave its `No Status` column visible. If its built-in workflow sets Status when an item is added, disable that workflow so it does not override the automation's cleared Status.
 
-The script adds the same issue to both projects. It sets Product Backlog Status to **Catch All PBI** and clears Sprint Backlog Status to place new issues in **No Status**. On reruns, it reuses existing issues and project items. It preserves both project columns on issues that existed before the run so manual sorting is not undone.
+The script adds the same goal and PBI issues to both projects. It sets Product Backlog Status to **Catch All PBI** and clears Sprint Backlog Status to place new issues in **No Status**. On reruns, it reuses existing issues and project items. It preserves both project columns on issues that existed before the run so manual sorting is not undone. Issues are created before project routing; if project access fails, the run reports the error after creating the issues.
 
 The workflow does not run when only its script or YAML changes. To retry previously created issues after setup, edit their source Markdown file in `pbis/` and push the change; the script will reuse the issues and add missing project entries.

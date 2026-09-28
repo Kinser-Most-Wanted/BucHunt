@@ -1,4 +1,4 @@
-# BucHunt Product Backlog Items
+# BucHunt Sprint Goals and Product Backlog Items
 
 > Combined from `sprint_1.txt` through `sprint_4.txt`. Each `## PBI`
 > section is formatted as a self-contained GitHub issue body.

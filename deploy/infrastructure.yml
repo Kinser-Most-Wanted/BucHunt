@@ -1,6 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: BucHunt static website infrastructure
 
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+
 Resources:
 
   WebsiteBucket:

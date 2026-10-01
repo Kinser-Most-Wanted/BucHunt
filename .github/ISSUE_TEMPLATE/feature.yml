@@ -1,0 +1,71 @@
+name: Feature
+description: Create a feature request or sprint feature item
+title: "[Feature]: "
+labels: ["feature", "triage"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What needs to be built?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / context
+      description: Why is this needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: What must be true for this to be considered done?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+    validations:
+      required: true
+
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      description: Fibonacci sizing
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+    validations:
+      required: true
+
+  - type: input
+    id: sprint
+    attributes:
+      label: Sprint / iteration
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Anything blocked by or depending on this?
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Add links, design notes, or other implementation details

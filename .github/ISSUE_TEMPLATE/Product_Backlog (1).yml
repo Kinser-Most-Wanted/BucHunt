@@ -1,0 +1,49 @@
+name: "Product Backlog Item"
+description: "This template will be used by the PO to place PBIs into the GitHub product backlog."
+title: "[PBI] "
+labels:
+  - backlog
+
+body:
+  - type: input
+    id: pbi_title
+    attributes:
+      label: Title
+      placeholder: "Title of PBI"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      placeholder: |
+        As a <role>,
+        I want <feature>,
+        so that <benefit>.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - criterion 1
+        - criterion 2
+        - criterion 3
+        - criterion 4
+        - criterion 5
+    validations:
+      required: true

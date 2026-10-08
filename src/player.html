@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Home | BucHunt</title>
+    <title>Player tasks | BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
   <body>
@@ -15,23 +15,19 @@
       </nav>
     </header>
     <main>
-      <h1>BucHunt</h1>
+      <h1>Hunt tasks</h1>
       <p class="notice">
-        Shared Sprint 2 foundation. Forms, authentication, and JSON storage are
-        not implemented.
+        Player task display awaiting implementation. No hunt has been loaded.
       </p>
-      <div class="grid">
-        <section>
-          <h2>Configure a hunt</h2>
-          <p>Administrative access, hunt creation, and task definitions.</p>
-          <a class="action" href="./admin.html">Open administration</a>
-        </section>
-        <section>
-          <h2>View hunt tasks</h2>
-          <p>A separate workspace for the player task list.</p>
-          <a class="action" href="./player.html">Open player view</a>
-        </section>
-      </div>
+      <section id="display-tasks" data-testid="display-tasks">
+        <h2 data-testid="player-hunt-name">Selected hunt</h2>
+        <p role="status" data-testid="player-task-status">No tasks loaded.</p>
+        <ul data-testid="player-task-list" aria-label="Hunt tasks"></ul>
+        <template id="player-task-template"
+          ><li data-testid="player-task">
+            <span data-task-label></span> <span data-task-completion></span></li
+        ></template>
+      </section>
     </main>
     <footer>Sprint 2 foundation · Features awaiting implementation</footer>
     <script type="module" src="./js/foundation/bootstrap.js"></script>

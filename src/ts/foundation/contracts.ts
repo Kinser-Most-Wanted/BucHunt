@@ -7,7 +7,6 @@ import type {
   PlayerHunt,
   TaskDefinition,
   TaskInput,
-  ValidationIssue,
 } from "./types.js";
 
 export interface AuthenticationService {
@@ -16,8 +15,8 @@ export interface AuthenticationService {
   signOut(): Promise<OperationResult<void>>;
 }
 export interface DefinitionValidator {
-  validateHunt(input: HuntInput): ValidationIssue[];
-  validateTask(input: TaskInput): ValidationIssue[];
+  // Validate a complete persisted Hunt, including all embedded Tasks.
+  validateHunt(input: unknown): OperationResult<HuntDefinition>;
 }
 // All administrative operations must be authorized by the future server.
 export interface HuntRepository {

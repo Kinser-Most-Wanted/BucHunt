@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BucHunt Hunt Configuration",
+  "description": "Private Hunt configuration. Tasks belong to their containing Hunt; participant progress is stored separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "hunts"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "hunts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hunt"
+      }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayLabel",
+        "description",
+        "requiredAnswer",
+        "location",
+        "order",
+        "answerCaseSensitive",
+        "hint",
+        "points"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "displayLabel": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "requiredAnswer": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "answerCaseSensitive": {
+          "type": "boolean",
+          "default": false
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "points": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "hunt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "ownerId",
+        "beginsAt",
+        "endsAt",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "accessCode",
+        "taskOrderMode",
+        "tasks"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "beginsAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "endsAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "published", "archived"],
+          "default": "draft"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "accessCode": {
+          "type": "null",
+          "default": null,
+          "description": "Reserved placeholder. Access code generation and lookup are not implemented."
+        },
+        "taskOrderMode": {
+          "type": "string",
+          "enum": ["sequential", "any"],
+          "default": "sequential"
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/task"
+          }
+        }
+      }
+    }
+  }
+}

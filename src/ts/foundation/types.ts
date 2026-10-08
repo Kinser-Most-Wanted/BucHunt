@@ -1,6 +1,13 @@
+export type HuntStatus = "draft" | "published" | "archived";
+export type TaskOrderMode = "sequential" | "any";
+
 export interface HuntInput {
   name: string;
   description: string;
+  ownerId: string;
+  beginsAt: string;
+  endsAt: string | null;
+  taskOrderMode: TaskOrderMode;
 }
 export interface TaskLocation {
   latitude: number;
@@ -8,16 +15,25 @@ export interface TaskLocation {
 }
 export interface TaskInput {
   displayLabel: string;
+  description: string;
   requiredAnswer: string;
-  location?: TaskLocation;
+  location: TaskLocation;
+  order: number;
+  answerCaseSensitive: boolean;
+  hint: string | null;
+  points: number;
 }
 export interface HuntDefinition extends HuntInput {
   id: string;
+  status: HuntStatus;
+  createdAt: string;
+  updatedAt: string;
+  // Reserved until access code functionality is implemented.
+  accessCode: null;
   tasks: TaskDefinition[];
 }
 export interface TaskDefinition extends TaskInput {
   id: string;
-  huntId: string;
 }
 export interface PlayerTask {
   id: string;

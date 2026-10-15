@@ -27,32 +27,20 @@
         Task details are submitted through the hunt service. A task is shown as
         saved only after the service confirms it.
       </p>
-      <section id="admin-access" data-testid="admin-access" class="access-panel">
-        <h2>Administrative access</h2>
-        <form data-testid="admin-login-form">
-          <fieldset disabled>
-            <legend>Sign in · #43</legend>
-            <label for="admin-username">Username</label
-            ><input
-              id="admin-username"
-              name="username"
-              autocomplete="username"
-            />
-            <label for="admin-password">Password</label
-            ><input
-              id="admin-password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-            />
-            <button type="submit">Sign in</button>
-          </fieldset>
-        </form>
-        <p role="status" data-testid="auth-status">
-          Authentication awaiting implementation.
+      <section class="access-panel">
+        <h2>Administrator access</h2>
+        <label for="admin-api-token">Administrator API token</label>
+        <input id="admin-api-token" type="password" autocomplete="off" />
+        <p>
+          The administrator provides this token. It stays on this page and is
+          required to create hunts or retrieve private task configuration.
         </p>
       </section>
-      <section id="create-hunt" data-testid="create-hunt" class="integration-panel">
+      <section
+        id="create-hunt"
+        data-testid="create-hunt"
+        class="integration-panel"
+      >
         <div class="section-heading">
           <span class="step-number" aria-hidden="true">01</span>
           <div>
@@ -62,21 +50,42 @@
         </div>
         <p class="section-copy">
           Create a hunt first, then use its ID below to attach tasks. The hunt
-          creation flow is being developed separately.
+          creation flow saves to the server.
         </p>
         <form data-testid="hunt-form">
-          <fieldset disabled>
-            <legend>Hunt details · #31</legend>
+          <fieldset>
+            <legend>Hunt details</legend>
             <label for="hunt-name">Hunt name</label
-            ><input id="hunt-name" name="name" />
+            ><input id="hunt-name" name="name" required />
             <label for="hunt-description">Description</label
-            ><textarea id="hunt-description" name="description"></textarea>
+            ><textarea
+              id="hunt-description"
+              name="description"
+              required
+            ></textarea>
+            <label for="hunt-begins">Begins at (local time)</label
+            ><input
+              id="hunt-begins"
+              name="beginsAt"
+              type="datetime-local"
+              required
+            />
+            <label for="hunt-ends">Ends at (optional, local time)</label
+            ><input id="hunt-ends" name="endsAt" type="datetime-local" />
+            <label for="hunt-order">Task order</label
+            ><select id="hunt-order" name="taskOrderMode">
+              <option value="sequential">Sequential</option>
+              <option value="any">Any</option>
+            </select>
             <button type="submit">Create hunt</button>
           </fieldset>
         </form>
         <p role="status" data-testid="hunt-status">
-          Hunt creation awaits integration with the shared repository.
+          Enter hunt details to begin.
         </p>
+        <a data-testid="hunt-player-link" hidden
+          >Open this hunt in player view</a
+        >
       </section>
       <section id="define-task" data-testid="define-task" class="task-panel">
         <div class="section-heading">
@@ -91,6 +100,9 @@
           location to the correct participant journey.
         </p>
         <form data-testid="task-form">
+          <button type="button" data-testid="load-admin-hunt">
+            Load existing hunt tasks
+          </button>
           <fieldset>
             <legend>What participants will discover</legend>
             <label for="task-hunt-id">Hunt ID</label>
@@ -197,7 +209,9 @@
                     name="answerCaseSensitive"
                     type="checkbox"
                   />
-                  <label for="task-case-sensitive">Answer is case-sensitive</label>
+                  <label for="task-case-sensitive"
+                    >Answer is case-sensitive</label
+                  >
                 </div>
               </div>
               <label for="task-hint">Optional hint</label>
@@ -207,7 +221,9 @@
                 placeholder="A gentle nudge for participants"
               />
             </details>
-            <button type="submit" class="primary-button">Add task to hunt</button>
+            <button type="submit" class="primary-button">
+              Add task to hunt
+            </button>
           </fieldset>
         </form>
         <p role="status" data-testid="task-status" aria-live="polite">
@@ -224,7 +240,10 @@
             <h3>Tasks in this hunt</h3>
             <span class="list-caption">Updated after a successful save</span>
           </div>
-          <ol data-testid="defined-task-list" aria-label="Defined hunt tasks"></ol>
+          <ol
+            data-testid="defined-task-list"
+            aria-label="Defined hunt tasks"
+          ></ol>
         </div>
       </section>
     </main>

@@ -1,0 +1,6 @@
+node_modules/
+src/js/
+playwright-report/
+test-results/
+.runtime/
+*.tmp

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "hunts": [
+    {
+      "id": "example-hunt-001",
+      "name": "Example Campus Hunt",
+      "description": "Illustrative configuration for developers; not a live Hunt.",
+      "ownerId": "example-owner-001",
+      "beginsAt": "2026-10-15T14:00:00Z",
+      "endsAt": "2026-10-15T18:00:00Z",
+      "status": "draft",
+      "createdAt": "2026-10-08T17:00:00Z",
+      "updatedAt": "2026-10-08T17:00:00Z",
+      "accessCode": null,
+      "taskOrderMode": "sequential",
+      "tasks": [
+        {
+          "id": "example-task-001",
+          "displayLabel": "First Landmark",
+          "description": "What word appears on the example landmark?",
+          "requiredAnswer": "Bucs",
+          "location": {
+            "latitude": 36.3,
+            "longitude": -82.4
+          },
+          "order": 1,
+          "answerCaseSensitive": false,
+          "hint": "An example hint for the first Task.",
+          "points": 10
+        },
+        {
+          "id": "example-task-002",
+          "displayLabel": "Second Landmark",
+          "description": "What color is the example sign?",
+          "requiredAnswer": "Blue",
+          "location": {
+            "latitude": 36.301,
+            "longitude": -82.401
+          },
+          "order": 2,
+          "answerCaseSensitive": false,
+          "hint": null,
+          "points": 10
+        }
+      ]
+    }
+  ]
+}

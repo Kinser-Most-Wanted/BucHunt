@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administration | BucHunt</title>
+    <link rel="stylesheet" href="./css/foundation.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./index.html">BucHunt</a>
+      <nav aria-label="Main navigation">
+        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
+        ><a href="./player.html">Player tasks</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Hunt administration</h1>
+      <p class="notice">
+        Skeleton only. This page does not grant administrative access or save
+        changes.
+      </p>
+      <section id="admin-access" data-testid="admin-access">
+        <h2>Administrative access</h2>
+        <form data-testid="admin-login-form">
+          <fieldset disabled>
+            <legend>Sign in · #43</legend>
+            <label for="admin-username">Username</label
+            ><input
+              id="admin-username"
+              name="username"
+              autocomplete="username"
+            />
+            <label for="admin-password">Password</label
+            ><input
+              id="admin-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+            />
+            <button type="submit">Sign in</button>
+          </fieldset>
+        </form>
+        <p role="status" data-testid="auth-status">
+          Authentication awaiting implementation.
+        </p>
+      </section>
+      <div class="grid">
+        <section id="create-hunt" data-testid="create-hunt">
+          <h2>Create a hunt</h2>
+          <form data-testid="hunt-form">
+            <fieldset disabled>
+              <legend>Hunt details · #31</legend>
+              <label for="hunt-name">Hunt name</label
+              ><input id="hunt-name" name="name" />
+              <label for="hunt-description">Description</label
+              ><textarea id="hunt-description" name="description"></textarea>
+              <button type="submit">Create hunt</button>
+            </fieldset>
+          </form>
+          <p role="status" data-testid="hunt-status">
+            Hunt creation awaiting implementation.
+          </p>
+        </section>
+        <section id="define-task" data-testid="define-task">
+          <h2>Define a task</h2>
+          <form data-testid="task-form">
+            <fieldset disabled>
+              <legend>Task details · #32</legend>
+              <label for="task-hunt-id">Hunt ID</label
+              ><input id="task-hunt-id" name="huntId" />
+              <label for="task-label">Display label</label
+              ><input id="task-label" name="displayLabel" />
+              <label for="task-answer">Required answer</label
+              ><input id="task-answer" name="requiredAnswer" />
+              <label for="task-latitude">Latitude (optional)</label
+              ><input
+                id="task-latitude"
+                name="latitude"
+                type="number"
+                step="any"
+              />
+              <label for="task-longitude">Longitude (optional)</label
+              ><input
+                id="task-longitude"
+                name="longitude"
+                type="number"
+                step="any"
+              />
+              <button type="submit">Add task</button>
+            </fieldset>
+          </form>
+          <p role="status" data-testid="task-status">
+            Task creation awaiting implementation.
+          </p>
+        </section>
+      </div>
+      <section aria-labelledby="validation-heading">
+        <h2 id="validation-heading">Validation feedback</h2>
+        <ul data-testid="validation-errors" aria-live="polite"></ul>
+        <p>
+          Validation (#33) and server-side JSON persistence (#34) await
+          implementation.
+        </p>
+      </section>
+    </main>
+    <footer>Sprint 2 foundation · Features awaiting implementation</footer>
+    <script type="module" src="./js/foundation/bootstrap.js"></script>
+  </body>
+</html>

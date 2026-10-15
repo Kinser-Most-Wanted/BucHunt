@@ -12,7 +12,7 @@ test("shared foundation links to independent PBI workspaces", async ({
   await expect(page.getByTestId("task-form")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Create hunt" }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page.getByRole("link", { name: "Player tasks", exact: true }).click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "No tasks loaded.",

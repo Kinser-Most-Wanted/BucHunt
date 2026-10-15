@@ -9,7 +9,7 @@ Hunts and their Tasks are stored together in a private JSON configuration file. 
 - `data/hunts.schema.json` defines the Draft 2020-12 JSON Schema.
 - `src/ts/foundation/types.ts` supplies the corresponding TypeScript interfaces.
 
-Keep real answer-bearing configuration outside the publicly served `src/` directory. The application server enforces administrative token authorization and returns player-facing projections without `requiredAnswer` or private owner metadata. Do not expose the raw configuration through a public file endpoint.
+Keep real answer-bearing configuration outside the publicly served `src/` directory. The application server enforces hunt owner/contributor authorization and returns player-facing projections without `requiredAnswer` or private owner metadata. Do not expose the raw configuration through a public file endpoint.
 
 ## File metadata
 
@@ -91,9 +91,15 @@ pnpm build
 pnpm serve
 ```
 
-Open `http://127.0.0.1:3000/admin.html`. The loopback-only development token is `local-development-only`; enter it in **Administrator API token**. For shared environments set a private `ADMIN_TOKEN` of at least 16 characters. Binding to a non-loopback address requires an explicit token. Never put a real token in source control or in a URL. The token stays in the administration page's memory and is cleared on reload. Token authorization is a temporary administrative boundary, not the account/session authentication planned for #43.
+Open `http://127.0.0.1:3000/admin.html` (Hunt Studio). There is no administrator API token, no global administrator role, and no AWS access requirement for hunt creators. Anyone with a temporary creator profile can create a hunt. The server derives ownership from that profile and ignores client-supplied `ownerId` values. IDs, timestamps and draft status are generated on the server.
 
-Create a hunt, then add tasks using the automatically populated hunt ID. The server generates IDs, timestamps, the configured owner (`ADMIN_OWNER_ID`, default `sprint-admin`), and the initial draft status. It ignores a client-supplied owner identity. Use **Load existing hunt tasks** to retrieve stored definitions after a reload. Copy the hunt ID to the player page or follow the player link. Access codes remain unimplemented; this sprint's player selector uses the hunt ID.
+**My hunts** lists only hunts this profile owns or contributes to. Select a hunt to load its tasks; manual hunt-ID entry is no longer needed for editing. Creating a hunt selects it automatically. The public player link still includes the hunt ID; access-code joining is later work.
+
+Until Google sign-in is integrated, `GET /api/admin/session` automatically sets a random, HttpOnly, SameSite browser cookie. Its SHA-256 hash becomes a public `browser:<hash>` creator ID. Public IDs are safe to share and cannot be used as the private session cookie to impersonate their owners. This is a temporary browser identity, not an authenticated Google account. Clearing cookies, changing browser profiles, or moving devices loses access to that profile; no account recovery or linking is implemented yet. Google integration must verify identity on the server and explicitly link/migrate these IDs before replacing them.
+
+To collaborate, the contributor opens Hunt Studio and copies their creator ID. The hunt owner selects the hunt and adds that ID under **Contributors**. Contributors can retrieve the hunt's private configuration and add tasks. Only the owner can grant or remove contributor access. Grants are stored in private `hunt-contributors.json`, using `{ "schemaVersion": 1, "contributors": { "<hunt-id>": ["<creator-id>"] } }`. This keeps the existing version-1 hunt schema unchanged. The server enforces access on each request; hiding or altering controls in the browser cannot bypass it. Membership persists across application restarts and removal revokes subsequent access immediately.
+
+Legacy hunts created with the former shared token retain their existing owner IDs and their stored data. They are not automatically claimed by the first visitor. Records owned by `sprint-admin` require a controlled one-time reassignment to the intended creator's ID by the data operator; back up the JSON and stop the writer before doing so. Never distribute the origin secret as a means to claim a hunt.
 
 By default the server writes the real `data/hunts.json` file. Set `DATA_DIRECTORY` to use another private directory. Missing stores start empty on first save; malformed stores and unsupported schema versions fail without overwriting existing bytes. Every mutation validates the complete hunt, including all embedded tasks. Concurrent mutations in the single application process are queued. Each save writes an exclusive temporary file, synchronizes it, atomically renames it, and synchronizes the containing directory on POSIX. Windows synchronizes the file but does not support this directory sync operation. Failed writes return a failed operation rather than a successful response. Do not run multiple writers against the same files or place them on a filesystem without atomic rename semantics.
 
@@ -101,20 +107,25 @@ Player responses omit required answers and owner metadata. Correct answers updat
 
 ### HTTP operations
 
-| Method | Path                                         | Result                                               |
-| ------ | -------------------------------------------- | ---------------------------------------------------- |
-| GET    | `/api/health`                                | Application readiness response                       |
-| POST   | `/api/admin/hunts`                           | Validate and persist a new hunt                      |
-| GET    | `/api/admin/hunts/:id`                       | Retrieve private hunt/task configuration             |
-| POST   | `/api/admin/hunts/:id/tasks`                 | Validate and persist an embedded task                |
-| GET    | `/api/player/hunts/:id`                      | Public task projection and this browser's completion |
-| POST   | `/api/player/hunts/:id/tasks/:taskId/answer` | Validate an answer and persist completion            |
+| Method | Path                                           | Result                                               |
+| ------ | ---------------------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/admin/session`                           | Start or restore the temporary creator profile       |
+| GET    | `/api/admin/hunts`                             | List only owned or contributed hunts                 |
+| GET    | `/api/admin/hunts/:id/contributors`            | List contributors (owner only)                       |
+| POST   | `/api/admin/hunts/:id/contributors`            | Add a creator ID (owner only)                        |
+| DELETE | `/api/admin/hunts/:id/contributors/:creatorId` | Revoke contributor access (owner only)               |
+| GET    | `/api/health`                                  | Application readiness response                       |
+| POST   | `/api/admin/hunts`                             | Validate and persist a new hunt                      |
+| GET    | `/api/admin/hunts/:id`                         | Retrieve private hunt/task configuration             |
+| POST   | `/api/admin/hunts/:id/tasks`                   | Validate and persist an embedded task                |
+| GET    | `/api/player/hunts/:id`                        | Public task projection and this browser's completion |
+| POST   | `/api/player/hunts/:id/tasks/:taskId/answer`   | Validate an answer and persist completion            |
 
-Administrative requests require `Authorization: Bearer <token>`. JSON bodies are limited to 64 KiB. API responses use the shared `OperationResult` shape and disable caching. Failures distinguish validation (400), authorization (401/403), missing records/routes (404), and storage failure (500). Server failures include a request ID; structured error logs omit answers, credentials, and request bodies. Static file serving excludes server code and private JSON files.
+Creator requests use the automatic private cookie. Creating a hunt requires a creator session; reading a private hunt or adding a task additionally requires ownership or contributor membership. Only owners can manage contributor membership. There is no shared creator credential. JSON bodies are limited to 64 KiB. API responses use the shared `OperationResult` shape and disable caching. Failures distinguish validation (400), authorization (401/403), missing records/routes (404), and storage failure (500). Server failures include a request ID; structured error logs omit answers, credentials, and request bodies. Static file serving excludes server code and private JSON files.
 
 ### Deployment and verification
 
-The former S3-only deployment could not write a server-side JSON file. The revised stack keeps a private versioned S3 bucket for release archives and runs the Node application as an unprivileged systemd service on one Amazon Linux 2023 EC2 instance. CloudFront provides HTTPS, forwards API methods/cookies without caching, and sends a private origin token. The origin security group accepts port 3000 only from CloudFront's managed prefix list. Administrative/origin tokens are generated in Secrets Manager, loaded into a root-readable environment file, and never included in release archives. The deployment selects the namespaced `node-22` executable described in the [Amazon Linux documentation](https://docs.aws.amazon.com/linux/al2023/ug/nodejs.html).
+The former S3-only deployment could not write a server-side JSON file. The revised stack keeps a private versioned S3 bucket for release archives and runs the Node application as an unprivileged systemd service on one Amazon Linux 2023 EC2 instance. CloudFront provides HTTPS, forwards API methods/cookies without caching, and sends a private origin token. The origin security group accepts port 3000 only from CloudFront's managed prefix list. The private CloudFront origin token is generated in Secrets Manager, loaded into a root-readable environment file as `ORIGIN_TOKEN`, and never included in release archives. It protects the infrastructure origin only and grants no hunt ownership or editing privileges. The historical CloudFormation logical resource name `AdminSecret` is retained to avoid replacing the existing secret; its output is now named `OriginSecretArn`. Creators and browser tests do not read it. The deployment selects the namespaced `node-22` executable described in the [Amazon Linux documentation](https://docs.aws.amazon.com/linux/al2023/ug/nodejs.html).
 
 Runtime JSON is under `/var/lib/buchunt` on encrypted EBS, outside release directories. Application deployment replaces a code symlink and restarts systemd without replacing configuration. Application and instance restarts preserve data. **Instance replacement is a recovery operation:** the root volume is retained on termination, but a replacement instance does not automatically attach the old data. Snapshot/restore `/var/lib/buchunt` before replacing an instance or changing its AMI/network. Retained volumes continue to incur storage charges after a stack/PR environment is destroyed; the existing destroy workflow deletes the stack and artifact bucket, not retained volumes. Backups and old-release retention are operator responsibilities.
 
@@ -122,13 +133,11 @@ The deploy script accepts an existing public `VPC_ID` and `SUBNET_ID`, or discov
 
 ```sh
 bash deploy/deploy.sh bucstop-stage
-# Retrieve the administrator token with an authorized AWS identity:
-aws secretsmanager get-secret-value --secret-id <AdminSecretArn-stack-output> --query SecretString --output text
 ```
 
-The delivery workflow first requires build, lint, formatting, and all automated tests to pass. It then deploys and runs the actual administration/player browser workflow against the HTTPS output URL; any failure fails the delivery job. Deployment traces are disabled to avoid recording the administrative token. Verification creates a small dedicated test hunt in each deployed environment. No production data is used for tests. Tests use temporary stores locally and never overwrite tracked `data/hunts.json`.
+The delivery workflow first requires build, lint, formatting, and all automated tests to pass. It then deploys and runs the actual administration/player browser workflow against the HTTPS output URL; any failure fails the delivery job. Deployment traces remain disabled for privacy; no creator token retrieval is part of deployment verification. Verification creates a small dedicated test hunt in each deployed environment. No production data is used for tests. Tests use temporary stores locally and never overwrite tracked `data/hunts.json`.
 
-`pnpm test` covers definition validation, restart persistence, failed writes, corrupt stores, concurrent task saves, HTTP authorization, answer privacy, player isolation, navigation, and the create-hunt/add-task/reload/answer workflow. Before merging into `stage`, obtain the team's two peer reviews and confirm the deployment job passes. A locally passing build alone does not satisfy the Definition of Done.
+`pnpm test` covers definition validation, restart persistence, failed writes, corrupt stores, concurrent task saves, owner/contributor authorization, grant/revoke persistence, public-ID impersonation rejection, answer privacy, player isolation, navigation, and the create-hunt/add-task/reload/answer workflow. Before merging into `stage`, obtain the team's two peer reviews and confirm the deployment job passes. A locally passing build alone does not satisfy the Definition of Done.
 
 ### Review findings against requested issues
 

@@ -3,18 +3,16 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
-import { timingSafeEqual, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HuntStore, StoreError } from "./huntStore.js";
+import { HuntStore, StoreError, ContributorStore } from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 
 interface ServerOptions {
   dataDirectory?: string;
   staticDirectory?: string;
-  adminToken: string;
-  ownerId?: string;
   originToken?: string;
 }
 const mime: Record<string, string> = {
@@ -52,12 +50,13 @@ function json(response: ServerResponse, status: number, value: unknown): void {
   });
   response.end(JSON.stringify(value));
 }
-export function createApplication(options: ServerOptions) {
-  if (options.adminToken.length < 16)
-    throw new Error("ADMIN_TOKEN must contain at least 16 characters.");
+export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
   const hunts = new HuntStore(resolve(directory, "hunts.json"));
+  const contributors = new ContributorStore(
+    resolve(directory, "hunt-contributors.json"),
+  );
   const progress = new PlayerProgressStore(
     resolve(directory, "player-progress.json"),
   );
@@ -81,54 +80,141 @@ export function createApplication(options: ServerOptions) {
         return;
       }
       if (path.startsWith("/api/admin/")) {
-        const provided = Buffer.from(
-          request.headers.authorization?.replace(/^Bearer /, "") ?? "",
-        );
-        const expected = Buffer.from(options.adminToken);
-        if (
-          provided.length !== expected.length ||
-          !timingSafeEqual(provided, expected)
-        ) {
-          json(response, 401, {
-            ok: false,
-            code: "unauthorized",
-            message: "Enter a valid administrator API token.",
-          });
-          return;
-        }
-        // Browser writes must be same-origin. Tokens are never sent in URLs.
+        // Google identity will replace this temporary browser identity. The
+        // opaque cookie is private; its public hash can safely identify owners.
         const origin = request.headers.origin;
-        if (origin && new URL(origin).host !== request.headers.host) {
+        if (
+          request.headers["sec-fetch-site"] === "cross-site" ||
+          (origin && new URL(origin).host !== request.headers.host)
+        ) {
           json(response, 403, {
             ok: false,
             code: "unauthorized",
-            message: "Cross-origin writes are not allowed.",
+            message: "Cross-origin requests are not allowed.",
           });
           return;
         }
+        let secret = /(?:^|;\s*)buchunt-creator=([a-f0-9]{64})(?:;|$)/.exec(
+          request.headers.cookie ?? "",
+        )?.[1];
+        if (path === "/api/admin/session" && method === "GET") {
+          secret ??= randomBytes(32).toString("hex");
+          response.setHeader(
+            "Set-Cookie",
+            `buchunt-creator=${secret}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=31536000${request.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`,
+          );
+          json(response, 200, {
+            ok: true,
+            value: {
+              id:
+                "browser:" + createHash("sha256").update(secret).digest("hex"),
+              identityType: "temporary-browser",
+            },
+          });
+          return;
+        }
+        if (!secret) {
+          json(response, 401, {
+            ok: false,
+            code: "unauthorized",
+            message: "Open Hunt Studio to start your creator session.",
+          });
+          return;
+        }
+        const creatorId =
+          "browser:" + createHash("sha256").update(secret).digest("hex");
         if (path === "/api/admin/hunts" && method === "POST") {
           json(response, 201, {
             ok: true,
-            value: await hunts.create(
-              await body(request),
-              options.ownerId ?? "sprint-admin",
-            ),
+            value: await hunts.create(await body(request), creatorId),
           });
           return;
         }
-        const match = /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(\/tasks)?$/.exec(
-          path,
-        );
-        if (match && !match[2] && method === "GET") {
-          json(response, 200, { ok: true, value: await hunts.get(match[1]) });
-          return;
-        }
-        if (match && match[2] && method === "POST") {
-          json(response, 201, {
+        if (path === "/api/admin/hunts" && method === "GET") {
+          const membership = await contributors.all();
+          const accessible = (await hunts.list()).filter(
+            (hunt) =>
+              hunt.ownerId === creatorId ||
+              membership[hunt.id]?.includes(creatorId),
+          );
+          json(response, 200, {
             ok: true,
-            value: await hunts.addTask(match[1], await body(request)),
+            value: accessible.map((hunt) => ({
+              id: hunt.id,
+              name: hunt.name,
+              role: hunt.ownerId === creatorId ? "owner" : "contributor",
+            })),
           });
           return;
+        }
+        const match =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/(browser:[a-f0-9]{64}))?)?$/.exec(
+            path,
+          );
+        if (match) {
+          const hunt = await hunts.get(match[1]);
+          const owner = hunt.ownerId === creatorId;
+          if (
+            !owner &&
+            !(await contributors.members(hunt.id)).includes(creatorId)
+          ) {
+            json(response, 403, {
+              ok: false,
+              code: "unauthorized",
+              message:
+                "Only this hunt's owner and contributors can access its configuration.",
+            });
+            return;
+          }
+          if (!match[2] && method === "GET") {
+            json(response, 200, { ok: true, value: hunt });
+            return;
+          }
+          if (match[2] === "tasks" && !match[3] && method === "POST") {
+            json(response, 201, {
+              ok: true,
+              value: await hunts.addTask(hunt.id, await body(request)),
+            });
+            return;
+          }
+          if (match[2] === "contributors") {
+            if (!owner) {
+              json(response, 403, {
+                ok: false,
+                code: "unauthorized",
+                message: "Only the hunt owner can manage contributors.",
+              });
+              return;
+            }
+            if (method === "GET" && !match[3]) {
+              json(response, 200, {
+                ok: true,
+                value: await contributors.members(hunt.id),
+              });
+              return;
+            }
+            if (method === "POST" && !match[3]) {
+              const input = await body(request);
+              const id =
+                input && typeof input === "object"
+                  ? (input as Record<string, unknown>).creatorId
+                  : undefined;
+              await contributors.add(hunt.id, id);
+              json(response, 200, {
+                ok: true,
+                value: await contributors.members(hunt.id),
+              });
+              return;
+            }
+            if (method === "DELETE" && match[3]) {
+              await contributors.remove(hunt.id, match[3]);
+              json(response, 200, {
+                ok: true,
+                value: await contributors.members(hunt.id),
+              });
+              return;
+            }
+          }
         }
       }
       const match =
@@ -258,13 +344,8 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const host = process.env.HOST ?? "127.0.0.1";
-  const token =
-    process.env.ADMIN_TOKEN ??
-    (host === "127.0.0.1" ? "local-development-only" : "");
   const app = createApplication({
-    adminToken: token,
     dataDirectory: process.env.DATA_DIRECTORY,
-    ownerId: process.env.ADMIN_OWNER_ID,
     originToken: process.env.ORIGIN_TOKEN,
   });
   app.listen(Number(process.env.PORT ?? 3000), host, () =>

@@ -29,8 +29,6 @@ const task = {
   hint: null,
   points: 0,
 };
-const token = "test-administrator-token";
-
 test("JSON survives fresh storage instances; concurrent updates preserve every task", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-store-"));
   try {
@@ -98,9 +96,9 @@ test("corrupt or unsupported stores are preserved and write failures reject", as
   }
 });
 
-test("HTTP authorization, validation, private projections, progress and server restart", async () => {
+test("creator ownership, contributor grants, privacy and restart persistence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-api-"));
-  let app = createApplication({ adminToken: token, dataDirectory: directory });
+  let app = createApplication({ dataDirectory: directory });
   async function start() {
     await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
     return `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
@@ -111,16 +109,36 @@ test("HTTP authorization, validation, private projections, progress and server r
     );
   }
   let base = await start();
-  const admin = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  async function identity() {
+    const response = await fetch(base + "/api/admin/session");
+    return {
+      id: (await response.json()).value.id as string,
+      cookie: response.headers.get("set-cookie")!.split(";")[0],
+    };
+  }
   try {
+    const crossSite = await fetch(base + "/api/admin/session", {
+      headers: { "Sec-Fetch-Site": "cross-site" },
+    });
+    expect(crossSite.status).toBe(403);
+    expect(crossSite.headers.get("set-cookie")).toBeNull();
+    const owner = await identity();
+    const collaborator = await identity();
+    const stranger = await identity();
+    const headers = (cookie: string) => ({
+      Cookie: cookie,
+      "Content-Type": "application/json",
+    });
+    const admin = headers(owner.cookie);
+    expect(owner.id).not.toBe(owner.cookie.split("=")[1]);
     expect(
       (
         await fetch(base + "/api/admin/hunts", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer local-development-only",
+          },
           body: JSON.stringify(input),
         })
       ).status,
@@ -159,17 +177,95 @@ test("HTTP authorization, validation, private projections, progress and server r
         body: JSON.stringify(input),
       })
     ).json();
+    expect(created.ok).toBe(true);
+    expect(created.value.ownerId).toBe(owner.id);
     const id = created.value.id;
+    const route = `/api/admin/hunts/${id}`;
     const saved = await (
-      await fetch(base + `/api/admin/hunts/${id}/tasks`, {
+      await fetch(base + route + "/tasks", {
         method: "POST",
         headers: admin,
         body: JSON.stringify(task),
       })
     ).json();
     expect(saved.ok).toBe(true);
+    for (const cookie of [
+      stranger.cookie,
+      collaborator.cookie,
+      "buchunt-creator=" + owner.id.slice(8),
+    ]) {
+      expect(
+        (await fetch(base + route, { headers: headers(cookie) })).status,
+      ).toBe(403);
+      expect(
+        (
+          await fetch(base + route + "/tasks", {
+            method: "POST",
+            headers: headers(cookie),
+            body: JSON.stringify({ ...task, order: 2 }),
+          })
+        ).status,
+      ).toBe(403);
+    }
+    expect(
+      (
+        await (
+          await fetch(base + "/api/admin/hunts", {
+            headers: headers(stranger.cookie),
+          })
+        ).json()
+      ).value,
+    ).toEqual([]);
+    expect(
+      (
+        await fetch(base + route + "/contributors", {
+          method: "POST",
+          headers: admin,
+          body: JSON.stringify({ creatorId: "not-an-id" }),
+        })
+      ).status,
+    ).toBe(400);
+    const grant = await (
+      await fetch(base + route + "/contributors", {
+        method: "POST",
+        headers: admin,
+        body: JSON.stringify({ creatorId: collaborator.id }),
+      })
+    ).json();
+    expect(grant.value).toEqual([collaborator.id]);
+    expect(
+      (await fetch(base + route, { headers: headers(collaborator.cookie) }))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await (
+          await fetch(base + "/api/admin/hunts", {
+            headers: headers(collaborator.cookie),
+          })
+        ).json()
+      ).value,
+    ).toEqual([{ id, name: input.name, role: "contributor" }]);
+    expect(
+      (
+        await fetch(base + route + "/tasks", {
+          method: "POST",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ ...task, order: 2 }),
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await fetch(base + route + "/contributors", {
+          method: "POST",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ creatorId: stranger.id }),
+        })
+      ).status,
+    ).toBe(403);
     const player = await fetch(base + `/api/player/hunts/${id}`);
-    const cookie = player.headers.get("set-cookie")!.split(";")[0];
+    const playerCookie = player.headers.get("set-cookie")!.split(";")[0];
     const projection = await player.json();
     expect(projection.value.tasks[0].completed).toBe(false);
     expect(JSON.stringify(projection)).not.toContain("Bucky");
@@ -179,7 +275,7 @@ test("HTTP authorization, validation, private projections, progress and server r
       (
         await fetch(base + answerPath, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Cookie: cookie },
+          headers: headers(playerCookie),
           body: '{"answer":"wrong"}',
         })
       ).status,
@@ -188,41 +284,91 @@ test("HTTP authorization, validation, private projections, progress and server r
       (
         await fetch(base + answerPath, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Cookie: cookie },
+          headers: headers(playerCookie),
           body: '{"answer":"bucky"}',
         })
       ).status,
     ).toBe(200);
-    expect((await fetch(base + "/data/hunts.json")).status).toBe(404);
-    expect((await fetch(base + "/js/server/server.js")).status).toBe(404);
-    expect((await fetch(base + "/api/player/hunts/missing")).status).toBe(404);
+    for (const path of [
+      "/data/hunts.json",
+      "/data/hunt-contributors.json",
+      "/js/server/server.js",
+    ])
+      expect((await fetch(base + path)).status).toBe(404);
     await stop();
-    app = createApplication({ adminToken: token, dataDirectory: directory });
+    app = createApplication({ dataDirectory: directory });
     base = await start();
-    const restored = await (
-      await fetch(base + `/api/player/hunts/${id}`, {
-        headers: { Cookie: cookie },
-      })
-    ).json();
-    expect(restored.value.tasks[0].completed).toBe(true);
-    const adminHunt = await (
-      await fetch(base + `/api/admin/hunts/${id}`, { headers: admin })
-    ).json();
-    expect(adminHunt.value.tasks[0].requiredAnswer).toBe("Bucky");
+    expect(
+      (
+        await (
+          await fetch(base + `/api/player/hunts/${id}`, {
+            headers: headers(playerCookie),
+          })
+        ).json()
+      ).value.tasks[0].completed,
+    ).toBe(true);
+    expect(
+      (await fetch(base + route, { headers: headers(collaborator.cookie) }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await (await fetch(base + route, { headers: admin })).json()).value
+        .ownerId,
+    ).toBe(owner.id);
+    expect(
+      (
+        await fetch(
+          base + route + "/contributors/" + encodeURIComponent(collaborator.id),
+          { method: "DELETE", headers: admin },
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (await fetch(base + route, { headers: headers(collaborator.cookie) }))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await (
+          await fetch(base + "/api/admin/hunts", {
+            headers: headers(collaborator.cookie),
+          })
+        ).json()
+      ).value,
+    ).toEqual([]);
+    expect((await fetch(base + route, { headers: admin })).status).toBe(200);
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test("saved hunt configuration survives terminating and starting the Node process", async () => {
+test("origin protection is infrastructure-only and needs no creator API token", async () => {
+  const app = createApplication({ originToken: "private-origin" });
+  await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  try {
+    expect((await fetch(base + "/api/admin/session")).status).toBe(403);
+    expect(
+      (
+        await fetch(base + "/api/admin/session", {
+          headers: { "x-origin-token": "private-origin" },
+        })
+      ).status,
+    ).toBe(200);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+  }
+});
+
+test("ownership and contributor grants survive terminating the Node process", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-process-"));
   let child: ChildProcess | undefined;
   async function start(): Promise<string> {
     const moduleUrl = pathToFileURL(resolve("src/js/server/server.js")).href;
-    const script = `import {createApplication} from ${JSON.stringify(moduleUrl)}; const app = createApplication({adminToken:process.env.ADMIN_TOKEN, dataDirectory:process.env.DATA_DIRECTORY}); app.listen(0, '127.0.0.1', () => process.send(app.address().port));`;
+    const script = `import {createApplication} from ${JSON.stringify(moduleUrl)}; const app=createApplication({dataDirectory:process.env.DATA_DIRECTORY}); app.listen(0,'127.0.0.1',()=>process.send(app.address().port));`;
     child = spawn(process.execPath, ["--input-type=module", "-e", script], {
-      env: { ...process.env, DATA_DIRECTORY: directory, ADMIN_TOKEN: token },
+      env: { ...process.env, DATA_DIRECTORY: directory },
       stdio: ["ignore", "ignore", "inherit", "ipc"],
     });
     const [port] = await once(child, "message");
@@ -237,10 +383,9 @@ test("saved hunt configuration survives terminating and starting the Node proces
   }
   try {
     let base = await start();
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
+    const identity = await fetch(base + "/api/admin/session");
+    const cookie = identity.headers.get("set-cookie")!.split(";")[0];
+    const headers = { Cookie: cookie, "Content-Type": "application/json" };
     const saved = await (
       await fetch(base + "/api/admin/hunts", {
         method: "POST",
@@ -248,13 +393,28 @@ test("saved hunt configuration survives terminating and starting the Node proces
         body: JSON.stringify(input),
       })
     ).json();
-    expect(saved.ok).toBe(true);
+    const collaborator = "browser:" + "a".repeat(64);
+    await fetch(base + `/api/admin/hunts/${saved.value.id}/contributors`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ creatorId: collaborator }),
+    });
     await stop();
     base = await start();
     const loaded = await (
       await fetch(base + `/api/admin/hunts/${saved.value.id}`, { headers })
     ).json();
     expect(loaded.value).toEqual(saved.value);
+    expect(
+      (
+        await (
+          await fetch(
+            base + `/api/admin/hunts/${saved.value.id}/contributors`,
+            { headers },
+          )
+        ).json()
+      ).value,
+    ).toEqual([collaborator]);
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });

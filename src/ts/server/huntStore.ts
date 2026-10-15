@@ -154,6 +154,9 @@ export class HuntStore {
       return hunt;
     });
   }
+  async list(): Promise<HuntDefinition[]> {
+    return (await this.file.get()).hunts;
+  }
   async get(id: string): Promise<HuntDefinition> {
     const hunt = (await this.file.get()).hunts.find((item) => item.id === id);
     if (!hunt) throw new StoreError("not-found", "Hunt not found.");
@@ -180,6 +183,77 @@ export class HuntStore {
       accepted(validateHunt(hunt));
       hunt.tasks.sort((left, right) => left.order - right.order);
       return task;
+    });
+  }
+}
+
+interface ContributorFile {
+  schemaVersion: 1;
+  contributors: Record<string, string[]>;
+}
+function contributorFile(value: unknown): ContributorFile {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Invalid contributor configuration");
+  const data = value as ContributorFile;
+  if (
+    data.schemaVersion !== 1 ||
+    !data.contributors ||
+    typeof data.contributors !== "object" ||
+    Array.isArray(data.contributors)
+  )
+    throw new Error("Invalid contributor configuration");
+  for (const [huntId, members] of Object.entries(data.contributors)) {
+    if (
+      !/^[a-zA-Z0-9-]+$/.test(huntId) ||
+      !Array.isArray(members) ||
+      members.some(
+        (id) => typeof id !== "string" || !/^browser:[a-f0-9]{64}$/.test(id),
+      )
+    )
+      throw new Error("Invalid contributor configuration");
+  }
+  return data;
+}
+// Keep membership separate so existing version-1 hunt definitions remain valid.
+// Future account integration must explicitly map these temporary creator IDs.
+export class ContributorStore {
+  private file: JsonFile<ContributorFile>;
+  constructor(path: string) {
+    this.file = new JsonFile(
+      path,
+      () => ({ schemaVersion: 1, contributors: {} }),
+      contributorFile,
+    );
+  }
+  async all(): Promise<Record<string, string[]>> {
+    return (await this.file.get()).contributors;
+  }
+  async members(huntId: string): Promise<string[]> {
+    const all = await this.all();
+    return Object.hasOwn(all, huntId) ? all[huntId] : [];
+  }
+  async add(huntId: string, creatorId: unknown): Promise<void> {
+    if (
+      typeof creatorId !== "string" ||
+      !/^browser:[a-f0-9]{64}$/.test(creatorId)
+    )
+      throw new StoreError(
+        "validation",
+        "Enter the contributor's creator ID from their Hunt Studio page.",
+      );
+    await this.file.update((data) => {
+      if (!Object.hasOwn(data.contributors, huntId))
+        data.contributors[huntId] = [];
+      if (!data.contributors[huntId].includes(creatorId))
+        data.contributors[huntId].push(creatorId);
+    });
+  }
+  async remove(huntId: string, creatorId: string): Promise<void> {
+    await this.file.update((data) => {
+      if (Object.hasOwn(data.contributors, huntId))
+        data.contributors[huntId] = data.contributors[huntId].filter(
+          (id) => id !== creatorId,
+        );
     });
   }
 }

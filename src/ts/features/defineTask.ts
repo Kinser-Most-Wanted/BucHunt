@@ -60,7 +60,8 @@ export function mountDefineTask(
     showIssues(root, []);
     const order = field<HTMLInputElement>(form, "order");
     if (order) order.value = "1";
-    status.textContent = "New hunt selected. Add its first task.";
+    status.textContent =
+      "Hunt selection updated. Add a task or load its saved tasks.";
   });
 
   root
@@ -68,7 +69,7 @@ export function mountDefineTask(
     ?.addEventListener("click", async () => {
       const id = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
       if (!id) {
-        status.textContent = "Enter a hunt ID first.";
+        status.textContent = "Choose a hunt from My hunts first.";
         return;
       }
       try {

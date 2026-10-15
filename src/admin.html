@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Administration | BucHunt</title>
+    <title>Hunt Studio | BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
   <body>
     <header>
       <a class="brand" href="./index.html">BucHunt</a>
       <nav aria-label="Main navigation">
-        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
+        <a href="./index.html">Home</a><a href="./admin.html">Hunt Studio</a
         ><a href="./player.html">Player tasks</a>
       </nav>
     </header>
@@ -27,14 +27,47 @@
         Task details are submitted through the hunt service. A task is shown as
         saved only after the service confirms it.
       </p>
-      <section class="access-panel">
-        <h2>Administrator access</h2>
-        <label for="admin-api-token">Administrator API token</label>
-        <input id="admin-api-token" type="password" autocomplete="off" />
+      <section class="access-panel" aria-labelledby="creator-heading">
+        <h2 id="creator-heading">Your creator profile</h2>
         <p>
-          The administrator provides this token. It stays on this page and is
-          required to create hunts or retrieve private task configuration.
+          No administrator token is needed. This temporary profile belongs to
+          this browser. Google sign-in will be added later; clearing cookies
+          loses access to this profile.
         </p>
+        <p>
+          Your creator ID:
+          <code data-testid="creator-id" style="overflow-wrap: anywhere"
+            >Starting your profile…</code
+          >
+        </p>
+        <button type="button" data-testid="copy-creator-id">
+          Copy creator ID
+        </button>
+        <p class="field-help">
+          Share your creator ID with a hunt owner if you want to contribute.
+        </p>
+        <h3>My hunts</h3>
+        <button type="button" data-testid="refresh-my-hunts">
+          Refresh my hunts
+        </button>
+        <p role="status" data-testid="creator-status"></p>
+        <ul data-testid="my-hunts" aria-label="My hunts"></ul>
+      </section>
+      <section data-testid="contributors-panel" hidden>
+        <h2>Contributors</h2>
+        <p>
+          As the owner, you can let another creator manage this hunt's tasks.
+        </p>
+        <form data-testid="contributor-form">
+          <label for="contributor-id">Contributor creator ID</label
+          ><input id="contributor-id" name="creatorId" required /><button
+            type="submit"
+          >
+            Add contributor
+          </button>
+        </form>
+        <p role="status" data-testid="contributor-status"></p>
+        <ul data-testid="contributor-list" aria-label="Hunt contributors"></ul>
       </section>
       <section
         id="create-hunt"
@@ -49,8 +82,8 @@
           </div>
         </div>
         <p class="section-copy">
-          Create a hunt first, then use its ID below to attach tasks. The hunt
-          creation flow saves to the server.
+          Create a hunt and add its tasks below. Return to My hunts whenever you
+          want to continue.
         </p>
         <form data-testid="hunt-form">
           <fieldset>
@@ -96,8 +129,7 @@
           </div>
         </div>
         <p class="section-copy">
-          Add a task to an existing hunt. The hunt ID ties the task and its
-          location to the correct participant journey.
+          Choose a hunt from My hunts, then add its tasks here.
         </p>
         <form data-testid="task-form">
           <button type="button" data-testid="load-admin-hunt">
@@ -112,10 +144,11 @@
               autocomplete="off"
               required
               aria-describedby="hunt-id-help"
-              placeholder="Paste the ID of the hunt"
+              readonly
+              placeholder="Select a hunt from My hunts"
             />
             <span id="hunt-id-help" class="field-help">
-              Use the ID returned by the hunt creation service.
+              Automatically set when you create or select a hunt.
             </span>
             <div class="field-grid">
               <div>

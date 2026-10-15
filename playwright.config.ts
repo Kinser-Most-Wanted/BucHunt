@@ -19,7 +19,6 @@ export default defineConfig({
           reuseExistingServer: false,
           env: {
             DATA_DIRECTORY: mkdtempSync(join(tmpdir(), "buchunt-e2e-")),
-            ADMIN_TOKEN: process.env.ADMIN_TOKEN ?? "local-development-only",
           },
         },
       }),

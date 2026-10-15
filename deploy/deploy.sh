@@ -20,7 +20,7 @@ aws cloudformation deploy --stack-name "$STACK_NAME" --template-file "$SCRIPT_DI
 output() { aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 BUCKET="$(output BucketName)"
 INSTANCE="$(output InstanceId)"
-SECRET="$(output AdminSecretArn)"
+SECRET="$(output OriginSecretArn)"
 SITE_URL="$(output SiteUrl)"
 DISTRIBUTION="$(output DistributionId)"
 RELEASE="$(date -u +%Y%m%d%H%M%S)-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD)"
@@ -54,7 +54,7 @@ mkdir src
 mv index.html admin.html player.html css js src/
 TOKEN=$(aws secretsmanager get-secret-value --secret-id {secret} --query SecretString --output text)
 umask 077
-printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nADMIN_TOKEN=%s\\nORIGIN_TOKEN=%s\\n' "$TOKEN" "$TOKEN" > /etc/buchunt.env
+printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\n' "$TOKEN" > /etc/buchunt.env
 ln -sfn /opt/buchunt/releases/{release} /opt/buchunt/next
 mv -Tf /opt/buchunt/next /opt/buchunt/current
 systemctl restart buchunt
@@ -77,6 +77,6 @@ INVALIDATION="$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUT
 aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$INVALIDATION"
 curl --fail --retry 12 --retry-all-errors --retry-delay 5 "$SITE_URL/api/health"
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-  printf 'site_url=%s\nadmin_secret_arn=%s\n' "$SITE_URL" "$SECRET" >> "$GITHUB_OUTPUT"
+  printf 'site_url=%s\n' "$SITE_URL" >> "$GITHUB_OUTPUT"
 fi
 printf '\nSite URL: %s\n' "$SITE_URL"

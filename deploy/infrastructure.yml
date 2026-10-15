@@ -28,7 +28,7 @@ Resources:
   AdminSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Description: BucHunt administrator and private origin token
+      Description: Private CloudFront origin token; never a hunt creator credential
       GenerateSecretString:
         PasswordLength: 48
         ExcludePunctuation: true
@@ -160,7 +160,7 @@ Outputs:
     Value: !Ref WebsiteBucket
   InstanceId:
     Value: !Ref ApplicationInstance
-  AdminSecretArn:
+  OriginSecretArn:
     Value: !Ref AdminSecret
   DistributionId:
     Value: !Ref CloudFrontDistribution

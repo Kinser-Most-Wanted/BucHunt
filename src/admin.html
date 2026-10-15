@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="same-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+    <title>BucHunt Administration</title>
+    <script type="module" src="./js/admin.js"></script>
+</head>
+<body>
+    <main>
+        <h1>BucHunt Administration</h1>
+        <form id="admin-login">
+            <p><label for="username">Username</label> <input id="username" name="username" autocomplete="username" maxlength="128" required></p>
+            <p><label for="password">Password</label> <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required></p>
+            <button id="sign-in" type="submit">Sign in</button>
+        </form>
+        <p id="admin-status" role="status" aria-live="polite">Checking session…</p>
+        <section id="admin-panel" hidden>
+            <h2>Administrative access</h2>
+            <p id="admin-identity"></p>
+            <p>Your administrative session is active. Hunt and task management will appear here when those capabilities are implemented.</p>
+            <button id="sign-out" type="button">Sign out of all sessions</button>
+        </section>
+    </main>
+</body>
+</html>

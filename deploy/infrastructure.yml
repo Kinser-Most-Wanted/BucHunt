@@ -5,8 +5,129 @@ Parameters:
   EnvironmentName:
     Type: String
     Default: production
+  AdminCodeBucket:
+    Type: String
+    Description: Private S3 bucket containing the compiled administrative Lambda ZIP
+  AdminCodeKey:
+    Type: String
+    Description: Immutable S3 object key for the administrative Lambda ZIP
 
 Resources:
+
+  AdminUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 14
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref AdminUserPool
+      GroupName: Administrators
+
+  AdminClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref AdminUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  AdminApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-admin'
+      ProtocolType: HTTP
+
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  AdminFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: admin.handler
+      Role: !GetAtt AdminRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Code:
+        S3Bucket: !Ref AdminCodeBucket
+        S3Key: !Ref AdminCodeKey
+      Environment:
+        Variables:
+          ADMIN_POOL_ID: !Ref AdminUserPool
+          ADMIN_CLIENT_ID: !Ref AdminClient
+          ADMIN_ORIGIN: !Sub 'https://${CloudFrontDistribution.DomainName}'
+
+  AdminIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref AdminApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt AdminFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  AdminRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/admin/{proxy+}
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+
+  AdminRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/admin
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+
+  AdminStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref AdminApi
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+
+  AdminInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/admin*'
 
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -43,6 +164,11 @@ Resources:
         DefaultRootObject: index.html
 
         Origins:
+          - Id: AdminApiOrigin
+            DomainName: !Sub '${AdminApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
           - Id: S3Origin
             DomainName: !GetAtt WebsiteBucket.RegionalDomainName
             S3OriginConfig:
@@ -66,15 +192,16 @@ Resources:
             QueryString: true
 
         PriceClass: PriceClass_100
-
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
+        CacheBehaviors:
+          - PathPattern: /api/admin*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # AWS managed CachingDisabled and AllViewerExceptHostHeader policies.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
 
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -95,6 +222,14 @@ Resources:
                 AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
 
 Outputs:
+
+  AdminUserPoolId:
+    Description: User pool for administrator provisioning
+    Value: !Ref AdminUserPool
+
+  AdminUrl:
+    Description: Administrative sign-in page
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/admin.html'
 
   BucketName:
     Description: S3 bucket containing the BucHunt website

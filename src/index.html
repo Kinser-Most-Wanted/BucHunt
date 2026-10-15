@@ -1,12 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BucHunt</title>
-</head>
-<body>
-    <h1>BucHunt is deployed!</h1>
-    <p>AWS S3 + CloudFront deployment is working.</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home | BucHunt</title>
+    <link rel="stylesheet" href="./css/foundation.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./index.html">BucHunt</a>
+      <nav aria-label="Main navigation">
+        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
+        ><a href="./player.html">Player tasks</a>
+      </nav>
+    </header>
+    <main>
+      <h1>BucHunt</h1>
+      <p class="notice">
+        Shared Sprint 2 foundation. Forms, authentication, and JSON storage are
+        not implemented.
+      </p>
+      <div class="grid">
+        <section>
+          <h2>Configure a hunt</h2>
+          <p>Administrative access, hunt creation, and task definitions.</p>
+          <a class="action" href="./admin.html">Open administration</a>
+        </section>
+        <section>
+          <h2>View hunt tasks</h2>
+          <p>A separate workspace for the player task list.</p>
+          <a class="action" href="./player.html">Open player view</a>
+        </section>
+      </div>
+    </main>
+    <footer>Sprint 2 foundation · Features awaiting implementation</footer>
+    <script type="module" src="./js/foundation/bootstrap.js"></script>
+  </body>
 </html>

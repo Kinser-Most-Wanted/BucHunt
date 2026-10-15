@@ -1,17 +1,18 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: BucHunt static website infrastructure
-
+AWSTemplateFormatVersion: "2010-09-09"
+Description: BucHunt HTTPS application with a single durable JSON writer
 Parameters:
-  EnvironmentName:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  CloudFrontPrefixListId:
     Type: String
-    Default: production
-
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
 Resources:
-
   WebsiteBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
     Properties:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -24,86 +25,146 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
-
-  CloudFrontOriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
     Properties:
-      OriginAccessControlConfig:
-        Name: !Sub '${AWS::StackName}-OAC'
-        Description: Access control for BucHunt S3 bucket
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
+      Description: Private CloudFront origin token; never a hunt creator credential
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
+  ApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ReadApplicationArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${WebsiteBucket.Arn}/releases/*"
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref AdminSecret
+  ApplicationProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref ApplicationRole]
+  ApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Only CloudFront can connect to the application origin
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+  ApplicationInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref ApplicationProfile
+      MetadataOptions:
+        HttpTokens: required
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref ApplicationSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 12
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-json-server"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -euo pipefail
+          dnf install -y nodejs22
+          useradd --system --home-dir /opt/buchunt buchunt
+          install -d -o buchunt -g buchunt -m 700 /var/lib/buchunt
+          install -d -o root -g root -m 755 /opt/buchunt/releases
+          cat > /etc/systemd/system/buchunt.service <<'SERVICE'
+          [Unit]
+          Description=BucHunt JSON application
+          After=network-online.target
+          Wants=network-online.target
+          [Service]
+          User=buchunt
+          Group=buchunt
+          WorkingDirectory=/opt/buchunt/current
+          EnvironmentFile=/etc/buchunt.env
+          ExecStart=/usr/bin/node-22 src/js/server/server.js
+          Restart=on-failure
+          NoNewPrivileges=true
+          ProtectSystem=strict
+          ProtectHome=true
+          PrivateTmp=true
+          ReadWritePaths=/var/lib/buchunt
+          UMask=0077
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+          systemctl daemon-reload
+          systemctl enable buchunt
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
-
         Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
-            S3OriginConfig:
-              OriginAccessIdentity: ''
-            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
-
+          - Id: ApplicationOrigin
+            DomainName: !GetAtt ApplicationInstance.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 3000
+              OriginProtocolPolicy: http-only
+            OriginCustomHeaders:
+              - HeaderName: X-Forwarded-Proto
+                HeaderValue: https
+              - HeaderName: X-Origin-Token
+                HeaderValue: !Sub "{{resolve:secretsmanager:${AdminSecret}:SecretString}}"
         DefaultCacheBehavior:
-          TargetOriginId: S3Origin
+          TargetOriginId: ApplicationOrigin
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
-
-          AllowedMethods:
-            - GET
-            - HEAD
-
-          CachedMethods:
-            - GET
-            - HEAD
-
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          MinTTL: 0
+          DefaultTTL: 0
+          MaxTTL: 0
           ForwardedValues:
             QueryString: true
-
+            Headers: ["*"]
+            Cookies:
+              Forward: all
         PriceClass: PriceClass_100
-
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-
-  BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowCloudFrontRead
-            Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Action:
-              - s3:GetObject
-            Resource: !Sub '${WebsiteBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
-
 Outputs:
-
   BucketName:
-    Description: S3 bucket containing the BucHunt website
     Value: !Ref WebsiteBucket
-
+  InstanceId:
+    Value: !Ref ApplicationInstance
+  OriginSecretArn:
+    Value: !Ref AdminSecret
   DistributionId:
-    Description: CloudFront distribution ID
     Value: !Ref CloudFrontDistribution
-
   SiteUrl:
-    Description: CloudFront website URL
-    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+  DataRecovery:
+    Value: Root EBS volume is retained on termination; snapshot and restore it before replacing the instance.

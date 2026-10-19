@@ -10,6 +10,13 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
     Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", {
       value: "test-client-id",
     });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (value: string) =>
+          sessionStorage.setItem("test-copied-value", value),
+      },
+    });
     const claims = btoa(
       JSON.stringify({
         email: "player@example.com",
@@ -87,15 +94,27 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await page.getByRole("button", { name: "Save name and continue" }).click();
 
   await expect(page.getByTestId("player-account")).toHaveText("Signed in as Baja");
-  await expect(page.getByTestId("player-email")).toHaveText(
-    "Google account: player@example.com",
-  );
+  await expect(page.getByTestId("player-google-email")).toBeVisible();
+  await expect(page.getByTestId("player-email")).toBeHidden();
+  await expect(page.getByTestId("copy-email")).toBeHidden();
+  await page.getByTestId("email-toggle").click();
+  await expect(page.getByTestId("player-email")).toHaveText("player@example.com");
+  await expect(page.getByTestId("copy-email")).toBeVisible();
+  await page.getByTestId("copy-email").click();
+  await expect.poll(() =>
+    page.evaluate(() => sessionStorage.getItem("test-copied-value")),
+  ).toBe("player@example.com");
   await expect(page.getByTestId("account-id-value")).toBeHidden();
   await expect(page.getByTestId("account-id-toggle")).toHaveText(
     "Show Google account ID",
   );
   await page.getByTestId("account-id-toggle").click();
   await expect(page.getByTestId("account-id-value")).toHaveText("google-account-123");
+  await expect(page.getByTestId("copy-account-id")).toBeVisible();
+  await page.getByTestId("copy-account-id").click();
+  await expect.poll(() =>
+    page.evaluate(() => sessionStorage.getItem("test-copied-value")),
+  ).toBe("google-account-123");
   await page.getByTestId("account-id-toggle").click();
   await expect(page.getByTestId("account-id-value")).toBeHidden();
   await expect(page.getByTestId("google-sign-in-host")).toBeHidden();

@@ -14,6 +14,8 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
       JSON.stringify({
         email: "player@example.com",
         email_verified: true,
+        sub: "google-account-123",
+        aud: "test-client-id",
       }),
     )
       .replace(/=/g, "")
@@ -31,14 +33,8 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
             }) {
               callback = options.callback;
             },
-            renderButton(element: HTMLElement) {
-              const button = document.createElement("button");
-              button.type = "button";
-              button.textContent = "Sign in with Google";
-              button.addEventListener("click", () => {
-                callback?.({ credential: `header.${claims}.signature` });
-              });
-              element.append(button);
+            prompt() {
+              callback?.({ credential: `header.${claims}.signature` });
             },
             disableAutoSelect() {},
           },
@@ -78,7 +74,7 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await page.getByRole("button", { name: "Sign in with Google" }).click();
 
   await expect(page.getByTestId("player-account")).toHaveText(
-    "Signed in as player@example.com with Google.",
+    "Signed in as player@example.com with Google. Account ID: google-account-123.",
   );
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "1 active Hunt available.",
@@ -99,7 +95,7 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
 
   await page.getByTestId("player-sign-out").click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
-    "Sign in with Google to see your active Hunts.",
+    "Choose a provider to sign in and see your active Hunts.",
   );
 });
 
@@ -107,8 +103,112 @@ test("shows why Google sign-in is unavailable until configured", async ({
   page,
 }) => {
   await page.goto("/player.html");
+  await expect(page.getByTestId("google-sign-in")).toBeVisible();
+  await expect(page.getByTestId("microsoft-sign-in")).toBeVisible();
+  await expect(page.getByTestId("player-sign-out")).toBeHidden();
+  await page.getByTestId("google-sign-in").click();
   await expect(page.getByTestId("player-provider-status")).toHaveText(
-    "Google Sign-In needs an OAuth client ID before players can sign in.",
+    "Google sign-in needs a Google OAuth client ID. Microsoft sign-in is available below when configured.",
   );
+  await page.getByTestId("microsoft-sign-in").click();
+  await expect(page.getByTestId("player-provider-status")).toHaveText(
+    "Microsoft sign-in needs a Microsoft Entra application client ID.",
+  );
+});
+
+test("Microsoft popup returns the account ID and keeps both sign-in options visible", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "BUCHUNT_MICROSOFT_CLIENT_ID", {
+      value: "microsoft-client-id",
+    });
+    Object.defineProperty(window, "open", {
+      configurable: true,
+      value: () => {
+        const location = {};
+        Object.defineProperty(location, "href", {
+          set(url: string) {
+            sessionStorage.setItem("test-microsoft-url", url);
+          },
+        });
+        return { location };
+      },
+    });
+  });
+  await page.route("**/api/player/hunts**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    }),
+  );
+
+  await page.goto("/player.html");
+  await page.getByTestId("microsoft-sign-in").click();
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem("test-microsoft-url")))
+    .not.toBeNull();
+  const authorizeUrl = await page.evaluate(
+    () => sessionStorage.getItem("test-microsoft-url") ?? "",
+  );
+  const flow = await page.evaluate((url) => {
+    const authorize = new URL(url);
+    return {
+      state: authorize.searchParams.get("state"),
+      nonce: authorize.searchParams.get("nonce"),
+      challengeMethod: authorize.searchParams.get("code_challenge_method"),
+      responseType: authorize.searchParams.get("response_type"),
+    };
+  }, authorizeUrl);
+  expect(flow.challengeMethod).toBe("S256");
+  expect(flow.responseType).toBe("code");
+  const credential = await page.evaluate((nonce) => {
+    const claims = btoa(
+      JSON.stringify({
+        aud: "microsoft-client-id",
+        nonce,
+        email: "microsoft@example.com",
+        oid: "microsoft-object-id",
+        tid: "microsoft-tenant-id",
+      }),
+    )
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+    return `header.${claims}.signature`;
+  }, flow.nonce);
+  await page.route(
+    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    async (route) => {
+      expect(route.request().postData()).toContain("grant_type=authorization_code");
+      expect(route.request().postData()).toContain("code_verifier=");
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ id_token: credential }),
+      });
+    },
+  );
+  await page.evaluate(
+    ({ state, credential }) => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          data: {
+            type: "buchunt-microsoft-login",
+            state,
+            authorizationCode: "test-authorization-code",
+          },
+        }),
+      );
+    },
+    { state: flow.state, credential },
+  );
+
+  await expect(page.getByTestId("player-account")).toHaveText(
+    "Signed in as microsoft@example.com with Microsoft. Account ID: microsoft-tenant-id:microsoft-object-id.",
+  );
+  await expect(page.getByTestId("google-sign-in")).toBeVisible();
+  await expect(page.getByTestId("microsoft-sign-in")).toBeVisible();
+  await expect(page.getByTestId("player-sign-out")).toBeVisible();
 });
 

@@ -30,9 +30,11 @@
         <h2>Sign in to see active Hunts</h2>
         <p data-testid="player-account" hidden></p>
         <div class="player-sign-in-options" aria-label="Sign-in options">
-          <button type="button" data-testid="google-sign-in" class="provider-button">
-            Sign in with Google
-          </button>
+          <div data-testid="google-sign-in-host" class="provider-button-host" aria-label="Sign in with Google">
+            <button type="button" data-testid="google-sign-in" class="provider-button">
+              Sign in with Google
+            </button>
+          </div>
           <button type="button" data-testid="microsoft-sign-in" class="provider-button">
             Sign in with Microsoft
           </button>

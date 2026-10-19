@@ -30,13 +30,14 @@
       <section id="admin-access" data-testid="admin-access" class="access-panel">
         <h2>Administrative access</h2>
         <form data-testid="admin-login-form">
-          <fieldset disabled>
-            <legend>Sign in · #43</legend>
+          <fieldset>
+            <legend>Demo administrator · #43</legend>
             <label for="admin-username">Username</label
             ><input
               id="admin-username"
               name="username"
               autocomplete="username"
+              required
             />
             <label for="admin-password">Password</label
             ><input
@@ -44,14 +45,20 @@
               name="password"
               type="password"
               autocomplete="current-password"
+              required
             />
             <button type="submit">Sign in</button>
           </fieldset>
         </form>
+        <p class="field-help">Prototype credentials: admin / password.</p>
+        <button type="button" data-testid="admin-sign-out" hidden>
+          Sign out
+        </button>
         <p role="status" data-testid="auth-status">
-          Authentication awaiting implementation.
+          Sign in to open the administration controls.
         </p>
       </section>
+      <div data-testid="admin-controls" inert>
       <section id="create-hunt" data-testid="create-hunt" class="integration-panel">
         <div class="section-heading">
           <span class="step-number" aria-hidden="true">01</span>
@@ -227,8 +234,10 @@
           <ol data-testid="defined-task-list" aria-label="Defined hunt tasks"></ol>
         </div>
       </section>
+      </div>
     </main>
     <footer>BucHunt · Create memorable campus discoveries</footer>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>
+

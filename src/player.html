@@ -17,19 +17,44 @@
     <main>
       <h1>Hunt tasks</h1>
       <p class="notice">
-        Player task display awaiting implementation. No hunt has been loaded.
+        Google sign-in identifies the player for this prototype. Active hunt
+        enrollment and server verification are not implemented yet.
       </p>
-      <section id="display-tasks" data-testid="display-tasks">
-        <h2 data-testid="player-hunt-name">Selected hunt</h2>
-        <p role="status" data-testid="player-task-status">No tasks loaded.</p>
-        <ul data-testid="player-task-list" aria-label="Hunt tasks"></ul>
-        <template id="player-task-template"
-          ><li data-testid="player-task">
-            <span data-task-label></span> <span data-task-completion></span></li
-        ></template>
+      <section
+        id="display-tasks"
+        data-testid="display-tasks"
+        data-google-client-id="YOUR_GOOGLE_CLIENT_ID"
+      >
+        <h2>Sign in to see active Hunts</h2>
+        <p data-testid="player-account" hidden></p>
+        <div data-testid="google-sign-in" aria-label="Sign in with Google"></div>
+        <button type="button" data-testid="player-sign-out" hidden>
+          Sign out
+        </button>
+        <p
+          class="field-help"
+          data-testid="player-provider-status"
+          role="status"
+          hidden
+        ></p>
+        <p role="status" data-testid="player-task-status" aria-live="polite">
+          No tasks loaded.
+        </p>
+        <ul
+          data-testid="player-hunt-list"
+          aria-label="Active Hunts"
+          class="player-hunt-list"
+        ></ul>
       </section>
     </main>
     <footer>Sprint 2 foundation · Features awaiting implementation</footer>
+    <script
+      id="google-identity-script"
+      src="https://accounts.google.com/gsi/client"
+      async
+      defer
+    ></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>
+

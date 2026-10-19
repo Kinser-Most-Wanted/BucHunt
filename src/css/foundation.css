@@ -166,6 +166,39 @@ footer {
 .access-panel p {
   color: #617683;
 }
+[data-testid="admin-controls"][inert] {
+  opacity: 0.7;
+}
+.player-hunt-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.player-hunt {
+  padding: 1rem;
+  border: 1px solid #dce5ea;
+  border-radius: 0.55rem;
+  background: #fbfcfd;
+}
+.player-hunt h3 {
+  margin: 0;
+}
+.player-hunt > p {
+  color: #536a78;
+}
+.player-hunt ul {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+.player-hunt li .task-completion {
+  display: inline-block;
+  margin-left: 0.75rem;
+  color: #536a78;
+  font-size: 0.88rem;
+}
 .integration-panel {
   background: #f9fbfc;
 }
@@ -309,3 +342,4 @@ footer {
     margin-top: 0.25rem;
   }
 }
+

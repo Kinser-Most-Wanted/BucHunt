@@ -437,7 +437,7 @@ export function mountDisplayTasks(
   providerStatus.hidden = true;
   const previousIdentity = storedIdentity();
   if (previousIdentity) void loadHunts(previousIdentity);
-  else showSignedOut("Choose a provider to sign in and see your active Hunts.");
+  else showSignedOut("No tasks loaded.");
 
   signOut.addEventListener("click", () => {
     try {

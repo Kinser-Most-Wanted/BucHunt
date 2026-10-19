@@ -17,7 +17,10 @@ interface GoogleIdentityApi {
         client_id: string;
         callback(response: GoogleCredentialResponse): void;
       }): void;
-      prompt(): void;
+      renderButton(
+        element: HTMLElement,
+        options: { theme: string; size: string; text: string; width: number },
+      ): void;
       disableAutoSelect(): void;
     };
   };
@@ -244,6 +247,9 @@ export function mountDisplayTasks(
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
   );
+  const googleSignInHost = root.querySelector<HTMLElement>(
+    '[data-testid="google-sign-in-host"]',
+  );
   const microsoftSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="microsoft-sign-in"]',
   );
@@ -258,6 +264,7 @@ export function mountDisplayTasks(
     !providerStatus ||
     !list ||
     !googleSignIn ||
+    !googleSignInHost ||
     !microsoftSignIn ||
     !signOut ||
     !account
@@ -320,6 +327,13 @@ export function mountDisplayTasks(
       client_id: googleClientId,
       callback: acceptGoogleCredential,
     });
+    window.google.accounts.id.renderButton(googleSignInHost, {
+      theme: "outline",
+      size: "large",
+      text: "signin_with",
+      width: 220,
+    });
+    googleSignIn.hidden = true;
     googleInitialized = true;
   };
 
@@ -341,9 +355,11 @@ export function mountDisplayTasks(
       return;
     }
     configureGoogle();
-    window.google.accounts.id.prompt();
-    providerStatus.hidden = true;
-    status.textContent = "Complete sign-in in the Google prompt.";
+    configureGoogle();
+    if (googleInitialized) {
+      providerStatus.hidden = true;
+      status.textContent = "Complete sign-in with the Google button.";
+    }
   });
 
   microsoftSignIn.addEventListener("click", async () => {

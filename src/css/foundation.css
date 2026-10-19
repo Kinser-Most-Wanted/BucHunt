@@ -184,16 +184,36 @@ footer {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-.provider-button {
-  min-width: 13rem;
+ .provider-button {
+  min-width: 15rem;
+  min-height: 3.25rem;
   margin-top: 0.75rem;
-  border: 1px solid #aebdc7;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
   background: #fff;
+  color: #3c4043;
+  box-shadow: 0 1px 2px rgb(60 64 67 / 18%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  font-weight: 600;
+  transition: box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
-[data-testid="microsoft-sign-in"] {
-  border-color: #185abd;
-  background: #185abd;
-  color: #fff;
+.google-sign-in-button:hover:not(:disabled) {
+  background: #f8faff;
+  box-shadow: 0 2px 5px rgb(60 64 67 / 25%);
+  filter: none;
+}
+.google-sign-in-button:active {
+  transform: translateY(1px);
+}
+.google-mark {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
 }
 .player-hunt {
   padding: 1rem;

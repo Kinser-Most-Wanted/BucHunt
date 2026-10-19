@@ -33,6 +33,15 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
             }) {
               callback = options.callback;
             },
+            renderButton(parent: HTMLElement) {
+              const button = document.createElement("button");
+              button.dataset.testid = "google-sign-in";
+              button.textContent = "Sign in with Google";
+              button.addEventListener("click", () =>
+                callback?.({ credential: `header.${claims}.signature` }),
+              );
+              parent.append(button);
+            },
             prompt() {
               callback?.({ credential: `header.${claims}.signature` });
             },

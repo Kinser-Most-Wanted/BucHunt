@@ -85,6 +85,8 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await expect(page.getByTestId("player-account")).toHaveText(
     "Signed in as player@example.com with Google. Account ID: google-account-123.",
   );
+  await expect(page.getByTestId("google-sign-in-host")).toBeHidden();
+  await expect(page.getByTestId("google-sign-in-host")).toHaveAttribute("inert", "");
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "1 active Hunt available.",
   );
@@ -106,6 +108,8 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "Choose Google to sign in and see your active Hunts.",
   );
+  await expect(page.getByTestId("google-sign-in-host")).toBeVisible();
+  await expect(page.getByTestId("google-sign-in-host")).not.toHaveAttribute("inert", "");
 });
 
 test("shows why Google sign-in is unavailable until configured", async ({

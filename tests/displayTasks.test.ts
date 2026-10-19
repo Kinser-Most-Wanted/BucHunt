@@ -104,7 +104,7 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
 
   await page.getByTestId("player-sign-out").click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
-    "Choose a provider to sign in and see your active Hunts.",
+    "Choose Google to sign in and see your active Hunts.",
   );
 });
 

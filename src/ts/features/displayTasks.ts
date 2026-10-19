@@ -16,6 +16,7 @@ interface GoogleIdentityApi {
         callback(response: GoogleCredentialResponse): void;
       }): void;
       prompt(): void;
+      renderButton(parent: HTMLElement, options: { theme: "outline"; size: "large"; shape: "pill"; text: "signin_with"; width: number }): void;
       disableAutoSelect(): void;
     };
   };
@@ -154,6 +155,8 @@ export function mountDisplayTasks(
   const googleClientId =
     window.BUCHUNT_GOOGLE_CLIENT_ID ?? root.dataset.googleClientId ?? "";
   let googleInitialized = false;
+  let googleButtonRendered = false;
+  const googleButtonHost = root.querySelector<HTMLElement>(`[data-testid="google-sign-in-host"]`);
 
   const showSignedOut = (message: string): void => {
     signOut.hidden = true;
@@ -207,6 +210,13 @@ export function mountDisplayTasks(
       callback: acceptGoogleCredential,
     });
     googleInitialized = true;
+    if (googleButtonHost && !googleButtonRendered) {
+      googleButtonHost.replaceChildren();
+      window.google.accounts.id.renderButton(googleButtonHost, {
+        theme: "outline", size: "large", shape: "pill", text: "signin_with", width: 280,
+      });
+      googleButtonRendered = true;
+    }
   };
 
   configureGoogle();
@@ -215,23 +225,10 @@ export function mountDisplayTasks(
     ?.addEventListener("load", configureGoogle, { once: true });
 
   googleSignIn.addEventListener("click", () => {
-    if (!googleClientId || googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER) {
-      providerStatus.hidden = false;
-      providerStatus.textContent =
-        "Google sign-in needs a Google OAuth client ID.";
-      return;
-    }
-    if (!window.google) {
-      providerStatus.hidden = false;
-      providerStatus.textContent = "Google sign-in is still loading. Try again in a moment.";
-      return;
-    }
-    configureGoogle();
-    if (googleInitialized) {
-      window.google.accounts.id.prompt();
-      providerStatus.hidden = true;
-      status.textContent = "Complete sign-in in the Google prompt.";
-    }
+    providerStatus.hidden = false;
+    providerStatus.textContent = googleClientId && googleClientId !== GOOGLE_CLIENT_ID_PLACEHOLDER
+      ? "Google sign-in is still loading. Try again in a moment."
+      : "Google sign-in needs a Google OAuth client ID.";
   });
 
 

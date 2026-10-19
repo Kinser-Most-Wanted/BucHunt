@@ -82,9 +82,22 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await page.goto("/player.html");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
 
-  await expect(page.getByTestId("player-account")).toHaveText(
-    "Signed in as player@example.com with Google. Account ID: google-account-123.",
+  await expect(page.getByTestId("player-name-form")).toBeVisible();
+  await page.getByTestId("player-display-name-input").fill("Baja");
+  await page.getByRole("button", { name: "Save name and continue" }).click();
+
+  await expect(page.getByTestId("player-account")).toHaveText("Signed in as Baja");
+  await expect(page.getByTestId("player-email")).toHaveText(
+    "Google account: player@example.com",
   );
+  await expect(page.getByTestId("account-id-value")).toBeHidden();
+  await expect(page.getByTestId("account-id-toggle")).toHaveText(
+    "Show Google account ID",
+  );
+  await page.getByTestId("account-id-toggle").click();
+  await expect(page.getByTestId("account-id-value")).toHaveText("google-account-123");
+  await page.getByTestId("account-id-toggle").click();
+  await expect(page.getByTestId("account-id-value")).toBeHidden();
   await expect(page.getByTestId("google-sign-in-host")).toBeHidden();
   await expect(page.getByTestId("google-sign-in-host")).toHaveAttribute("inert", "");
   await expect(page.getByTestId("player-task-status")).toHaveText(
@@ -110,6 +123,8 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   );
   await expect(page.getByTestId("google-sign-in-host")).toBeVisible();
   await expect(page.getByTestId("google-sign-in-host")).not.toHaveAttribute("inert", "");
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await expect(page.getByTestId("player-account")).toHaveText("Signed in as Baja");
 });
 
 test("shows why Google sign-in is unavailable until configured", async ({

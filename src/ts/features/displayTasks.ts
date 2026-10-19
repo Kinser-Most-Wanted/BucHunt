@@ -155,8 +155,17 @@ export function mountDisplayTasks(
   const displayName = root.querySelector<HTMLElement>(
     '[data-testid="player-display-name"]',
   );
-  const email = root.querySelector<HTMLElement>(
+  const emailDetails = root.querySelector<HTMLElement>(
+    '[data-testid="player-google-email"]',
+  );
+  const email = root.querySelector<HTMLOutputElement>(
     '[data-testid="player-email"]',
+  );
+  const emailToggle = root.querySelector<HTMLButtonElement>(
+    '[data-testid="email-toggle"]',
+  );
+  const copyEmail = root.querySelector<HTMLButtonElement>(
+    '[data-testid="copy-email"]',
   );
   const accountIdDetails = root.querySelector<HTMLElement>(
     '[data-testid="player-google-account-id"]',
@@ -166,6 +175,9 @@ export function mountDisplayTasks(
   );
   const accountIdValue = root.querySelector<HTMLOutputElement>(
     '[data-testid="account-id-value"]',
+  );
+  const copyAccountId = root.querySelector<HTMLButtonElement>(
+    '[data-testid="copy-account-id"]',
   );
   const nameForm = root.querySelector<HTMLFormElement>(
     '[data-testid="player-name-form"]',
@@ -181,10 +193,14 @@ export function mountDisplayTasks(
     !signOut ||
     !account ||
     !displayName ||
+    !emailDetails ||
     !email ||
+    !emailToggle ||
+    !copyEmail ||
     !accountIdDetails ||
     !accountIdToggle ||
     !accountIdValue ||
+    !copyAccountId ||
     !nameForm ||
     !nameInput
   ) return;
@@ -207,10 +223,18 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(true);
     signOut.hidden = true;
     account.hidden = true;
+    emailDetails.hidden = true;
     email.hidden = true;
+    emailToggle.hidden = false;
+    emailToggle.textContent = "Show Google account email";
+    emailToggle.setAttribute("aria-expanded", "false");
+    copyEmail.hidden = true;
     accountIdDetails.hidden = true;
     accountIdValue.hidden = true;
+    accountIdToggle.hidden = false;
     accountIdToggle.textContent = "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", "false");
+    copyAccountId.hidden = true;
     accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
     list.replaceChildren();
@@ -222,17 +246,25 @@ export function mountDisplayTasks(
     name: string,
   ): Promise<void> => {
     setGoogleSignInEnabled(false);
+    providerStatus.hidden = true;
     nameForm.hidden = true;
     signOut.hidden = false;
     account.hidden = false;
     displayName.textContent = name;
-    email.textContent = `Google account: ${signedIn.email}`;
-    email.hidden = false;
+    email.textContent = signedIn.email;
+    emailDetails.hidden = false;
+    email.hidden = true;
+    emailToggle.hidden = false;
+    emailToggle.textContent = "Show Google account email";
+    emailToggle.setAttribute("aria-expanded", "false");
+    copyEmail.hidden = true;
     accountIdValue.textContent = signedIn.accountId;
     accountIdDetails.hidden = false;
     accountIdValue.hidden = true;
+    accountIdToggle.hidden = false;
     accountIdToggle.textContent = "Show Google account ID";
     accountIdToggle.setAttribute("aria-expanded", "false");
+    copyAccountId.hidden = true;
     list.replaceChildren();
     status.textContent = "Loading your active Hunts…";
     try {
@@ -256,7 +288,7 @@ export function mountDisplayTasks(
     pendingIdentity = signedIn;
     setGoogleSignInEnabled(false);
     account.hidden = true;
-    email.hidden = true;
+    emailDetails.hidden = true;
     accountIdDetails.hidden = true;
     nameForm.hidden = false;
     signOut.hidden = false;
@@ -286,13 +318,44 @@ export function mountDisplayTasks(
     void loadHunts(signedIn, name);
   });
 
+  const toggleSensitiveValue = (
+    value: HTMLOutputElement,
+    toggle: HTMLButtonElement,
+    copyButton: HTMLButtonElement,
+    label: string,
+  ): void => {
+    const reveal = value.hidden;
+    value.hidden = !reveal;
+    copyButton.hidden = !reveal;
+    toggle.textContent = reveal ? `Hide Google account ${label}` : `Show Google account ${label}`;
+    toggle.setAttribute("aria-expanded", String(reveal));
+  };
+
+  const copySensitiveValue = async (
+    value: HTMLOutputElement,
+    label: string,
+  ): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value.textContent ?? "");
+      providerStatus.hidden = false;
+      providerStatus.textContent = `Google account ${label} copied.`;
+    } catch {
+      providerStatus.hidden = false;
+      providerStatus.textContent = `Could not copy the Google account ${label}. Check clipboard permissions and try again.`;
+    }
+  };
+
+  emailToggle.addEventListener("click", () => {
+    toggleSensitiveValue(email, emailToggle, copyEmail, "email");
+  });
   accountIdToggle.addEventListener("click", () => {
-    const reveal = accountIdValue.hidden;
-    accountIdValue.hidden = !reveal;
-    accountIdToggle.textContent = reveal
-      ? "Hide Google account ID"
-      : "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", String(reveal));
+    toggleSensitiveValue(accountIdValue, accountIdToggle, copyAccountId, "ID");
+  });
+  copyEmail.addEventListener("click", () => {
+    void copySensitiveValue(email, "email");
+  });
+  copyAccountId.addEventListener("click", () => {
+    void copySensitiveValue(accountIdValue, "ID");
   });
 
   const acceptGoogleCredential = (response: GoogleCredentialResponse): void => {

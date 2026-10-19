@@ -51,7 +51,7 @@ export interface PlayerHunt {
 export interface PlayerIdentity {
   email: string;
   accountId: string;
-  provider: "google" | "microsoft";
+  provider: "google";
   idToken: string;
 }
 export interface AdminCredentials {

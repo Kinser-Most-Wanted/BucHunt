@@ -2,6 +2,7 @@ import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
+const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 const GOOGLE_CLIENT_ID_PLACEHOLDER = "YOUR_GOOGLE_CLIENT_ID";
 
 interface GoogleCredentialResponse {
@@ -70,6 +71,14 @@ function decodeGoogleCredential(
   };
 }
 
+function storedDisplayName(accountId: string): string | null {
+  try {
+    const value = localStorage.getItem(`${PLAYER_PROFILE_KEY_PREFIX}${accountId}`)?.trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
 
 function storedIdentity(): PlayerIdentity | null {
   try {
@@ -143,13 +152,41 @@ export function mountDisplayTasks(
   const account = root.querySelector<HTMLElement>(
     '[data-testid="player-account"]',
   );
+  const displayName = root.querySelector<HTMLElement>(
+    '[data-testid="player-display-name"]',
+  );
+  const email = root.querySelector<HTMLElement>(
+    '[data-testid="player-email"]',
+  );
+  const accountIdDetails = root.querySelector<HTMLElement>(
+    '[data-testid="player-google-account-id"]',
+  );
+  const accountIdToggle = root.querySelector<HTMLButtonElement>(
+    '[data-testid="account-id-toggle"]',
+  );
+  const accountIdValue = root.querySelector<HTMLOutputElement>(
+    '[data-testid="account-id-value"]',
+  );
+  const nameForm = root.querySelector<HTMLFormElement>(
+    '[data-testid="player-name-form"]',
+  );
+  const nameInput = root.querySelector<HTMLInputElement>(
+    '[data-testid="player-display-name-input"]',
+  );
   if (
     !status ||
     !providerStatus ||
     !list ||
     !googleSignIn ||
     !signOut ||
-    !account
+    !account ||
+    !displayName ||
+    !email ||
+    !accountIdDetails ||
+    !accountIdToggle ||
+    !accountIdValue ||
+    !nameForm ||
+    !nameInput
   ) return;
 
   const googleClientId =
@@ -170,15 +207,32 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(true);
     signOut.hidden = true;
     account.hidden = true;
+    email.hidden = true;
+    accountIdDetails.hidden = true;
+    accountIdValue.hidden = true;
+    accountIdToggle.textContent = "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", "false");
+    nameForm.hidden = true;
     list.replaceChildren();
     status.textContent = message;
   };
 
-  const loadHunts = async (signedIn: PlayerIdentity): Promise<void> => {
+  const loadHunts = async (
+    signedIn: PlayerIdentity,
+    name: string,
+  ): Promise<void> => {
     setGoogleSignInEnabled(false);
+    nameForm.hidden = true;
     signOut.hidden = false;
     account.hidden = false;
-    account.textContent = `Signed in as ${signedIn.email} with Google. Account ID: ${signedIn.accountId}.`;
+    displayName.textContent = name;
+    email.textContent = `Google account: ${signedIn.email}`;
+    email.hidden = false;
+    accountIdValue.textContent = signedIn.accountId;
+    accountIdDetails.hidden = false;
+    accountIdValue.hidden = true;
+    accountIdToggle.textContent = "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", "false");
     list.replaceChildren();
     status.textContent = "Loading your active Hunts…";
     try {
@@ -196,6 +250,51 @@ export function mountDisplayTasks(
     }
   };
 
+  let pendingIdentity: PlayerIdentity | null = null;
+
+  const requestDisplayName = (signedIn: PlayerIdentity): void => {
+    pendingIdentity = signedIn;
+    setGoogleSignInEnabled(false);
+    account.hidden = true;
+    email.hidden = true;
+    accountIdDetails.hidden = true;
+    nameForm.hidden = false;
+    signOut.hidden = false;
+    nameInput.value = "";
+    nameInput.focus();
+    status.textContent = "Choose a display name for your player profile.";
+  };
+
+  nameForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const signedIn = pendingIdentity;
+    const name = nameInput.value.trim();
+    if (!signedIn || !name) return;
+    try {
+      localStorage.setItem(
+        `${PLAYER_PROFILE_KEY_PREFIX}${signedIn.accountId}`,
+        name,
+      );
+    } catch {
+      providerStatus.hidden = false;
+      providerStatus.textContent =
+        "This browser could not save your display name. Enable browser storage and try again.";
+      return;
+    }
+    pendingIdentity = null;
+    providerStatus.hidden = true;
+    void loadHunts(signedIn, name);
+  });
+
+  accountIdToggle.addEventListener("click", () => {
+    const reveal = accountIdValue.hidden;
+    accountIdValue.hidden = !reveal;
+    accountIdToggle.textContent = reveal
+      ? "Hide Google account ID"
+      : "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", String(reveal));
+  });
+
   const acceptGoogleCredential = (response: GoogleCredentialResponse): void => {
     const player = decodeGoogleCredential(response.credential, googleClientId);
     if (!player) {
@@ -209,7 +308,9 @@ export function mountDisplayTasks(
       return;
     }
     providerStatus.hidden = true;
-    void loadHunts(player);
+    const savedName = storedDisplayName(player.accountId);
+    if (savedName) void loadHunts(player, savedName);
+    else requestDisplayName(player);
   };
 
   const configureGoogle = (): void => {
@@ -244,8 +345,11 @@ export function mountDisplayTasks(
 
   providerStatus.hidden = true;
   const previousIdentity = storedIdentity();
-  if (previousIdentity) void loadHunts(previousIdentity);
-  else showSignedOut("No tasks loaded.");
+  if (previousIdentity) {
+    const savedName = storedDisplayName(previousIdentity.accountId);
+    if (savedName) void loadHunts(previousIdentity, savedName);
+    else requestDisplayName(previousIdentity);
+  } else showSignedOut("No tasks loaded.");
 
   signOut.addEventListener("click", () => {
     try {
@@ -254,6 +358,7 @@ export function mountDisplayTasks(
       // The visible state still signs out for this page view.
     }
     window.google?.accounts.id.disableAutoSelect();
+    pendingIdentity = null;
     showSignedOut("Choose Google to sign in and see your active Hunts.");
   });
 }

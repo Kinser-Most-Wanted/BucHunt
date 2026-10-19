@@ -27,7 +27,22 @@
         data-google-client-id="436661871708-p5g867dkf2lk0vlon4dialct09j1m70c.apps.googleusercontent.com"
       >
         <h2>Sign in to see active Hunts</h2>
-        <p data-testid="player-account" hidden></p>
+        <p data-testid="player-account" class="player-account" hidden>
+          Signed in as <strong data-testid="player-display-name"></strong>
+        </p>
+        <p data-testid="player-email" class="player-email" hidden></p>
+        <div data-testid="player-google-account-id" class="player-account-id" hidden>
+          <button type="button" data-testid="account-id-toggle" aria-expanded="false" aria-controls="player-account-id-value">
+            Show Google account ID
+          </button>
+          <output id="player-account-id-value" data-testid="account-id-value" hidden></output>
+        </div>
+        <form data-testid="player-name-form" class="player-name-form" hidden>
+          <label for="player-display-name-input">Choose your display name</label>
+          <p class="field-help">This is the name shown on your BucHunt player page.</p>
+          <input id="player-display-name-input" data-testid="player-display-name-input" name="displayName" autocomplete="nickname" maxlength="40" required />
+          <button type="submit" class="primary-button">Save name and continue</button>
+        </form>
         <div class="player-sign-in-options" aria-label="Sign-in options">
           <div data-testid="google-sign-in-host" class="provider-button-host" aria-label="Sign in with Google">
             <button type="button" data-testid="google-sign-in" class="provider-button google-sign-in-button">

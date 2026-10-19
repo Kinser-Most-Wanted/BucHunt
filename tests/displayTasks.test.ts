@@ -94,6 +94,7 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await page.getByRole("button", { name: "Save name and continue" }).click();
 
   await expect(page.getByTestId("player-account")).toHaveText("Signed in as Baja");
+  await expect(page.getByTestId("player-heading")).toHaveText("Your active Hunts");
   await expect(page.getByTestId("player-google-email")).toBeVisible();
   await expect(page.getByTestId("player-email")).toBeHidden();
   await expect(page.getByTestId("copy-email")).toBeHidden();
@@ -139,6 +140,9 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await page.getByTestId("player-sign-out").click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "Choose Google to sign in and see your active Hunts.",
+  );
+  await expect(page.getByTestId("player-heading")).toHaveText(
+    "Sign in to see active Hunts",
   );
   await expect(page.getByTestId("google-sign-in-host")).toBeVisible();
   await expect(page.getByTestId("google-sign-in-host")).not.toHaveAttribute("inert", "");

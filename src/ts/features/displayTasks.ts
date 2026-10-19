@@ -158,7 +158,16 @@ export function mountDisplayTasks(
   let googleButtonRendered = false;
   const googleButtonHost = root.querySelector<HTMLElement>(`[data-testid="google-sign-in-host"]`);
 
+  const setGoogleSignInEnabled = (enabled: boolean): void => {
+    if (googleButtonHost) {
+      googleButtonHost.hidden = !enabled;
+      googleButtonHost.inert = !enabled;
+    }
+    googleSignIn.disabled = !enabled;
+  };
+
   const showSignedOut = (message: string): void => {
+    setGoogleSignInEnabled(true);
     signOut.hidden = true;
     account.hidden = true;
     list.replaceChildren();
@@ -166,6 +175,7 @@ export function mountDisplayTasks(
   };
 
   const loadHunts = async (signedIn: PlayerIdentity): Promise<void> => {
+    setGoogleSignInEnabled(false);
     signOut.hidden = false;
     account.hidden = false;
     account.textContent = `Signed in as ${signedIn.email} with Google. Account ID: ${signedIn.accountId}.`;

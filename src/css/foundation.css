@@ -179,22 +179,19 @@ footer {
 .player-account strong {
   color: #0c6b59;
 }
-.player-email {
-  margin: 0.25rem 0;
-  color: #536a78;
-}
-.player-account-id {
+.player-sensitive-detail {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
+  margin: 0.25rem 0;
 }
-.player-account-id button {
+.player-sensitive-detail button {
   margin-top: 0.5rem;
   padding: 0.45rem 0.7rem;
   font-size: 0.85rem;
 }
-.player-account-id output {
+.player-sensitive-detail output {
   overflow-wrap: anywhere;
   color: #536a78;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;

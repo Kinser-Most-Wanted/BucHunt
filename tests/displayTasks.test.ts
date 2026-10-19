@@ -80,7 +80,7 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
   await expect(page.getByTestId("player-account")).toHaveText(
     "Signed in as player@example.com with Google.",
   );
-  await expect(page.getByTestId("player-provider-status")).toHaveText(
+  await expect(page.getByTestId("player-task-status")).toHaveText(
     "1 active Hunt available.",
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText(
@@ -107,7 +107,7 @@ test("shows why Google sign-in is unavailable until configured", async ({
   page,
 }) => {
   await page.goto("/player.html");
-  await expect(page.getByTestId("player-task-status")).toHaveText(
+  await expect(page.getByTestId("player-provider-status")).toHaveText(
     "Google Sign-In needs an OAuth client ID before players can sign in.",
   );
 });

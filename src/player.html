@@ -30,12 +30,19 @@
         <p data-testid="player-account" class="player-account" hidden>
           Signed in as <strong data-testid="player-display-name"></strong>
         </p>
-        <p data-testid="player-email" class="player-email" hidden></p>
-        <div data-testid="player-google-account-id" class="player-account-id" hidden>
+        <div data-testid="player-google-email" class="player-sensitive-detail" hidden>
+          <button type="button" data-testid="email-toggle" aria-expanded="false" aria-controls="player-email-value">
+            Show Google account email
+          </button>
+          <output id="player-email-value" data-testid="player-email" hidden></output>
+          <button type="button" data-testid="copy-email" hidden>Copy email</button>
+        </div>
+        <div data-testid="player-google-account-id" class="player-sensitive-detail" hidden>
           <button type="button" data-testid="account-id-toggle" aria-expanded="false" aria-controls="player-account-id-value">
             Show Google account ID
           </button>
           <output id="player-account-id-value" data-testid="account-id-value" hidden></output>
+          <button type="button" data-testid="copy-account-id" hidden>Copy account ID</button>
         </div>
         <form data-testid="player-name-form" class="player-name-form" hidden>
           <label for="player-display-name-input">Choose your display name</label>

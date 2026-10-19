@@ -111,6 +111,9 @@ test("Google sign-in loads active player-safe Hunts and task status", async ({
 test("shows why Google sign-in is unavailable until configured", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", { value: "" });
+  });
   await page.goto("/player.html");
   await expect(page.getByTestId("google-sign-in")).toBeVisible();
   await expect(page.getByTestId("player-sign-out")).toBeHidden();

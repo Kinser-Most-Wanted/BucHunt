@@ -50,7 +50,8 @@ export interface PlayerHunt {
 }
 export interface PlayerIdentity {
   email: string;
-  provider: "google";
+  accountId: string;
+  provider: "google" | "microsoft";
   idToken: string;
 }
 export interface AdminCredentials {

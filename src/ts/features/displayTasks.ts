@@ -134,6 +134,9 @@ export function mountDisplayTasks(
   repository: HuntRepository,
 ): void {
   root.dataset.feature = "displayTasks";
+  const heading = root.querySelector<HTMLElement>(
+    '[data-testid="player-heading"]',
+  );
   const status = root.querySelector<HTMLElement>(
     '[data-testid="player-task-status"]',
   );
@@ -186,6 +189,7 @@ export function mountDisplayTasks(
     '[data-testid="player-display-name-input"]',
   );
   if (
+    !heading ||
     !status ||
     !providerStatus ||
     !list ||
@@ -237,6 +241,7 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
+    heading.textContent = "Sign in to see active Hunts";
     list.replaceChildren();
     status.textContent = message;
   };
@@ -248,6 +253,7 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(false);
     providerStatus.hidden = true;
     nameForm.hidden = true;
+    heading.textContent = "Your active Hunts";
     signOut.hidden = false;
     account.hidden = false;
     displayName.textContent = name;
@@ -290,6 +296,7 @@ export function mountDisplayTasks(
     account.hidden = true;
     emailDetails.hidden = true;
     accountIdDetails.hidden = true;
+    heading.textContent = "Set up your player profile";
     nameForm.hidden = false;
     signOut.hidden = false;
     nameInput.value = "";

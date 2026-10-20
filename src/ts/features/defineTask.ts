@@ -27,7 +27,9 @@ function renderTasks(root: HTMLElement, tasks: TaskDefinition[]): void {
   );
   if (!list) return;
   list.replaceChildren();
-  for (const task of [...tasks].sort((left, right) => left.order - right.order)) {
+  for (const task of [...tasks].sort(
+    (left, right) => left.order - right.order,
+  )) {
     const item = document.createElement("li");
     item.className = "defined-task";
     const order = document.createElement("span");
@@ -50,13 +52,43 @@ export function mountDefineTask(
   repository: HuntRepository,
 ): void {
   root.dataset.feature = "defineTask";
-  const form = root.querySelector<HTMLFormElement>(
-    '[data-testid="task-form"]',
-  );
-  const status = root.querySelector<HTMLElement>(
-    '[data-testid="task-status"]',
-  );
+  const form = root.querySelector<HTMLFormElement>('[data-testid="task-form"]');
+  const status = root.querySelector<HTMLElement>('[data-testid="task-status"]');
   if (!form || !status) return;
+  root.addEventListener("hunt-selected", () => {
+    renderTasks(root, []);
+    showIssues(root, []);
+    const order = field<HTMLInputElement>(form, "order");
+    if (order) order.value = "1";
+    status.textContent =
+      "Hunt selection updated. Add a task or load its saved tasks.";
+  });
+
+  root
+    .querySelector('[data-testid="load-admin-hunt"]')
+    ?.addEventListener("click", async () => {
+      const id = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
+      if (!id) {
+        status.textContent = "Choose a hunt from My hunts first.";
+        return;
+      }
+      try {
+        const result = await repository.getAdminHunt(id);
+        if (!result.ok) {
+          showIssues(root, [result.message]);
+          return;
+        }
+        renderTasks(root, result.value.tasks);
+        const order = field<HTMLInputElement>(form, "order");
+        if (order)
+          order.value = String(
+            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+          );
+        status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
+      } catch {
+        status.textContent = "The hunt service could not be reached.";
+      }
+    });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -69,7 +101,8 @@ export function mountDefineTask(
       field<HTMLTextAreaElement>(form, "description")?.value.trim() ?? "";
     const requiredAnswer =
       field<HTMLInputElement>(form, "requiredAnswer")?.value.trim() ?? "";
-    const latitudeValue = field<HTMLInputElement>(form, "latitude")?.value ?? "";
+    const latitudeValue =
+      field<HTMLInputElement>(form, "latitude")?.value ?? "";
     const longitudeValue =
       field<HTMLInputElement>(form, "longitude")?.value ?? "";
     const orderValue = field<HTMLInputElement>(form, "order")?.value ?? "";
@@ -141,18 +174,19 @@ export function mountDefineTask(
       const result = await repository.getAdminHunt(huntId);
       if (result.ok) {
         renderTasks(root, result.value.tasks);
-        status.textContent =
-          `“${saved.value.displayLabel}” was saved and appears in this hunt’s task list.`;
+        status.textContent = `“${saved.value.displayLabel}” was saved and appears in this hunt’s task list.`;
         form.reset();
         const pointsInput = field<HTMLInputElement>(form, "points");
         const orderInput = field<HTMLInputElement>(form, "order");
         if (pointsInput) pointsInput.value = "0";
-        if (orderInput) orderInput.value = String(result.value.tasks.length + 1);
+        if (orderInput)
+          orderInput.value = String(
+            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+          );
         const huntInput = field<HTMLInputElement>(form, "huntId");
         if (huntInput) huntInput.value = huntId;
       } else {
-        status.textContent =
-          `Task was saved, but the updated hunt list could not be loaded: ${result.message}`;
+        status.textContent = `Task was saved, but the updated hunt list could not be loaded: ${result.message}`;
       }
     } catch {
       status.textContent = "The task service could not be reached. Try again.";

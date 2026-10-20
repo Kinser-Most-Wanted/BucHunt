@@ -7,7 +7,7 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
   },
   webServer: {
-    command: 'pnpm run serve',
+    command: 'pnpm run build && pnpm run serve',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
   },

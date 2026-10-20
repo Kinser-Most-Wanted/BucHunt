@@ -147,11 +147,11 @@ test("create hunt, save task, reload configuration and persist player completion
   await page.route("**/api/auth/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/auth/config") {
-      await route.fulfill({ json: { clientId: "test-client-id", nonce: "test-nonce" } });
+      await route.fulfill({\n        json: { clientId: "test-client-id", nonce: "test-nonce" },\n      });
     } else if (path === "/api/auth/session") {
       await route.fulfill({
         status: authenticated ? 200 : 401,
-        json: authenticated ? { user: playerSession } : { error: "Sign in required." },
+        json: authenticated\n          ? { user: playerSession }\n          : { error: "Sign in required." },
       });
     } else if (path === "/api/auth/login") {
       authenticated = true;
@@ -160,7 +160,7 @@ test("create hunt, save task, reload configuration and persist player completion
       authenticated = false;
       await route.fulfill({ json: { signedOut: true } });
     } else {
-      await route.fulfill({ status: 404, json: { error: "Not found." } });
+      await route.fulfill({\n        status: 404,\n        json: { error: "Not found." },\n      });
     }
   });
   await page.goto("/admin.html");

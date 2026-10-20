@@ -1,21 +1,85 @@
-import type {
-  AuthenticationService,
-  HuntRepository,
-} from "../foundation/contracts.js";
-import {
-  createAuthenticationService,
-  loadGoogleIdentity,
-  type GoogleIdentityApi,
-} from "./adminAccess.js";
-import type {
-  AdminSession,
-  PlayerHunt,
-  PlayerIdentity,
-} from "../foundation/types.js";
+import type { HuntRepository } from "../foundation/contracts.js";
+import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 const PLAYER_HUNTS_KEY_PREFIX = "buchunt.player-hunts.";
+const GOOGLE_CLIENT_ID_PLACEHOLDER = "YOUR_GOOGLE_CLIENT_ID";
+
+interface GoogleCredentialResponse {
+  credential: string;
+}
+
+interface GoogleIdentityApi {
+  accounts: {
+    id: {
+      initialize(options: {
+        client_id: string;
+        callback(response: GoogleCredentialResponse): void;
+      }): void;
+      prompt(): void;
+      renderButton(
+        parent: HTMLElement,
+        options: {
+          theme: "outline";
+          size: "large";
+          shape: "pill";
+          text: "signin_with";
+          width: number;
+        },
+      ): void;
+      disableAutoSelect(): void;
+    };
+  };
+}
+
+declare global {
+  interface Window {
+    google?: GoogleIdentityApi;
+    BUCHUNT_GOOGLE_CLIENT_ID?: string;
+  }
+}
+
+function decodeClaims(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const bytes = Uint8Array.from(atob(padded), (character) =>
+      character.charCodeAt(0),
+    );
+    const claims = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    return typeof claims === "object" && claims !== null
+      ? (claims as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeGoogleCredential(
+  token: string,
+  expectedClientId: string,
+): PlayerIdentity | null {
+  const claims = decodeClaims(token);
+  if (
+    !claims ||
+    claims.aud !== expectedClientId ||
+    typeof claims.email !== "string" ||
+    claims.email_verified !== true ||
+    typeof claims.sub !== "string"
+  ) {
+    return null;
+  }
+  return {
+    email: claims.email,
+    accountId: claims.sub,
+    provider: "google",
+    idToken: token,
+  };
+}
+
 function storedDisplayName(accountId: string): string | null {
   try {
     const value = localStorage
@@ -57,7 +121,8 @@ function storedIdentity(): PlayerIdentity | null {
     if (
       value?.provider === "google" &&
       typeof value.email === "string" &&
-      typeof value.accountId === "string"
+      typeof value.accountId === "string" &&
+      typeof value.idToken === "string"
     ) {
       return value as PlayerIdentity;
     }
@@ -76,7 +141,7 @@ function taskLocationElement(
   const details = document.createElement("p");
   details.className = "task-location";
   details.append(
-    document.createTextNode(`Location: ${latitude}, ${longitude} · `),
+    document.createTextNode(`Location: ${latitude}, ${longitude} � `),
   );
   const mapLink = document.createElement("a");
   mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
@@ -123,7 +188,6 @@ function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
 export function mountDisplayTasks(
   root: HTMLElement,
   repository: HuntRepository,
-  authentication: AuthenticationService = createAuthenticationService(),
 ): void {
   root.dataset.feature = "displayTasks";
   const heading = root.querySelector<HTMLElement>(
@@ -206,9 +270,12 @@ export function mountDisplayTasks(
   )
     return;
 
-  let google: GoogleIdentityApi | undefined;
+  const googleClientId =
+    window.BUCHUNT_GOOGLE_CLIENT_ID ?? root.dataset.googleClientId ?? "";
+  let googleInitialized = false;
+  let googleButtonRendered = false;
   const googleButtonHost = root.querySelector<HTMLElement>(
-    '[data-testid="google-sign-in-host"]',
+    `[data-testid="google-sign-in-host"]`,
   );
 
   const setGoogleSignInEnabled = (enabled: boolean): void => {
@@ -235,6 +302,7 @@ export function mountDisplayTasks(
     accountIdToggle.textContent = "Show Google account ID";
     accountIdToggle.setAttribute("aria-expanded", "false");
     copyAccountId.hidden = true;
+    accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
     huntLookup.hidden = true;
     heading.textContent = "Sign in to see active Hunts";
@@ -269,7 +337,7 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     list.replaceChildren();
     huntLookup.hidden = false;
-    status.textContent = "Loading your Hunts…";
+    status.textContent = "Loading your Hunts�w^~)�v";
     const ids = storedHuntIds(signedIn.accountId);
     const hunts = await Promise.all(
       ids.map(async (id) => {
@@ -368,97 +436,70 @@ export function mountDisplayTasks(
     void copySensitiveValue(accountIdValue, "ID");
   });
 
-  const identityFromSession = (session: AdminSession): PlayerIdentity => ({
-    email: session.email,
-    accountId: session.subject,
-    provider: "google",
-  });
-  const persistIdentity = (player: PlayerIdentity): boolean => {
+  const acceptGoogleCredential = (response: GoogleCredentialResponse): void => {
+    const player = decodeGoogleCredential(response.credential, googleClientId);
+    if (!player) {
+      showSignedOut("Google did not return a verified account ID and email.");
+      return;
+    }
     try {
       sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(player));
-      return true;
     } catch {
       showSignedOut("This browser could not keep the player session.");
-      return false;
-    }
-  };
-  const acceptGoogleCredential = async (credential: string): Promise<void> => {
-    providerStatus.hidden = true;
-    status.textContent = "Verifying Google sign-in…";
-    const result = await authentication.signIn(credential);
-    if (!result.ok) {
-      showSignedOut(result.message);
-      providerStatus.hidden = false;
-      providerStatus.textContent = result.message;
-      void prepareGoogle();
       return;
     }
-    const player = identityFromSession(result.value);
-    if (!persistIdentity(player)) return;
+    providerStatus.hidden = true;
     const savedName = storedDisplayName(player.accountId);
     if (savedName) void loadHunts(player, savedName);
     else requestDisplayName(player);
   };
 
-  const prepareGoogle = async (): Promise<void> => {
-    const config = await authentication.getGoogleConfig();
-    if (!config.ok) {
-      providerStatus.hidden = false;
-      providerStatus.textContent = config.message;
+  const configureGoogle = (): void => {
+    if (
+      googleInitialized ||
+      !window.google ||
+      !googleClientId ||
+      googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER
+    )
       return;
-    }
-    try {
-      google = await loadGoogleIdentity();
-      google.accounts.id.initialize({
-        client_id: config.value.clientId,
-        nonce: config.value.nonce,
-        auto_select: false,
-        callback: (response) =>
-          void acceptGoogleCredential(response.credential),
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: acceptGoogleCredential,
+    });
+    googleInitialized = true;
+    if (googleButtonHost && !googleButtonRendered) {
+      googleButtonHost.replaceChildren();
+      window.google.accounts.id.renderButton(googleButtonHost, {
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        width: 280,
       });
-      if (googleButtonHost) {
-        googleButtonHost.replaceChildren();
-        google.accounts.id.renderButton(googleButtonHost, {
-          type: "standard",
-          theme: "outline",
-          size: "large",
-          shape: "pill",
-          text: "signin_with",
-          width: 280,
-        });
-      }
-    } catch (error) {
-      providerStatus.hidden = false;
-      providerStatus.textContent =
-        error instanceof Error
-          ? error.message
-          : "Google sign-in could not load.";
+      googleButtonRendered = true;
     }
   };
+
+  configureGoogle();
+  document
+    .getElementById("google-identity-script")
+    ?.addEventListener("load", configureGoogle, { once: true });
 
   googleSignIn.addEventListener("click", () => {
-    if (!google) void prepareGoogle();
-  });
-  providerStatus.hidden = true;
-  const initializePlayer = async (): Promise<void> => {
-    const session = await authentication.getSession();
-    if (!session.ok) {
-      showSignedOut("Choose Google to sign in and see your active Hunts.");
-      await prepareGoogle();
-      return;
-    }
-    const player = identityFromSession(session.value);
-    if (!persistIdentity(player)) return;
-    const savedName = storedDisplayName(player.accountId);
-    if (savedName) void loadHunts(player, savedName);
-    else requestDisplayName(player);
-  };
-  void initializePlayer().catch((error: unknown) => {
-    showSignedOut("The sign-in service could not be reached. Try again.");
     providerStatus.hidden = false;
     providerStatus.textContent =
-      error instanceof Error ? error.message : "Unable to check your session.";
+      googleClientId && googleClientId !== GOOGLE_CLIENT_ID_PLACEHOLDER
+        ? "Google sign-in is still loading. Try again in a moment."
+        : "Google sign-in needs a Google OAuth client ID.";
   });
+
+  providerStatus.hidden = true;
+  const previousIdentity = storedIdentity();
+  if (previousIdentity) {
+    const savedName = storedDisplayName(previousIdentity.accountId);
+    if (savedName) void loadHunts(previousIdentity, savedName);
+    else requestDisplayName(previousIdentity);
+  } else showSignedOut("No tasks loaded.");
 
   const huntForm = root.querySelector<HTMLFormElement>(
     '[data-testid="player-hunt-form"]',
@@ -478,7 +519,7 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       huntTasks.replaceChildren();
-      huntStatus.textContent = "Loading Hunt…";
+      huntStatus.textContent = "Loading Hunt�w^~)�v";
       const result = await repository.getPlayerHunt(huntId);
       if (requestId !== huntRequest) return;
       if (!result.ok) {
@@ -577,23 +618,14 @@ export function mountDisplayTasks(
     if (selectedHunt) huntInput.value = selectedHunt;
   }
 
-  signOut.addEventListener("click", async () => {
-    signOut.disabled = true;
-    const result = await authentication.signOut();
-    signOut.disabled = false;
-    if (!result.ok) {
-      providerStatus.hidden = false;
-      providerStatus.textContent = result.message;
-      return;
-    }
+  signOut.addEventListener("click", () => {
     try {
       sessionStorage.removeItem(PLAYER_SESSION_KEY);
     } catch {
-      // The server session has ended, even if browser storage is unavailable.
+      // The visible state still signs out for this page view.
     }
-    google?.accounts.id.disableAutoSelect();
+    window.google?.accounts.id.disableAutoSelect();
     pendingIdentity = null;
     showSignedOut("Choose Google to sign in and see your active Hunts.");
-    void prepareGoogle();
   });
 }

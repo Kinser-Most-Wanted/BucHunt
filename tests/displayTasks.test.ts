@@ -6,52 +6,6 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
   await page.route("https://accounts.google.com/gsi/client", (route) =>
     route.fulfill({ contentType: "application/javascript", body: "" }),
   );
-  let authenticated = false;
-  const session = {
-    user: {
-      subject: "google-account-123",
-      email: "player@example.com",
-      expiresAt: Math.floor(Date.now() / 1000) + 60 * 60,
-      role: "user",
-    },
-  };
-  await page.route("**/api/auth/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/api/auth/config") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          clientId: "test-client-id",
-          nonce: "test-nonce",
-        }),
-      });
-    } else if (path === "/api/auth/session") {
-      await route.fulfill({
-        status: authenticated ? 200 : 401,
-        contentType: "application/json",
-        body: JSON.stringify(
-          authenticated ? session : { error: "Unauthorized" },
-        ),
-      });
-    } else if (path === "/api/auth/login") {
-      authenticated = true;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(session),
-      });
-    } else if (path === "/api/auth/logout") {
-      authenticated = false;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ signedOut: true }),
-      });
-    } else {
-      await route.continue();
-    }
-  });
   await page.addInitScript(() => {
     Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", {
       value: "test-client-id",
@@ -230,26 +184,6 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
 test("shows why Google sign-in is unavailable until configured", async ({
   page,
 }) => {
-  await page.route("**/api/auth/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/api/auth/session") {
-      await route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "Sign-in required." }),
-      });
-      return;
-    }
-    if (path === "/api/auth/config") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ clientId: "", nonce: "test-nonce" }),
-      });
-      return;
-    }
-    await route.continue();
-  });
   await page.addInitScript(() => {
     Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", { value: "" });
   });
@@ -258,6 +192,6 @@ test("shows why Google sign-in is unavailable until configured", async ({
   await expect(page.getByTestId("player-sign-out")).toBeHidden();
   await page.getByTestId("google-sign-in").click();
   await expect(page.getByTestId("player-provider-status")).toHaveText(
-    "Google sign-in is not configured correctly.",
+    "Google sign-in needs a Google OAuth client ID.",
   );
 });

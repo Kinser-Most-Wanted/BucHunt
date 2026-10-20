@@ -14,11 +14,11 @@ test("application navigation exposes working configuration and player workspaces
   await expect(page.getByTestId("task-form")).toBeVisible();
   await page.getByRole("link", { name: "Player tasks", exact: true }).click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
-    "Choose Google to sign in and see your active Hunts.",
+    "No tasks loaded.",
   );
 });
 
-test("Google sign-in creates one verified session shared by administration and player pages", async ({
+test("administrator Google sign-in uses the verified server session", async ({
   page,
 }) => {
   let authenticated = false;
@@ -110,14 +110,6 @@ test("Google sign-in creates one verified session shared by administration and p
     "Signed in with administrator access.",
   );
   await expect(page.locator("#admin-panel")).toBeVisible();
-
-  await page.goto("/player.html");
-  await expect(page.getByTestId("player-name-form")).toBeVisible();
-  await page.getByTestId("player-display-name-input").fill("Baja");
-  await page.getByRole("button", { name: "Save name and continue" }).click();
-  await expect(page.getByTestId("player-display-name")).toHaveText("Baja");
-  await page.getByTestId("player-sign-out").click();
-  await expect(page.getByTestId("player-heading")).toHaveText(
-    "Sign in to see active Hunts",
-  );
+  await page.locator("#sign-out").click();
+  await expect(page.locator("#admin-login")).toBeVisible();
 });

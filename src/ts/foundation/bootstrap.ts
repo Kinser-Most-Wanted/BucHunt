@@ -13,5 +13,5 @@ if (adminAccess) mountAdminAccess(adminAccess, services.authentication);
 if (createHunt) mountCreateHunt(createHunt, services.repository);
 if (defineTask) mountDefineTask(defineTask, services.repository);
 if (displayTasks)
-  mountDisplayTasks(displayTasks, services.repository, services.authentication);
+  mountDisplayTasks(displayTasks, services.repository);
 

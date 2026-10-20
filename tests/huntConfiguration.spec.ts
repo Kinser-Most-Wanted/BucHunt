@@ -96,52 +96,6 @@ test("create hunt, save task, reload configuration and persist player completion
   await page.route("https://accounts.google.com/gsi/client", (route) =>
     route.fulfill({ contentType: "application/javascript", body: "" }),
   );
-  let authenticated = false;
-  const session = {
-    user: {
-      subject: "google-account-123",
-      email: "player@example.com",
-      expiresAt: Math.floor(Date.now() / 1000) + 60 * 60,
-      role: "user",
-    },
-  };
-  await page.route("**/api/auth/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/api/auth/config") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          clientId: "test-client-id",
-          nonce: "test-nonce",
-        }),
-      });
-    } else if (path === "/api/auth/session") {
-      await route.fulfill({
-        status: authenticated ? 200 : 401,
-        contentType: "application/json",
-        body: JSON.stringify(
-          authenticated ? session : { error: "Unauthorized" },
-        ),
-      });
-    } else if (path === "/api/auth/login") {
-      authenticated = true;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(session),
-      });
-    } else if (path === "/api/auth/logout") {
-      authenticated = false;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ signedOut: true }),
-      });
-    } else {
-      await route.continue();
-    }
-  });
   await page.addInitScript(() => {
     Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", {
       value: "test-client-id",

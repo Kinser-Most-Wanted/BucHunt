@@ -52,6 +52,7 @@ export interface PlayerIdentity {
   email: string;
   accountId: string;
   provider: "google";
+  idToken: string;
 }
 export interface GoogleAuthConfig {
   clientId: string;

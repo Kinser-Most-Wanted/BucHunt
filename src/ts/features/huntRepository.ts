@@ -1,5 +1,9 @@
 import type { HuntRepository } from "../foundation/contracts.js";
-import type { OperationResult, PlayerHunt } from "../foundation/types.js";
+import type {
+  OperationResult,
+  PlayerHunt,
+  PlayerIdentity,
+} from "../foundation/types.js";
 
 export interface CreatorIdentity {
   id: string;
@@ -53,10 +57,12 @@ export function createHuntRepository(): HuntRepository {
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
-    async listActiveHunts(): Promise<OperationResult<PlayerHunt[]>> {
+    async listActiveHunts(
+      identity: PlayerIdentity,
+    ): Promise<OperationResult<PlayerHunt[]>> {
       try {
         const response = await fetch("/api/player/hunts", {
-          credentials: "same-origin",
+          headers: { Authorization: `Bearer ${identity.idToken}` },
         });
         if (response.status === 404 || response.status === 405) {
           return {

@@ -35,7 +35,6 @@ interface GoogleIdentityApi {
 
 declare global {
   interface Window {
-    google?: GoogleIdentityApi;
     BUCHUNT_GOOGLE_CLIENT_ID?: string;
   }
 }
@@ -455,21 +454,22 @@ export function mountDisplayTasks(
   };
 
   const configureGoogle = (): void => {
+    const google = (window as unknown as { google?: GoogleIdentityApi }).google;
     if (
       googleInitialized ||
-      !window.google ||
+      !google ||
       !googleClientId ||
       googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER
     )
       return;
-    window.google.accounts.id.initialize({
+    google.accounts.id.initialize({
       client_id: googleClientId,
       callback: acceptGoogleCredential,
     });
     googleInitialized = true;
     if (googleButtonHost && !googleButtonRendered) {
       googleButtonHost.replaceChildren();
-      window.google.accounts.id.renderButton(googleButtonHost, {
+      google.accounts.id.renderButton(googleButtonHost, {
         theme: "outline",
         size: "large",
         shape: "pill",
@@ -624,7 +624,7 @@ export function mountDisplayTasks(
     } catch {
       // The visible state still signs out for this page view.
     }
-    window.google?.accounts.id.disableAutoSelect();
+    (window as unknown as { google?: GoogleIdentityApi }).google?.accounts.id.disableAutoSelect();
     pendingIdentity = null;
     showSignedOut("Choose Google to sign in and see your active Hunts.");
   });

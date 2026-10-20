@@ -1,16 +1,11 @@
+
 name: Deploy
 
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-
+    types: [opened, synchronize, reopened]
   push:
-    branches:
-      - main
-      - stage
+    branches: [main, stage]
 
 permissions:
   id-token: write
@@ -57,13 +52,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Deploy
+        env:
+          ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
           chmod +x ./deploy/deploy.sh
           ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"

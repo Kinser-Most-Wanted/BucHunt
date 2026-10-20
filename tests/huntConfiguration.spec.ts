@@ -79,6 +79,23 @@ async function installMapMock(context: BrowserContext): Promise<void> {
   );
 }
 
+async function installAdminSession(page: Page): Promise<void> {
+  const administrator = {
+    subject: "google-admin-123",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: administrator } }),
+  );
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: { administrator, capabilities: ["administrative.access"] },
+    }),
+  );
+}
+
 async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
   await page.evaluate(
     ({ latitude, longitude }) =>
@@ -137,13 +154,20 @@ test("create hunt, save task, reload configuration and persist player completion
       },
     });
   });
-  let authenticated = false;
   const playerSession = {
     subject: "google-account-123",
     email: "player@example.com",
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     role: "user",
   };
+  const adminSession = {
+    subject: "google-admin-123",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+  let currentSession = adminSession;
+  let authenticated = true;
   await page.route("**/api/auth/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/auth/config") {
@@ -158,6 +182,7 @@ test("create hunt, save task, reload configuration and persist player completion
           : { error: "Sign in required." },
       });
     } else if (path === "/api/auth/login") {
+      currentSession = playerSession;
       authenticated = true;
       await route.fulfill({ json: { user: playerSession } });
     } else if (path === "/api/auth/logout") {
@@ -170,6 +195,14 @@ test("create hunt, save task, reload configuration and persist player completion
       });
     }
   });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: {
+        administrator: adminSession,
+        capabilities: ["administrative.access"],
+      },
+    }),
+  );
   await page.goto("/admin.html");
   await page
     .getByLabel("Hunt name", { exact: true })
@@ -206,9 +239,11 @@ test("create hunt, save task, reload configuration and persist player completion
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
+  authenticated = false;
+  currentSession = playerSession;
   await page.goto("/");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
-  await expect(page.locator("#admin-status")).toHaveText("Signed in.");
+  await expect(page).toHaveURL(/player\.html$/);
   await page.goto(`/player.html?huntId=${id}`);
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
   await page.getByTestId("player-display-name-input").fill("Baja");
@@ -239,6 +274,7 @@ test("only owners and contributors can configure a hunt through the creator work
   baseURL,
 }) => {
   await installMapMock(page.context());
+  await installAdminSession(page);
   await page.goto("/admin.html");
   await expect(page.getByTestId("creator-id")).toHaveText(
     /^browser:[a-f0-9]{64}$/,
@@ -257,6 +293,7 @@ test("only owners and contributors can configure a hunt through the creator work
   try {
     const member = await contributor.newPage();
     await installMapMock(contributor);
+    await installAdminSession(member);
     await member.goto("/admin.html");
     await expect(member.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,
@@ -268,6 +305,7 @@ test("only owners and contributors can configure a hunt through the creator work
       (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
     ).toBe(403);
     const visitor = await stranger.newPage();
+    await installAdminSession(visitor);
     await visitor.goto("/admin.html");
     await expect(visitor.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,

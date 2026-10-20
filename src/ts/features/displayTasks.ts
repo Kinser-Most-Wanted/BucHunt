@@ -454,7 +454,9 @@ export function mountDisplayTasks(
   };
 
   const configureGoogle = (): void => {
-    const google = (window as unknown as { google?: GoogleIdentityApi }).google;
+    const google = (
+      window as unknown as { google?: GoogleIdentityApi }
+    ).google;
     if (
       googleInitialized ||
       !google ||
@@ -624,7 +626,9 @@ export function mountDisplayTasks(
     } catch {
       // The visible state still signs out for this page view.
     }
-    (window as unknown as { google?: GoogleIdentityApi }).google?.accounts.id.disableAutoSelect();
+    (
+      window as unknown as { google?: GoogleIdentityApi }
+    ).google?.accounts.id.disableAutoSelect();
     pendingIdentity = null;
     showSignedOut("Choose Google to sign in and see your active Hunts.");
   });

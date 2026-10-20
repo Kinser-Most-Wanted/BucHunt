@@ -1,8 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("application navigation routes shared sign-in to player and Hunt Studio", async ({
-  page,
-}) => {
+test("navigation links to player and Hunt Studio", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/BucHunt/);
   await expect(page.getByTestId("google-sign-in")).toBeAttached();
@@ -23,9 +21,7 @@ test("application navigation routes shared sign-in to player and Hunt Studio", a
   await expect(page.getByTestId("task-form")).toBeVisible();
 });
 
-test("home Google sign-in uses the verified server session for admin access", async ({
-  page,
-}) => {
+test("shared Google sign-in checks the server admin role", async ({ page }) => {
   let authenticated = false;
   const administrator = {
     subject: "google-subject-123",

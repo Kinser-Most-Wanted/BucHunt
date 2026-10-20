@@ -132,6 +132,26 @@ function storedIdentity(): PlayerIdentity | null {
   return null;
 }
 
+function taskLocationElement(
+  location: PlayerHunt["tasks"][number]["location"],
+): HTMLParagraphElement | null {
+  if (!location) return null;
+  const latitude = location.latitude.toFixed(6);
+  const longitude = location.longitude.toFixed(6);
+  const details = document.createElement("p");
+  details.className = "task-location";
+  details.append(
+    document.createTextNode(`Location: ${latitude}, ${longitude} � `),
+  );
+  const mapLink = document.createElement("a");
+  mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
+  mapLink.target = "_blank";
+  mapLink.rel = "noopener noreferrer";
+  mapLink.textContent = "Open map";
+  details.append(mapLink);
+  return details;
+}
+
 function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
   list.replaceChildren();
   for (const hunt of hunts) {
@@ -154,7 +174,10 @@ function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
       const completion = document.createElement("span");
       completion.className = "task-completion";
       completion.textContent = task.completed ? "Completed" : "Not completed";
-      taskItem.append(label, completion);
+      taskItem.append(label);
+      const location = taskLocationElement(task.location);
+      if (location) taskItem.append(location);
+      taskItem.append(completion);
       tasks.append(taskItem);
     }
     item.append(heading, description, open, tasks);
@@ -314,7 +337,7 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     list.replaceChildren();
     huntLookup.hidden = false;
-    status.textContent = "Loading your Hunts…";
+    status.textContent = "Loading your Hunts�w^~)�v";
     const ids = storedHuntIds(signedIn.accountId);
     const hunts = await Promise.all(
       ids.map(async (id) => {
@@ -496,7 +519,7 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       huntTasks.replaceChildren();
-      huntStatus.textContent = "Loading Hunt…";
+      huntStatus.textContent = "Loading Hunt�w^~)�v";
       const result = await repository.getPlayerHunt(huntId);
       if (requestId !== huntRequest) return;
       if (!result.ok) {
@@ -536,6 +559,8 @@ export function mountDisplayTasks(
         const state = document.createElement("p");
         state.textContent = task.completed ? "Completed" : "Incomplete";
         item.append(label, state);
+        const location = taskLocationElement(task.location);
+        if (location) item.append(location);
         if (!task.completed) {
           const answerForm = document.createElement("form");
           const answerLabel = document.createElement("label");

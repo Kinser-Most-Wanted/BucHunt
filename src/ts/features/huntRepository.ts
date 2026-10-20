@@ -107,6 +107,31 @@ export function createHuntRepository(): HuntRepository {
   };
 }
 
+function parseTaskLocation(
+  value: unknown,
+): NonNullable<PlayerHunt["tasks"][number]["location"]> {
+  if (typeof value !== "object" || value === null) {
+    throw new TypeError("Invalid Player Task location.");
+  }
+  const location = value as Record<string, unknown>;
+  if (
+    typeof location.latitude !== "number" ||
+    !Number.isFinite(location.latitude) ||
+    location.latitude < -90 ||
+    location.latitude > 90 ||
+    typeof location.longitude !== "number" ||
+    !Number.isFinite(location.longitude) ||
+    location.longitude < -180 ||
+    location.longitude > 180
+  ) {
+    throw new TypeError("Invalid Player Task location.");
+  }
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+  };
+}
+
 function toPlayerHunt(value: unknown): PlayerHunt {
   if (typeof value !== "object" || value === null) {
     throw new TypeError("Invalid Player Hunt response.");
@@ -140,6 +165,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
           : (candidate.id as string),
       displayLabel: item.displayLabel,
       completed: item.completed,
+      ...(item.location !== undefined
+        ? { location: parseTaskLocation(item.location) }
+        : {}),
     };
   });
   return {

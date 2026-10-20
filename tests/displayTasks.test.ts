@@ -66,7 +66,12 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
           name: "Campus Hunt",
           description: "Find the campus landmarks.",
           tasks: [
-            { id: "task-1", displayLabel: "Old Fountain", completed: true },
+            {
+              id: "task-1",
+              displayLabel: "Old Fountain",
+              completed: true,
+              location: { latitude: 36.304, longitude: -82.368 },
+            },
             { id: "task-2", displayLabel: "Library Steps", completed: false },
           ],
         },
@@ -134,6 +139,17 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Old Fountain",
+  );
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Location: 36.304000, -82.368000",
+  );
+  await expect(
+    page
+      .getByTestId("player-hunt-list")
+      .getByRole("link", { name: "Open map" }),
+  ).toHaveAttribute(
+    "href",
+    "https://www.openstreetmap.org/?mlat=36.304000&mlon=-82.368000#map=18/36.304000/-82.368000",
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText("Completed");
   await expect(page.getByTestId("player-hunt-list")).toContainText(

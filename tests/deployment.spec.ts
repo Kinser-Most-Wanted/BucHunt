@@ -7,6 +7,7 @@ test("application navigation exposes working configuration and player workspaces
   await expect(page).toHaveTitle(/BucHunt/);
   await page.getByRole("link", { name: "Open administration" }).click();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await expect(page.locator("#google-sign-in")).toBeAttached();
   await expect(
     page.getByRole("button", { name: "Create hunt", exact: true }),
   ).toBeEnabled();

@@ -12,7 +12,7 @@
       crossorigin=""
     />
   </head>
-  <body>
+  <body data-page="admin">
     <header>
       <a class="brand" href="./index.html">BucHunt</a>
       <nav aria-label="Main navigation">
@@ -33,12 +33,46 @@
         Task details are submitted through the hunt service. A task is shown as
         saved only after the service confirms it.
       </p>
+      <section
+        id="admin-access"
+        data-testid="admin-access"
+        class="access-panel"
+        aria-labelledby="admin-access-heading"
+      >
+        <h2 id="admin-access-heading">Administrator sign-in</h2>
+        <p>
+          Google sign-in verifies administrator access. Hunt creation continues
+          to use your creator profile below.
+        </p>
+        <section id="admin-login">
+          <p>Sign in with your Google account.</p>
+          <div id="google-sign-in"></div>
+        </section>
+        <p id="admin-status" role="status" aria-live="polite">
+          Checking administrator session...
+        </p>
+        <section id="user-panel" hidden>
+          <p>This Google account is signed in without administrator access.</p>
+        </section>
+        <section id="signed-in" hidden>
+          <p id="admin-identity"></p>
+          <button id="sign-out" type="button">
+            Sign out of administrator session
+          </button>
+        </section>
+        <section id="admin-panel" hidden>
+          <p>
+            Administrator access is active. Hunt Studio edits use the creator
+            profile below.
+          </p>
+        </section>
+      </section>
       <section class="access-panel" aria-labelledby="creator-heading">
         <h2 id="creator-heading">Your creator profile</h2>
         <p>
           No administrator token is needed. This temporary profile belongs to
-          this browser. Google sign-in will be added later; clearing cookies
-          loses access to this profile.
+          this browser. This browser profile is separate from Google
+          administrator sign-in; clearing cookies loses access to this profile.
         </p>
         <p>
           Your creator ID:
@@ -313,6 +347,7 @@
       crossorigin=""
       defer
     ></script>
+    <script type="module" src="./js/admin.js"></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>

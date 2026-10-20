@@ -7,6 +7,24 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   CloudFrontPrefixListId:
     Type: String
+  AdminCodeBucket:
+    Type: String
+    Description: Private S3 bucket in this region containing the authentication Lambda ZIP
+  AdminCodeKey:
+    Type: String
+    Description: Immutable S3 object key for the authentication Lambda ZIP
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: Google Identity Services Web application client ID
+  AdminEmails:
+    Type: String
+    Default: ''
+    Description: Comma-separated verified Google email addresses allowed administrator access
+  AdminOrigin:
+    Type: String
+    Default: https://localhost
+    Description: Exact HTTPS origin allowed to submit authentication requests
   ImageId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
@@ -123,6 +141,112 @@ Resources:
           SERVICE
           systemctl daemon-reload
           systemctl enable buchunt
+  AdminSessions:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+  AdminApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-admin'
+      ProtocolType: HTTP
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: AdminSessions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt AdminSessions.Arn
+  AdminFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: admin.handler
+      Role: !GetAtt AdminRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Code:
+        S3Bucket: !Ref AdminCodeBucket
+        S3Key: !Ref AdminCodeKey
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          ADMIN_EMAILS: !Ref AdminEmails
+          ADMIN_SESSION_TABLE: !Ref AdminSessions
+          ADMIN_ORIGIN: !Ref AdminOrigin
+  AdminIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref AdminApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt AdminFunction.Arn
+      PayloadFormatVersion: '2.0'
+  AdminCapabilityRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/admin/capabilities
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AuthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth/{proxy+}
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AuthRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AdminStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref AdminApi
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+  AdminInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/admin/capabilities'
+  AuthInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/auth*'
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -130,6 +254,11 @@ Resources:
         Enabled: true
         DefaultRootObject: index.html
         Origins:
+          - Id: AdminApiOrigin
+            DomainName: !Sub '${AdminApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
           - Id: ApplicationOrigin
             DomainName: !GetAtt ApplicationInstance.PublicDnsName
             CustomOriginConfig:
@@ -154,6 +283,23 @@ Resources:
             Headers: ["*"]
             Cookies:
               Forward: all
+        CacheBehaviors:
+          - PathPattern: /api/auth*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          - PathPattern: /api/admin/capabilities*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         PriceClass: PriceClass_100
 Outputs:
   BucketName:

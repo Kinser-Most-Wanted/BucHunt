@@ -3,6 +3,16 @@ set -euo pipefail
 
 if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name>"; exit 1; fi
 STACK_NAME="$1"
+ARTIFACT_BUCKET="${ADMIN_ARTIFACT_BUCKET:-}"
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+ADMIN_EMAILS="${ADMIN_EMAILS:-}"
+if [[ -z "$ARTIFACT_BUCKET" ]]; then
+  echo "Missing ADMIN_ARTIFACT_BUCKET. Configure a private S3 bucket in us-east-1 for the authentication Lambda." >&2
+  exit 1
+fi
+case "$STACK_NAME" in
+  bucstop-pr-[0-9]*) GOOGLE_CLIENT_ID=""; ADMIN_EMAILS="" ;;
+esac
 if [[ ! "$STACK_NAME" =~ ^[A-Za-z][A-Za-z0-9-]*$ ]]; then echo "Invalid stack name"; exit 1; fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/.."
@@ -15,18 +25,30 @@ PREFIX_ID="$(aws ec2 describe-managed-prefix-lists --filters Name=prefix-list-na
 for value in "$VPC_ID" "$SUBNET_ID" "$PREFIX_ID"; do
   if [[ -z "$value" || "$value" == None ]]; then echo "A public subnet/VPC and CloudFront origin prefix list are required"; exit 1; fi
 done
-(cd "$PROJECT_ROOT" && pnpm build)
-aws cloudformation deploy --stack-name "$STACK_NAME" --template-file "$SCRIPT_DIR/infrastructure.yml" --capabilities CAPABILITY_IAM --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "CloudFrontPrefixListId=$PREFIX_ID" --no-fail-on-empty-changeset
+ADMIN_BUILD="$(mktemp -d)"
+ADMIN_ZIP="$ADMIN_BUILD/admin.zip"
+ARCHIVE=""
+PARAMETERS=""
+trap 'rm -f "${ARCHIVE:-}" "${PARAMETERS:-}"; rm -rf "$ADMIN_BUILD"' EXIT
+(cd "$PROJECT_ROOT" && pnpm build && pnpm build:admin "$ADMIN_BUILD")
+printf '%s\n' '{"name":"buchunt-admin-runtime","version":"1.0.0","private":true,"type":"commonjs"}' > "$ADMIN_BUILD/package.json"
+npm install --omit=dev --prefix "$ADMIN_BUILD" '@aws-sdk/client-dynamodb@3.1152.0' 'google-auth-library@10.9.1'
+(cd "$ADMIN_BUILD" && zip -qr "$ADMIN_ZIP" admin.js package.json node_modules)
+ADMIN_CODE_KEY="admin/${STACK_NAME}/${GITHUB_SHA:-local}-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-1}.zip"
+aws s3 cp "$ADMIN_ZIP" "s3://$ARTIFACT_BUCKET/$ADMIN_CODE_KEY" --only-show-errors
+aws cloudformation deploy --stack-name "$STACK_NAME" --template-file "$SCRIPT_DIR/infrastructure.yml" --capabilities CAPABILITY_IAM --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "CloudFrontPrefixListId=$PREFIX_ID" "AdminCodeBucket=$ARTIFACT_BUCKET" "AdminCodeKey=$ADMIN_CODE_KEY" "GoogleClientId=$GOOGLE_CLIENT_ID" "AdminEmails=$ADMIN_EMAILS" --no-fail-on-empty-changeset
 output() { aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 BUCKET="$(output BucketName)"
 INSTANCE="$(output InstanceId)"
 SECRET="$(output OriginSecretArn)"
 SITE_URL="$(output SiteUrl)"
+# Bind Google login POSTs to the deployed HTTPS site. A separate parameter avoids
+# a CloudFormation dependency cycle between the function and its distribution.
+aws cloudformation deploy --stack-name "$STACK_NAME" --template-file "$SCRIPT_DIR/infrastructure.yml" --capabilities CAPABILITY_IAM --parameter-overrides "VpcId=$VPC_ID" "SubnetId=$SUBNET_ID" "CloudFrontPrefixListId=$PREFIX_ID" "AdminCodeBucket=$ARTIFACT_BUCKET" "AdminCodeKey=$ADMIN_CODE_KEY" "GoogleClientId=$GOOGLE_CLIENT_ID" "AdminEmails=$ADMIN_EMAILS" "AdminOrigin=$SITE_URL" --no-fail-on-empty-changeset
 DISTRIBUTION="$(output DistributionId)"
 RELEASE="$(date -u +%Y%m%d%H%M%S)-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD)"
 ARCHIVE="$(mktemp)"
 PARAMETERS="$(mktemp)"
-trap 'rm -f "$ARCHIVE" "$PARAMETERS"' EXIT
 # Neither source configuration nor runtime data is uploaded to the public app.
 tar -czf "$ARCHIVE" -C "$PROJECT_ROOT" package.json -C src index.html admin.html player.html css js
 aws s3 cp "$ARCHIVE" "s3://$BUCKET/releases/$RELEASE.tar.gz" --only-show-errors

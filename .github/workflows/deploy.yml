@@ -25,6 +25,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm lint
+      - run: pnpm check:admin
+      - run: pnpm test:admin
       - run: pnpm format:check
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
@@ -68,6 +70,10 @@ jobs:
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
       - name: Deploy application and durable storage
         id: release
+        env:
+          ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
       - run: pnpm exec playwright install --with-deps chromium
       - name: Verify deployed hunt creation, persistence, and player workflow

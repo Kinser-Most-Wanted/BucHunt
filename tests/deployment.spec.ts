@@ -106,7 +106,7 @@ test("Google sign-in creates one verified session shared by administration and p
 
   await page.goto("/admin.html");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
-  await expect(page.getByTestId("admin-status")).toHaveText(
+  await expect(page.locator("#admin-status")).toHaveText(
     "Signed in with administrator access.",
   );
   await expect(page.locator("#admin-panel")).toBeVisible();

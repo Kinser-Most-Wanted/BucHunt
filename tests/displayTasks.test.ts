@@ -21,13 +21,18 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ clientId: "test-client-id", nonce: "test-nonce" }),
+        body: JSON.stringify({
+          clientId: "test-client-id",
+          nonce: "test-nonce",
+        }),
       });
     } else if (path === "/api/auth/session") {
       await route.fulfill({
         status: authenticated ? 200 : 401,
         contentType: "application/json",
-        body: JSON.stringify(authenticated ? session : { error: "Unauthorized" }),
+        body: JSON.stringify(
+          authenticated ? session : { error: "Unauthorized" },
+        ),
       });
     } else if (path === "/api/auth/login") {
       authenticated = true;
@@ -225,6 +230,26 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
 test("shows why Google sign-in is unavailable until configured", async ({
   page,
 }) => {
+  await page.route("**/api/auth/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/auth/session") {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Sign-in required." }),
+      });
+      return;
+    }
+    if (path === "/api/auth/config") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ clientId: "", nonce: "test-nonce" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
   await page.addInitScript(() => {
     Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", { value: "" });
   });
@@ -233,6 +258,6 @@ test("shows why Google sign-in is unavailable until configured", async ({
   await expect(page.getByTestId("player-sign-out")).toBeHidden();
   await page.getByTestId("google-sign-in").click();
   await expect(page.getByTestId("player-provider-status")).toHaveText(
-    "Google sign-in needs a Google OAuth client ID.",
+    "Google sign-in is not configured correctly.",
   );
 });

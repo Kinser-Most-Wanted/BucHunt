@@ -11,9 +11,7 @@ test("navigation links to player and Hunt Studio", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Sign in from BucHunt home" }),
   ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Administration", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Administration", exact: true }).click();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Go to BucHunt sign-in" }),
@@ -103,9 +101,7 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   );
 
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Sign in with Google" })
-    .click();
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
   await expect(page.locator("#admin-status")).toHaveText(
     "Signed in with administrator access.",
   );

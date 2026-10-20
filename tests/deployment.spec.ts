@@ -1,24 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-test("application navigation exposes working configuration and player workspaces", async ({
+test("application navigation routes shared sign-in to player and Hunt Studio", async ({
   page,
 }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/BucHunt/);
-  await page.getByRole("link", { name: "Open administration" }).click();
-  await expect(page.getByTestId("hunt-form")).toBeVisible();
-  await expect(page.locator("#google-sign-in")).toBeAttached();
-  await expect(
-    page.getByRole("button", { name: "Create hunt", exact: true }),
-  ).toBeEnabled();
-  await expect(page.getByTestId("task-form")).toBeVisible();
+  await expect(page.getByTestId("google-sign-in")).toBeAttached();
   await page.getByRole("link", { name: "Player tasks", exact: true }).click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
     "No tasks loaded.",
   );
+  await expect(page.getByRole("button", { name: "Sign in from BucHunt home" })).toBeVisible();
+  await page.getByRole("link", { name: "Administration", exact: true }).click();
+  await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to BucHunt sign-in" })).toBeVisible();
+  await expect(page.getByTestId("task-form")).toBeVisible();
 });
 
-test("administrator Google sign-in uses the verified server session", async ({
+test("home Google sign-in uses the verified server session for admin access", async ({
   page,
 }) => {
   let authenticated = false;
@@ -54,9 +53,7 @@ test("administrator Google sign-in uses the verified server session", async ({
             button.type = "button";
             button.textContent = "Sign in with Google";
             button.addEventListener("click", () => {
-              testWindow.googleCallback?.({
-                credential: "verified-test-token",
-              });
+              testWindow.googleCallback?.({ credential: "verified-test-token" });
             });
             parent.replaceChildren(button);
           },
@@ -97,19 +94,20 @@ test("administrator Google sign-in uses the verified server session", async ({
   });
   await page.route("**/api/admin/capabilities", (route) =>
     route.fulfill({
-      json: {
-        administrator,
-        capabilities: ["administrative.access"],
-      },
+      json: { administrator, capabilities: ["administrative.access"] },
     }),
   );
 
-  await page.goto("/admin.html");
+  await page.goto("/");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
   await expect(page.locator("#admin-status")).toHaveText(
     "Signed in with administrator access.",
   );
   await expect(page.locator("#admin-panel")).toBeVisible();
+  await page.getByRole("link", { name: "Open Hunt Studio" }).click();
+  await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await expect(page.locator("#admin-panel")).toBeVisible();
   await page.locator("#sign-out").click();
   await expect(page.locator("#admin-login")).toBeVisible();
+  await expect(page.locator("#home-sign-in-link")).toBeVisible();
 });

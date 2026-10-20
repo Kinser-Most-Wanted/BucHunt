@@ -103,6 +103,11 @@ async function initialize(): Promise<void> {
   await prepareGoogle();
 }
 async function loadGoogle(): Promise<void> {
+  const existingGoogle = (window as Window & { google?: GoogleIdentity }).google;
+  if (existingGoogle) {
+    google = existingGoogle;
+    return;
+  }
   if (google) return;
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");

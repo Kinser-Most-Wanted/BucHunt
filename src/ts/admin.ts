@@ -59,7 +59,7 @@ function rememberPlayerSession(user: { subject?: unknown; email?: unknown }, cre
 function signedOut(message: string): void {
   clearTimeout(expiryTimer);
   clearPlayerSession();
-  if (loginPanel) loginPanel.hidden = !isHomePage;
+  if (loginPanel) loginPanel.hidden = false;
   if (googleButton) googleButton.hidden = !isHomePage;
   if (adminPanel) adminPanel.hidden = true;
   if (userPanel) userPanel.hidden = true;

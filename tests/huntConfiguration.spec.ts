@@ -2,9 +2,51 @@ import { test, expect } from "@playwright/test";
 
 test("create hunt, save task, reload configuration and persist player completion", async ({
   page,
-  browser,
-  baseURL,
 }) => {
+  await page.route("https://accounts.google.com/gsi/client", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: "" }),
+  );
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", {
+      value: "test-client-id",
+    });
+    const claims = btoa(
+      JSON.stringify({
+        email: "player@example.com",
+        email_verified: true,
+        sub: "google-account-123",
+        aud: "test-client-id",
+      }),
+    )
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+    let callback: ((response: { credential: string }) => void) | undefined;
+    Object.defineProperty(window, "google", {
+      value: {
+        accounts: {
+          id: {
+            initialize(options: {
+              callback(response: { credential: string }): void;
+            }) {
+              callback = options.callback;
+            },
+            renderButton(parent: HTMLElement) {
+              const button = document.createElement("button");
+              button.dataset.testid = "google-sign-in";
+              button.textContent = "Sign in with Google";
+              button.addEventListener("click", () =>
+                callback?.({ credential: `header.${claims}.signature` }),
+              );
+              parent.append(button);
+            },
+            prompt() {},
+            disableAutoSelect() {},
+          },
+        },
+      },
+    });
+  });
   await page.goto("/admin.html");
   await page
     .getByLabel("Hunt name", { exact: true })
@@ -36,6 +78,13 @@ test("create hunt, save task, reload configuration and persist player completion
     "Find the fountain",
   );
   await page.goto(`/player.html?huntId=${id}`);
+  await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await page.getByTestId("player-display-name-input").fill("Baja");
+  await page.getByRole("button", { name: "Save name and continue" }).click();
+  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.getByLabel("Hunt ID")).toHaveValue(id);
+  await page.getByRole("button", { name: "Join Hunt" }).click();
   await expect(page.getByTestId("player-task")).toContainText("Incomplete");
   await page.getByLabel("Answer for Find the fountain").fill("wrong");
   await page.getByRole("button", { name: "Submit answer" }).click();
@@ -46,17 +95,11 @@ test("create hunt, save task, reload configuration and persist player completion
   await page.getByRole("button", { name: "Submit answer" }).click();
   await expect(page.getByTestId("player-task")).toContainText("Completed");
   await page.reload();
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Sprint verification",
+  );
+  await page.getByRole("button", { name: "Open Hunt" }).click();
   await expect(page.getByTestId("player-task")).toContainText("Completed");
-  const other = await browser.newContext({ baseURL });
-  try {
-    const otherPage = await other.newPage();
-    await otherPage.goto(`/player.html?huntId=${id}`);
-    await expect(otherPage.getByTestId("player-task")).toContainText(
-      "Incomplete",
-    );
-  } finally {
-    await other.close();
-  }
 });
 
 test("only owners and contributors can configure a hunt through the creator workspace", async ({

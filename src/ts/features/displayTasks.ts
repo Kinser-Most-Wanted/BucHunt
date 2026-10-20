@@ -3,6 +3,7 @@ import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
+const PLAYER_HUNTS_KEY_PREFIX = "buchunt.player-hunts.";
 const GOOGLE_CLIENT_ID_PLACEHOLDER = "YOUR_GOOGLE_CLIENT_ID";
 
 interface GoogleCredentialResponse {
@@ -90,6 +91,28 @@ function storedDisplayName(accountId: string): string | null {
   }
 }
 
+function storedHuntIds(accountId: string): string[] {
+  try {
+    const value = JSON.parse(
+      localStorage.getItem(`${PLAYER_HUNTS_KEY_PREFIX}${accountId}`) ?? "[]",
+    ) as unknown;
+    return Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHuntId(accountId: string, huntId: string): void {
+  const ids = storedHuntIds(accountId);
+  if (!ids.includes(huntId)) ids.push(huntId);
+  localStorage.setItem(
+    `${PLAYER_HUNTS_KEY_PREFIX}${accountId}`,
+    JSON.stringify(ids),
+  );
+}
+
 function storedIdentity(): PlayerIdentity | null {
   try {
     const value = JSON.parse(
@@ -118,6 +141,10 @@ function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
     heading.textContent = hunt.name;
     const description = document.createElement("p");
     description.textContent = hunt.description;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.dataset.huntId = hunt.id;
+    open.textContent = "Open Hunt";
     const tasks = document.createElement("ul");
     tasks.setAttribute("aria-label", `${hunt.name} tasks`);
     for (const task of hunt.tasks) {
@@ -130,7 +157,7 @@ function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
       taskItem.append(label, completion);
       tasks.append(taskItem);
     }
-    item.append(heading, description, tasks);
+    item.append(heading, description, open, tasks);
     list.append(item);
   }
 }
@@ -194,6 +221,9 @@ export function mountDisplayTasks(
   const nameInput = root.querySelector<HTMLInputElement>(
     '[data-testid="player-display-name-input"]',
   );
+  const huntLookup = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-lookup"]',
+  );
   if (
     !heading ||
     !status ||
@@ -212,7 +242,8 @@ export function mountDisplayTasks(
     !accountIdValue ||
     !copyAccountId ||
     !nameForm ||
-    !nameInput
+    !nameInput ||
+    !huntLookup
   )
     return;
 
@@ -250,6 +281,7 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
+    huntLookup.hidden = true;
     heading.textContent = "Sign in to see active Hunts";
     list.replaceChildren();
     status.textContent = message;
@@ -262,7 +294,7 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(false);
     providerStatus.hidden = true;
     nameForm.hidden = true;
-    heading.textContent = "Your active Hunts";
+    heading.textContent = "Your Hunts";
     signOut.hidden = false;
     account.hidden = false;
     displayName.textContent = name;
@@ -281,20 +313,24 @@ export function mountDisplayTasks(
     accountIdToggle.setAttribute("aria-expanded", "false");
     copyAccountId.hidden = true;
     list.replaceChildren();
-    status.textContent = "Loading your active Hunts…";
-    try {
-      const result = await repository.listActiveHunts(signedIn);
-      if (!result.ok) {
-        status.textContent = result.message;
-        return;
-      }
-      renderHunts(list, result.value);
-      status.textContent = result.value.length
-        ? `${result.value.length} active Hunt${result.value.length === 1 ? "" : "s"} available.`
-        : "No active Hunts are available for this account.";
-    } catch {
-      status.textContent = "Active Hunts could not be loaded. Try again later.";
-    }
+    huntLookup.hidden = false;
+    status.textContent = "Loading your Hunts…";
+    const ids = storedHuntIds(signedIn.accountId);
+    const hunts = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const result = await repository.getPlayerHunt(id);
+          return result.ok ? result.value : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const available = hunts.filter((hunt): hunt is PlayerHunt => hunt !== null);
+    renderHunts(list, available);
+    status.textContent = available.length
+      ? `${available.length} saved Hunt${available.length === 1 ? "" : "s"}.`
+      : "You have no saved Hunts yet. Join one with its ID below.";
   };
 
   let pendingIdentity: PlayerIdentity | null = null;
@@ -307,6 +343,7 @@ export function mountDisplayTasks(
     accountIdDetails.hidden = true;
     heading.textContent = "Set up your player profile";
     nameForm.hidden = false;
+    huntLookup.hidden = true;
     signOut.hidden = false;
     nameInput.value = "";
     nameInput.focus();
@@ -466,6 +503,27 @@ export function mountDisplayTasks(
         huntStatus.textContent = result.message;
         return;
       }
+      const identity = storedIdentity();
+      if (identity) {
+        try {
+          saveHuntId(identity.accountId, huntId);
+          const saved = await Promise.all(
+            storedHuntIds(identity.accountId).map(async (id) => {
+              const savedResult = await repository.getPlayerHunt(id);
+              return savedResult.ok ? savedResult.value : null;
+            }),
+          );
+          renderHunts(
+            list,
+            saved.filter((hunt): hunt is PlayerHunt => hunt !== null),
+          );
+          const savedCount = storedHuntIds(identity.accountId).length;
+          status.textContent = `${savedCount} saved Hunt${savedCount === 1 ? "" : "s"}.`;
+        } catch {
+          huntStatus.textContent =
+            "Hunt opened, but this browser could not save it to your profile.";
+        }
+      }
       huntName.textContent = result.value.name;
       huntStatus.textContent = result.value.tasks.length
         ? `${result.value.tasks.length} tasks loaded.`
@@ -525,11 +583,14 @@ export function mountDisplayTasks(
       event.preventDefault();
       void loadHunt(huntInput.value.trim());
     });
+    list.addEventListener("click", (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+        "button[data-hunt-id]",
+      );
+      if (button) void loadHunt(button.dataset.huntId ?? "");
+    });
     const selectedHunt = new URLSearchParams(location.search).get("huntId");
-    if (selectedHunt) {
-      huntInput.value = selectedHunt;
-      void loadHunt(selectedHunt);
-    }
+    if (selectedHunt) huntInput.value = selectedHunt;
   }
 
   signOut.addEventListener("click", () => {

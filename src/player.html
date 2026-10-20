@@ -164,18 +164,20 @@
         </p>
         <ul
           data-testid="player-hunt-list"
-          aria-label="Active Hunts"
+          aria-label="Your Hunts"
           class="player-hunt-list"
         ></ul>
         <section
+          data-testid="player-hunt-lookup"
           class="player-hunt-lookup"
           aria-labelledby="hunt-lookup-heading"
+          hidden
         >
-          <h2 id="hunt-lookup-heading">Open a Hunt by ID</h2>
+          <h2 id="hunt-lookup-heading">Join a Hunt</h2>
           <form data-testid="player-hunt-form">
             <label for="player-hunt-id">Hunt ID</label>
             <input id="player-hunt-id" name="huntId" required />
-            <button type="submit">Load Hunt</button>
+            <button type="submit">Join Hunt</button>
           </form>
           <p role="status" data-testid="player-hunt-lookup-status"></p>
           <h3 data-testid="player-hunt-name">Selected Hunt</h3>

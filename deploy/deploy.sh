@@ -10,9 +10,6 @@ if [[ -z "$ARTIFACT_BUCKET" ]]; then
   echo "Missing ADMIN_ARTIFACT_BUCKET. Configure a private S3 bucket in us-east-1 for the authentication Lambda." >&2
   exit 1
 fi
-case "$STACK_NAME" in
-  bucstop-pr-[0-9]*) GOOGLE_CLIENT_ID=""; ADMIN_EMAILS="" ;;
-esac
 if [[ ! "$STACK_NAME" =~ ^[A-Za-z][A-Za-z0-9-]*$ ]]; then echo "Invalid stack name"; exit 1; fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/.."

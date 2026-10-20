@@ -14,7 +14,7 @@ test("application navigation exposes working configuration and player workspaces
   await expect(page.getByTestId("task-form")).toBeVisible();
   await page.getByRole("link", { name: "Player tasks", exact: true }).click();
   await expect(page.getByTestId("player-task-status")).toHaveText(
-    "No tasks loaded.",
+    "Choose Google to sign in and see your active Hunts.",
   );
 });
 

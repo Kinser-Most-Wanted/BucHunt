@@ -28,7 +28,7 @@ jobs:
       - run: pnpm check:admin
       - run: pnpm test:admin
       - run: pnpm format:check
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install chromium
       - run: pnpm test
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -75,7 +75,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install chromium
       - name: Verify deployed hunt creation, persistence, and player workflow
         env:
           BASE_URL: ${{ steps.release.outputs.site_url }}

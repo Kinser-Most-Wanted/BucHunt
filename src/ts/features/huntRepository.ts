@@ -2,7 +2,6 @@ import type { HuntRepository } from "../foundation/contracts.js";
 import type {
   OperationResult,
   PlayerHunt,
-  PlayerIdentity,
 } from "../foundation/types.js";
 
 export interface CreatorIdentity {
@@ -57,9 +56,7 @@ export function createHuntRepository(): HuntRepository {
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
-    async listActiveHunts(
-      _identity: PlayerIdentity,
-    ): Promise<OperationResult<PlayerHunt[]>> {
+    async listActiveHunts(): Promise<OperationResult<PlayerHunt[]>> {
       try {
         const response = await fetch("/api/player/hunts", {
           credentials: "same-origin",

@@ -407,6 +407,7 @@ export function mountDisplayTasks(
       if (googleButtonHost) {
         googleButtonHost.replaceChildren();
         google.accounts.id.renderButton(googleButtonHost, {
+          type: "standard",
           theme: "outline",
           size: "large",
           shape: "pill",

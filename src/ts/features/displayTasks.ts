@@ -39,6 +39,10 @@ declare global {
   }
 }
 
+function playerGoogleIdentity(): GoogleIdentityApi | undefined {
+  return (window as unknown as { google?: GoogleIdentityApi }).google;
+}
+
 function decodeClaims(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split(".")[1];
@@ -454,9 +458,7 @@ export function mountDisplayTasks(
   };
 
   const configureGoogle = (): void => {
-    const google = (
-      window as unknown as { google?: GoogleIdentityApi }
-    ).google;
+    const google = playerGoogleIdentity();
     if (
       googleInitialized ||
       !google ||
@@ -626,9 +628,7 @@ export function mountDisplayTasks(
     } catch {
       // The visible state still signs out for this page view.
     }
-    (
-      window as unknown as { google?: GoogleIdentityApi }
-    ).google?.accounts.id.disableAutoSelect();
+    playerGoogleIdentity()?.accounts.id.disableAutoSelect();
     pendingIdentity = null;
     showSignedOut("Choose Google to sign in and see your active Hunts.");
   });

@@ -1,3 +1,6 @@
+﻿import { OAuth2Client } from "google-auth-library";
+import { DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+
 interface ApiEvent {
   rawPath: string;
   headers: Record<string, string | undefined>;
@@ -6,139 +9,147 @@ interface ApiEvent {
   isBase64Encoded?: boolean;
   requestContext: { http: { method: string } };
 }
-
-interface Config {
-  region: string;
-  poolId: string;
-  clientId: string;
-  origin: string;
+interface Config { clientId: string; origin: string; adminEmails: string[]; }
+interface StoredSession { kind: "login" | "session"; subject: string; email: string; expiresAt: number; }
+export interface SessionStore {
+  get(key: string): Promise<StoredSession | undefined>;
+  put(key: string, value: StoredSession): Promise<void>;
+  take(key: string): Promise<StoredSession | undefined>;
 }
-
-type Transport = (operation: string, body: Record<string, unknown>) => Promise<Record<string, unknown>>;
-
+type VerifyGoogle = (credential: string, nonce: string) => Promise<{ subject: string; email: string }>;
 class HttpError extends Error {
   status: number;
   constructor(status: number, message: string) { super(message); this.status = status; }
 }
+const sessionCookie = "__Host-buchunt-session";
+const loginCookie = "__Host-buchunt-login";
+const cookie = (name: string, token: string, age: number) =>
+  `${name}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${age}`;
+const now = () => Math.floor(Date.now() / 1000);
+const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
+async function sessionKey(kind: string, token: string) {
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  return `${kind}:${Array.from(hash, byte => byte.toString(16).padStart(2, "0")).join("")}`;
+}
 
-const cookieName = "__Host-buchunt-admin";
-const cookie = (token: string, age: number) =>
-  `${cookieName}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${age}`;
-
-export function createAdminHandler(config: Config, transport?: Transport) {
-  const call: Transport = transport ?? (async (operation, body) => {
-    const response = await fetch(`https://cognito-idp.${config.region}.amazonaws.com/`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-amz-json-1.1",
-        "x-amz-target": `AWSCognitoIdentityProviderService.${operation}`,
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) {
-      const failure = await response.json() as { __type?: string };
-      if (response.status === 429 || failure.__type?.endsWith("TooManyRequestsException")) {
-        throw new HttpError(429, "Too many requests. Try again later.");
-      }
-      if (response.status >= 500) throw new HttpError(503, "Authentication is temporarily unavailable.");
-      throw new HttpError(401, "Administrative authentication failed.");
-    }
-    return await response.json() as Record<string, unknown>;
-  });
-
-  async function authenticate(token: string) {
-    if (!token || token.length > 3800 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
-      throw new HttpError(401, "Administrator sign-in required.");
-    }
-    // GetUser validates the signature, expiry and revocation with Cognito on every request.
-    // Claims are trusted only after this succeeds; decoding alone is not authentication.
-    const user = await call("GetUser", { AccessToken: token });
-    let claims: Record<string, unknown>;
+export function createAdminHandler(config: Config, store: SessionStore, verifyGoogle?: VerifyGoogle) {
+  const allowed = new Set(config.adminEmails.map(email => email.trim().toLowerCase()).filter(Boolean));
+  const google = new OAuth2Client(config.clientId);
+  const verify: VerifyGoogle = verifyGoogle ?? (async (credential, nonce) => {
     try {
-      const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-      claims = JSON.parse(atob(payload)) as Record<string, unknown>;
+      // Google's library validates Google's signature, issuer, audience and expiry.
+      const ticket = await google.verifyIdToken({ idToken: credential, audience: config.clientId });
+      const payload = ticket.getPayload() as (ReturnType<typeof ticket.getPayload> & { nonce?: string });
+      if (!payload?.sub || !payload.email || payload.email_verified !== true || payload.nonce !== nonce ||
+          (payload.azp && payload.azp !== config.clientId)) throw new Error("Invalid identity");
+      return { subject: payload.sub, email: payload.email.toLowerCase() };
     } catch {
-      throw new HttpError(401, "Administrator sign-in required.");
+      throw new HttpError(401, "Google sign-in could not be verified. Please try again.");
     }
-    if (claims.iss !== `https://cognito-idp.${config.region}.amazonaws.com/${config.poolId}` ||
-        claims.client_id !== config.clientId || claims.token_use !== "access" ||
-        typeof claims.exp !== "number" || claims.exp <= Date.now() / 1000 ||
-        typeof claims.sub !== "string" || claims.username !== user.Username) {
-      throw new HttpError(401, "Administrator sign-in required.");
-    }
-    if (!Array.isArray(claims["cognito:groups"]) || !claims["cognito:groups"].includes("Administrators")) {
-      throw new HttpError(403, "Administrator access required.");
-    }
-    return { username: user.Username, subject: claims.sub, expiresAt: claims.exp };
-  }
-
+  });
   return async (event: ApiEvent) => {
-    const headers = {
-      "content-type": "application/json",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
+    const headers: Record<string, string> = {
+      "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff",
     };
     const reply = (statusCode: number, value: unknown, cookies: string[] = []) =>
       ({ statusCode, headers, cookies, body: JSON.stringify(value) });
     try {
+      if (!config.clientId || !config.origin) throw new HttpError(503, "Google sign-in is not configured.");
       const method = event.requestContext.http.method;
       const path = event.rawPath;
       const requestHeaders = Object.fromEntries(Object.entries(event.headers).map(([key, value]) => [key.toLowerCase(), value]));
-      if (method !== "GET" && requestHeaders.origin !== config.origin) {
-        throw new HttpError(403, "Request origin denied.");
-      }
-      if (path === "/api/admin/login" && method === "POST") {
-        if (!requestHeaders["content-type"]?.toLowerCase().startsWith("application/json") ||
-            !event.body || event.body.length > 8192 || event.isBase64Encoded) {
-          throw new HttpError(400, "A JSON username and password are required.");
-        }
-        let credentials;
-        try { credentials = JSON.parse(event.body) as { username?: unknown; password?: unknown }; }
-        catch { throw new HttpError(400, "Invalid JSON request."); }
-        if (!credentials || typeof credentials.username !== "string" ||
-            !credentials.username.trim() || credentials.username.length > 128 ||
-            typeof credentials.password !== "string" || !credentials.password || credentials.password.length > 256) {
-          throw new HttpError(400, "A username and password are required.");
-        }
-        const result = await call("InitiateAuth", {
-          AuthFlow: "USER_PASSWORD_AUTH", ClientId: config.clientId,
-          AuthParameters: { USERNAME: credentials.username, PASSWORD: credentials.password },
-        });
-        const auth = result.AuthenticationResult as { AccessToken?: string } | undefined;
-        if (!auth?.AccessToken) throw new HttpError(401, "Administrative authentication failed. Complete account provisioning first.");
-        const administrator = await authenticate(auth.AccessToken);
-        return reply(200, { administrator }, [cookie(auth.AccessToken, Math.min(3600, Math.floor(administrator.expiresAt - Date.now() / 1000)))]);
-      }
-
-      // Every other administrative route, including unknown/future routes, must pass this guard.
       const rawCookies = event.cookies ?? (requestHeaders.cookie ? requestHeaders.cookie.split(/;\s*/) : []);
-      const tokens = rawCookies.filter(value => value.startsWith(`${cookieName}=`));
-      if (tokens.length !== 1) throw new HttpError(401, "Administrator sign-in required.");
-      const token = tokens[0].slice(cookieName.length + 1);
-      const administrator = await authenticate(token);
-      if (path === "/api/admin/logout" && method === "POST") {
-        await call("GlobalSignOut", { AccessToken: token });
-        return reply(200, { signedOut: true }, [cookie("", 0)]);
+      const readCookie = (name: string) => {
+        const matches = rawCookies.filter(value => value.startsWith(`${name}=`));
+        const value = matches.length === 1 ? matches[0].slice(name.length + 1) : "";
+        return /^[a-f0-9]{64}$/.test(value) ? value : "";
+      };
+      if (method !== "GET" && requestHeaders.origin !== config.origin) throw new HttpError(403, "Request origin denied.");
+      if (path === "/api/auth/config" && method === "GET") {
+        const nonce = randomToken();
+        await store.put(await sessionKey("login", nonce), { kind: "login", subject: "", email: "", expiresAt: now() + 300 });
+        return reply(200, { clientId: config.clientId, nonce }, [cookie(loginCookie, nonce, 300)]);
       }
-      if (path === "/api/admin/session" && method === "GET") return reply(200, { administrator });
-      if (path === "/api/admin/capabilities" && method === "GET") {
-        return reply(200, { administrator, capabilities: ["administrative.access"] });
+      if (path === "/api/auth/login" && method === "POST") {
+        if (!requestHeaders["content-type"]?.toLowerCase().startsWith("application/json") ||
+            !event.body || event.body.length > 16384 || event.isBase64Encoded) throw new HttpError(400, "A Google sign-in credential is required.");
+        let credentials;
+        try { credentials = JSON.parse(event.body) as { credential?: unknown }; }
+        catch { throw new HttpError(400, "Invalid JSON request."); }
+        if (!credentials || typeof credentials.credential !== "string" || !credentials.credential) throw new HttpError(400, "A Google sign-in credential is required.");
+        const nonce = readCookie(loginCookie);
+        if (!nonce) throw new HttpError(401, "Start Google sign-in again.");
+        // Delete atomically: each browser-bound Google nonce can be used only once.
+        const pending = await store.take(await sessionKey("login", nonce));
+        if (!pending || pending.kind !== "login" || pending.expiresAt <= now()) throw new HttpError(401, "Start Google sign-in again.");
+        const identity = await verify(credentials.credential, nonce);
+        const previous = readCookie(sessionCookie);
+        if (previous) await store.take(await sessionKey("session", previous));
+        const token = randomToken();
+        const session: StoredSession = { kind: "session", ...identity, expiresAt: now() + 3600 };
+        await store.put(await sessionKey("session", token), session);
+        const user = { subject: session.subject, email: session.email, expiresAt: session.expiresAt,
+          role: allowed.has(session.email.toLowerCase()) ? "administrator" : "user" };
+        return reply(200, { user }, [cookie(sessionCookie, token, 3600), cookie(loginCookie, "", 0)]);
       }
-      return reply(404, { error: "Administrative capability not found." });
+      // All signed-in users may inspect and end their own session.
+      const token = readCookie(sessionCookie);
+      if (!token) throw new HttpError(401, "Sign-in required.");
+      const key = await sessionKey("session", token);
+      const session = await store.get(key);
+      if (!session || session.kind !== "session" || session.expiresAt <= now()) throw new HttpError(401, "Session expired. Sign in again.");
+      const isAdministrator = allowed.has(session.email.toLowerCase());
+      const identity = { subject: session.subject, email: session.email, expiresAt: session.expiresAt };
+      if (path === "/api/auth/logout" && method === "POST") {
+        await store.take(key);
+        return reply(200, { signedOut: true }, [cookie(sessionCookie, "", 0)]);
+      }
+      if (path === "/api/auth/session" && method === "GET") {
+        return reply(200, { user: { ...identity, role: isAdministrator ? "administrator" : "user" } });
+      }
+      // Every current and future /api/admin route must check the server-derived role.
+      if (path === "/api/admin" || path.startsWith("/api/admin/")) {
+        if (!isAdministrator) throw new HttpError(403, "Administrator access required.");
+        if (path === "/api/admin/capabilities" && method === "GET") {
+          return reply(200, { administrator: identity, capabilities: ["administrative.access"] });
+        }
+      }
+      return reply(404, { error: "Capability not found." });
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 503;
-      const message = error instanceof HttpError ? error.message : "Authentication is temporarily unavailable.";
-      return reply(status, { error: message }, status === 401 ? [cookie("", 0)] : []);
+      const message = error instanceof HttpError ? error.message : "Sign-in is temporarily unavailable.";
+      return reply(status, { error: message }, status === 401 ? [cookie(sessionCookie, "", 0), cookie(loginCookie, "", 0)] : []);
     }
   };
 }
 
+const dynamo = new DynamoDBClient({});
+function dynamoStore(table: string): SessionStore {
+  const decode = (item: Record<string, { S?: string; N?: string }> | undefined): StoredSession | undefined => {
+    if (!item) return undefined;
+    return JSON.parse(item.data.S ?? "null") as StoredSession | undefined;
+  };
+  return {
+    async get(key) {
+      const result = await dynamo.send(new GetItemCommand({ TableName: table, Key: { id: { S: key } }, ConsistentRead: true }));
+      return decode(result.Item);
+    },
+    async put(key, value) {
+      await dynamo.send(new PutItemCommand({ TableName: table, Item: {
+        id: { S: key }, data: { S: JSON.stringify(value) }, expiresAt: { N: String(value.expiresAt) },
+      } }));
+    },
+    async take(key) {
+      const result = await dynamo.send(new DeleteItemCommand({ TableName: table, Key: { id: { S: key } }, ReturnValues: "ALL_OLD" }));
+      return decode(result.Attributes);
+    },
+  };
+}
 export async function handler(event: ApiEvent) {
   const env = (globalThis as typeof globalThis & { process: { env: Record<string, string | undefined> } }).process.env;
-  const { AWS_REGION: region, ADMIN_POOL_ID: poolId, ADMIN_CLIENT_ID: clientId, ADMIN_ORIGIN: origin } = env;
-  if (!region || !poolId || !clientId || !origin) {
-    return { statusCode: 503, headers: { "cache-control": "no-store" }, body: '{"error":"Authentication is not configured."}' };
-  }
-  return createAdminHandler({ region, poolId, clientId, origin })(event);
+  const { GOOGLE_CLIENT_ID: clientId, ADMIN_ORIGIN: origin, ADMIN_EMAILS: emails, ADMIN_SESSION_TABLE: table } = env;
+  if (!clientId || !origin || !table) return {
+    statusCode: 503, headers: { "cache-control": "no-store" }, body: '{"error":"Google sign-in is not configured."}',
+  };
+  return createAdminHandler({ clientId, origin, adminEmails: (emails ?? "").split(",") }, dynamoStore(table))(event);
 }

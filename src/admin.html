@@ -4,24 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="same-origin">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
-    <title>BucHunt Administration</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; style-src 'self' https://accounts.google.com/gsi/style; base-uri 'none'; form-action 'self'; object-src 'none'">
+    <title>BucHunt Sign In</title>
     <script type="module" src="./js/admin.js"></script>
 </head>
-<body>
+<body data-page="admin">
     <main>
-        <h1>BucHunt Administration</h1>
-        <form id="admin-login">
-            <p><label for="username">Username</label> <input id="username" name="username" autocomplete="username" maxlength="128" required></p>
-            <p><label for="password">Password</label> <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required></p>
-            <button id="sign-in" type="submit">Sign in</button>
-        </form>
+        <h1>BucHunt</h1>
+        <section id="admin-login">
+            <p>Sign in with your Google account.</p>
+            <div id="google-sign-in"></div>
+        </section>
         <p id="admin-status" role="status" aria-live="polite">Checking session…</p>
+        <section id="user-panel" hidden>
+            <h2>Signed in to BucHunt</h2>
+            <p>This account has regular user access. Administrative capabilities require administrator access.</p>
+        </section>
         <section id="admin-panel" hidden>
             <h2>Administrative access</h2>
-            <p id="admin-identity"></p>
             <p>Your administrative session is active. Hunt and task management will appear here when those capabilities are implemented.</p>
-            <button id="sign-out" type="button">Sign out of all sessions</button>
+        </section>
+        <section id="signed-in" hidden>
+            <p id="admin-identity"></p>
+            <p><a href="./index.html">Return to BucHunt</a></p>
+            <button id="sign-out" type="button">Sign out</button>
         </section>
     </main>
 </body>

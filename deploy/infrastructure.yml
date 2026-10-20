@@ -11,47 +11,30 @@ Parameters:
   AdminCodeKey:
     Type: String
     Description: Immutable S3 object key for the administrative Lambda ZIP
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: Google Identity Services Web application OAuth client ID
+  AdminEmails:
+    Type: String
+    Default: ''
+    Description: Comma-separated verified Google email addresses allowed administrator access; empty permits regular sign-in with no administrators
 
 Resources:
 
-  AdminUserPool:
-    Type: AWS::Cognito::UserPool
+  AdminSessions:
+    Type: AWS::DynamoDB::Table
     Properties:
-      AdminCreateUserConfig:
-        AllowAdminCreateUserOnly: true
-      Policies:
-        PasswordPolicy:
-          MinimumLength: 14
-          RequireLowercase: true
-          RequireUppercase: true
-          RequireNumbers: true
-          RequireSymbols: true
-      AccountRecoverySetting:
-        RecoveryMechanisms:
-          - Name: admin_only
-            Priority: 1
-
-  AdminGroup:
-    Type: AWS::Cognito::UserPoolGroup
-    Properties:
-      UserPoolId: !Ref AdminUserPool
-      GroupName: Administrators
-
-  AdminClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      UserPoolId: !Ref AdminUserPool
-      GenerateSecret: false
-      PreventUserExistenceErrors: ENABLED
-      EnableTokenRevocation: true
-      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
-      AccessTokenValidity: 1
-      IdTokenValidity: 1
-      RefreshTokenValidity: 1
-      TokenValidityUnits:
-        AccessToken: hours
-        IdToken: hours
-        RefreshToken: days
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
 
   AdminApi:
     Type: AWS::ApiGatewayV2::Api
@@ -71,6 +54,17 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: AdminSessions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt AdminSessions.Arn
 
   AdminFunction:
     Type: AWS::Lambda::Function
@@ -85,8 +79,9 @@ Resources:
         S3Key: !Ref AdminCodeKey
       Environment:
         Variables:
-          ADMIN_POOL_ID: !Ref AdminUserPool
-          ADMIN_CLIENT_ID: !Ref AdminClient
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          ADMIN_EMAILS: !Ref AdminEmails
+          ADMIN_SESSION_TABLE: !Ref AdminSessions
           ADMIN_ORIGIN: !Sub 'https://${CloudFrontDistribution.DomainName}'
 
   AdminIntegration:
@@ -111,6 +106,20 @@ Resources:
       RouteKey: ANY /api/admin
       Target: !Join ['/', [integrations, !Ref AdminIntegration]]
 
+  AuthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth/{proxy+}
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+
+  AuthRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+
   AdminStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -128,6 +137,14 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/admin*'
+
+  AuthInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/auth*'
 
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -193,6 +210,15 @@ Resources:
 
         PriceClass: PriceClass_100
         CacheBehaviors:
+          - PathPattern: /api/auth*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # AWS managed CachingDisabled and AllViewerExceptHostHeader policies.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
           - PathPattern: /api/admin*
             TargetOriginId: AdminApiOrigin
             ViewerProtocolPolicy: https-only
@@ -223,12 +249,8 @@ Resources:
 
 Outputs:
 
-  AdminUserPoolId:
-    Description: User pool for administrator provisioning
-    Value: !Ref AdminUserPool
-
   AdminUrl:
-    Description: Administrative sign-in page
+    Description: Google sign-in and administrative access page
     Value: !Sub 'https://${CloudFrontDistribution.DomainName}/admin.html'
 
   BucketName:

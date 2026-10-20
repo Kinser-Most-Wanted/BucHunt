@@ -1,6 +1,17 @@
-import type { AuthenticationService, HuntRepository } from "../foundation/contracts.js";
-import { createAuthenticationService, loadGoogleIdentity, type GoogleIdentityApi } from "./adminAccess.js";
-import type { AdminSession, PlayerHunt, PlayerIdentity } from "../foundation/types.js";
+import type {
+  AuthenticationService,
+  HuntRepository,
+} from "../foundation/contracts.js";
+import {
+  createAuthenticationService,
+  loadGoogleIdentity,
+  type GoogleIdentityApi,
+} from "./adminAccess.js";
+import type {
+  AdminSession,
+  PlayerHunt,
+  PlayerIdentity,
+} from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
@@ -402,7 +413,8 @@ export function mountDisplayTasks(
         client_id: config.value.clientId,
         nonce: config.value.nonce,
         auto_select: false,
-        callback: (response) => void acceptGoogleCredential(response.credential),
+        callback: (response) =>
+          void acceptGoogleCredential(response.credential),
       });
       if (googleButtonHost) {
         googleButtonHost.replaceChildren();
@@ -418,7 +430,9 @@ export function mountDisplayTasks(
     } catch (error) {
       providerStatus.hidden = false;
       providerStatus.textContent =
-        error instanceof Error ? error.message : "Google sign-in could not load.";
+        error instanceof Error
+          ? error.message
+          : "Google sign-in could not load.";
     }
   };
 

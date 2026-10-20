@@ -18,7 +18,6 @@ test("application navigation exposes working configuration and player workspaces
   );
 });
 
-
 test("Google sign-in creates one verified session shared by administration and player pages", async ({
   page,
 }) => {
@@ -55,7 +54,9 @@ test("Google sign-in creates one verified session shared by administration and p
             button.type = "button";
             button.textContent = "Sign in with Google";
             button.addEventListener("click", () => {
-              testWindow.googleCallback?.({ credential: "verified-test-token" });
+              testWindow.googleCallback?.({
+                credential: "verified-test-token",
+              });
             });
             parent.replaceChildren(button);
           },

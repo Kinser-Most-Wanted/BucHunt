@@ -1,8 +1,5 @@
 import type { HuntRepository } from "../foundation/contracts.js";
-import type {
-  OperationResult,
-  PlayerHunt,
-} from "../foundation/types.js";
+import type { OperationResult, PlayerHunt } from "../foundation/types.js";
 
 export interface CreatorIdentity {
   id: string;

@@ -111,13 +111,18 @@ test("create hunt, save task, reload configuration and persist player completion
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ clientId: "test-client-id", nonce: "test-nonce" }),
+        body: JSON.stringify({
+          clientId: "test-client-id",
+          nonce: "test-nonce",
+        }),
       });
     } else if (path === "/api/auth/session") {
       await route.fulfill({
         status: authenticated ? 200 : 401,
         contentType: "application/json",
-        body: JSON.stringify(authenticated ? session : { error: "Unauthorized" }),
+        body: JSON.stringify(
+          authenticated ? session : { error: "Unauthorized" },
+        ),
       });
     } else if (path === "/api/auth/login") {
       authenticated = true;
@@ -128,7 +133,11 @@ test("create hunt, save task, reload configuration and persist player completion
       });
     } else if (path === "/api/auth/logout") {
       authenticated = false;
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedOut: true }) });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ signedOut: true }),
+      });
     } else {
       await route.continue();
     }

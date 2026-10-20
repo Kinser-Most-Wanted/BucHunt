@@ -18,7 +18,7 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm format:check
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install chromium
       - run: pnpm test
       - uses: actions/upload-artifact@v4
         if: failure()

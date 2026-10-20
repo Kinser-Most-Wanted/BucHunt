@@ -194,6 +194,10 @@ export function mountDisplayTasks(
   )
     return;
 
+  const googleButtonHost = root.querySelector<HTMLElement>(
+    '[data-testid="google-sign-in-host"]',
+  );
+
   const setGoogleSignInEnabled = (enabled: boolean): void => {
     if (googleButtonHost) {
       googleButtonHost.hidden = !enabled;

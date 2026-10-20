@@ -3,13 +3,7 @@ import { expect, test } from "@playwright/test";
 test("Google sign-in lets a player join and revisit saved Hunts", async ({
   page,
 }) => {
-  await page.route("https://accounts.google.com/gsi/client", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
-  );
   await page.addInitScript(() => {
-    Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", {
-      value: "test-client-id",
-    });
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
@@ -17,45 +11,16 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
           sessionStorage.setItem("test-copied-value", value),
       },
     });
-    const claims = btoa(
-      JSON.stringify({
-        email: "player@example.com",
-        email_verified: true,
-        sub: "google-account-123",
-        aud: "test-client-id",
-      }),
-    )
-      .replace(/=/g, "")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_");
-    let callback: ((response: { credential: string }) => void) | undefined;
-    Object.defineProperty(window, "google", {
-      value: {
-        accounts: {
-          id: {
-            initialize(options: {
-              callback(response: { credential: string }): void;
-            }) {
-              callback = options.callback;
-            },
-            renderButton(parent: HTMLElement) {
-              const button = document.createElement("button");
-              button.dataset.testid = "google-sign-in";
-              button.textContent = "Sign in with Google";
-              button.addEventListener("click", () =>
-                callback?.({ credential: `header.${claims}.signature` }),
-              );
-              parent.append(button);
-            },
-            prompt() {
-              callback?.({ credential: `header.${claims}.signature` });
-            },
-            disableAutoSelect() {},
-          },
-        },
-      },
-    });
+    sessionStorage.setItem("buchunt.player-session", JSON.stringify({
+      provider: "google",
+      email: "player@example.com",
+      accountId: "google-account-123",
+      idToken: "verified-server-session",
+    }));
   });
+  await page.route("**/api/auth/logout", route =>
+    route.fulfill({ json: { signedOut: true } }),
+  );
   await page.route("**/api/player/hunts/hunt-1", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -81,8 +46,6 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
 
   await page.goto("/player.html");
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
-  await page.getByRole("button", { name: "Sign in with Google" }).click();
-
   await expect(page.getByTestId("player-name-form")).toBeVisible();
   await page.getByTestId("player-display-name-input").fill("Baja");
   await page.getByRole("button", { name: "Save name and continue" }).click();
@@ -160,38 +123,11 @@ test("Google sign-in lets a player join and revisit saved Hunts", async ({
   );
 
   await page.getByTestId("player-sign-out").click();
-  await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
-  await expect(page.getByTestId("player-task-status")).toHaveText(
-    "Choose Google to sign in and see your active Hunts.",
-  );
-  await expect(page.getByTestId("player-heading")).toHaveText(
-    "Sign in to see active Hunts",
-  );
-  await expect(page.getByTestId("google-sign-in-host")).toBeVisible();
-  await expect(page.getByTestId("google-sign-in-host")).not.toHaveAttribute(
-    "inert",
-    "",
-  );
-  await page.getByRole("button", { name: "Sign in with Google" }).click();
-  await expect(page.getByTestId("player-account")).toHaveText(
-    "Signed in as Baja",
-  );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Campus Hunt",
-  );
+  await expect(page).toHaveURL(/\/index\.html$/);
 });
 
-test("shows why Google sign-in is unavailable until configured", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(window, "BUCHUNT_GOOGLE_CLIENT_ID", { value: "" });
-  });
+test("player sign-in link opens the shared home sign-in", async ({ page }) => {
   await page.goto("/player.html");
-  await expect(page.getByTestId("google-sign-in")).toBeVisible();
-  await expect(page.getByTestId("player-sign-out")).toBeHidden();
-  await page.getByTestId("google-sign-in").click();
-  await expect(page.getByTestId("player-provider-status")).toHaveText(
-    "Google sign-in needs a Google OAuth client ID.",
-  );
+  await page.getByRole("button", { name: "Sign in from BucHunt home" }).click();
+  await expect(page).toHaveURL(/\/index\.html$/);
 });

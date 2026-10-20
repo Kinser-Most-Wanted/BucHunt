@@ -1,6 +1,6 @@
 import type {
-  AdminCredentials,
   AdminSession,
+  GoogleAuthConfig,
   HuntDefinition,
   HuntInput,
   OperationResult,
@@ -11,8 +11,10 @@ import type {
 } from "./types.js";
 
 export interface AuthenticationService {
-  signIn(credentials: AdminCredentials): Promise<OperationResult<AdminSession>>;
+  getGoogleConfig(): Promise<OperationResult<GoogleAuthConfig>>;
+  signIn(credential: string): Promise<OperationResult<AdminSession>>;
   getSession(): Promise<OperationResult<AdminSession>>;
+  getCapabilities(): Promise<OperationResult<void>>;
   signOut(): Promise<OperationResult<void>>;
 }
 export interface DefinitionValidator {

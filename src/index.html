@@ -3,37 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Home | BucHunt</title>
+    <title>Sign in | BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
-  <body>
+  <body data-page="home">
     <header>
       <a class="brand" href="./index.html">BucHunt</a>
       <nav aria-label="Main navigation">
-        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
-        ><a href="./player.html">Player tasks</a>
+        <a href="./index.html">Home</a>
+        <a href="./player.html">Player tasks</a>
       </nav>
     </header>
-    <main>
-      <h1>BucHunt</h1>
-      <p class="notice">
-        Shared Sprint 2 foundation. Forms, authentication, and JSON storage are
-        not implemented.
-      </p>
-      <div class="grid">
-        <section>
-          <h2>Configure a hunt</h2>
-          <p>Administrative access, hunt creation, and task definitions.</p>
-          <a class="action" href="./admin.html">Open administration</a>
+    <main class="admin-page">
+      <section class="access-panel" aria-labelledby="welcome-heading">
+        <p class="eyebrow">WELCOME TO BUCHUNT</p>
+        <h1 id="welcome-heading">One sign-in. Your whole BucHunt.</h1>
+        <p>Use your Google account to open your player profile. Administrator access is checked securely after sign-in.</p>
+        <section id="admin-login" aria-label="Google sign-in">
+          <div id="google-sign-in" data-testid="google-sign-in"></div>
         </section>
-        <section>
-          <h2>View hunt tasks</h2>
-          <p>A separate workspace for the player task list.</p>
-          <a class="action" href="./player.html">Open player view</a>
-        </section>
-      </div>
+        <p id="admin-status" role="status" aria-live="polite">Preparing Google sign-in…</p>
+      </section>
     </main>
-    <footer>Sprint 2 foundation · Features awaiting implementation</footer>
-    <script type="module" src="./js/foundation/bootstrap.js"></script>
+    <footer>Find your next adventure with BucHunt.</footer>
+    <script type="module" src="./js/admin.js"></script>
   </body>
 </html>

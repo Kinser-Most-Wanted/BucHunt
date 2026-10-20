@@ -159,10 +159,7 @@ test("create hunt, save task, reload configuration and persist player completion
   await expect(page.getByTestId("task-location-coordinates")).toContainText(
     "36.304000, -82.368000",
   );
-  await page.evaluate(() => {
-    (window as unknown as { __testMapClick(lat: number, lng: number): void })
-      .__testMapClick(36.302, -82.369);
-  });
+  await clickMap(page, 36.302, -82.369);
   await expect(page.locator('[name="latitude"]')).toHaveValue("36.302");
   await expect(page.locator('[name="longitude"]')).toHaveValue("-82.369");
   await page.getByRole("button", { name: "Add task to hunt" }).click();
@@ -261,10 +258,7 @@ test("only owners and contributors can configure a hunt through the creator work
       .fill("Collaborator task");
     await member.getByLabel("Clue and instructions").fill("Look nearby");
     await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
-    await member.evaluate(() => {
-      (window as unknown as { __testMapClick(lat: number, lng: number): void })
-        .__testMapClick(36, -82);
-    });
+    await clickMap(member, 36, -82);
     await expect(member.locator('[name="latitude"]')).toHaveValue("36");
     await expect(member.locator('[name="longitude"]')).toHaveValue("-82");
     await member.getByRole("button", { name: "Add task to hunt" }).click();

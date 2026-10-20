@@ -178,7 +178,7 @@ test("create hunt, save task, reload configuration and persist player completion
       await route.fulfill({
         status: authenticated ? 200 : 401,
         json: authenticated
-          ? { user: playerSession }
+          ? { user: currentSession }
           : { error: "Sign in required." },
       });
     } else if (path === "/api/auth/login") {

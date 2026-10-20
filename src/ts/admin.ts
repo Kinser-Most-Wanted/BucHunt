@@ -26,7 +26,6 @@ interface GoogleIdentity {
 const loginPanel = document.getElementById("admin-login") as HTMLElement | null;
 const googleButton = document.getElementById("google-sign-in") as HTMLElement | null;
 const adminPanel = document.getElementById("admin-panel") as HTMLElement | null;
-const userPanel = document.getElementById("user-panel") as HTMLElement | null;
 const signedInPanel = document.getElementById("signed-in") as HTMLElement | null;
 const adminLink = document.getElementById("administration-link") as HTMLElement | null;
 const adminHomeLink = document.getElementById("admin-home-link") as HTMLElement | null;
@@ -62,7 +61,6 @@ function signedOut(message: string): void {
   if (loginPanel) loginPanel.hidden = false;
   if (googleButton) googleButton.hidden = !isHomePage;
   if (adminPanel) adminPanel.hidden = true;
-  if (userPanel) userPanel.hidden = true;
   if (signedInPanel) signedInPanel.hidden = true;
   if (adminLink) adminLink.hidden = true;
   if (adminHomeLink) adminHomeLink.hidden = true;
@@ -96,7 +94,6 @@ async function showSession(): Promise<void> {
   if (googleButton) googleButton.hidden = true;
   if (signedInPanel) signedInPanel.hidden = false;
   if (adminPanel) adminPanel.hidden = !isAdministrator;
-  if (userPanel) userPanel.hidden = isAdministrator;
   if (adminLink) adminLink.hidden = !isAdministrator;
   if (adminHomeLink) adminHomeLink.hidden = !isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;
@@ -106,7 +103,7 @@ async function showSession(): Promise<void> {
     : "Your player profile is ready.";
   statusText.textContent = isAdministrator
     ? "Signed in with administrator access."
-    : (isAdminPage ? "Signed in. This account does not have administrator access." : "Signed in.");
+    : (isAdminPage ? "This Google account is not listed as a BucHunt administrator." : "Signed in.");
   clearTimeout(expiryTimer);
   if (typeof user.expiresAt === "number") {
     expiryTimer = setTimeout(() => {

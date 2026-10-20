@@ -48,12 +48,19 @@ export interface PlayerHunt {
   description: string;
   tasks: PlayerTask[];
 }
+export interface PlayerIdentity {
+  email: string;
+  accountId: string;
+  provider: "google";
+  idToken: string;
+}
 export interface AdminCredentials {
   username: string;
   password: string;
 }
 export interface AdminSession {
   authenticated: boolean;
+  username: string;
 }
 export interface ValidationIssue {
   field: string;
@@ -77,3 +84,4 @@ export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
 }
+

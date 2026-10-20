@@ -25,16 +25,14 @@ interface GoogleIdentity {
 
 const loginPanel = document.getElementById("admin-login") as HTMLElement | null;
 const googleButton = document.getElementById("google-sign-in") as HTMLElement | null;
-const adminPanel = document.getElementById("admin-panel") as HTMLElement | null;
+const adminWorkspace = document.getElementById("admin-workspace") as HTMLElement | null;
+const adminDenied = document.getElementById("admin-denied") as HTMLElement | null;
 const signedInPanel = document.getElementById("signed-in") as HTMLElement | null;
-const adminLink = document.getElementById("administration-link") as HTMLElement | null;
-const adminHomeLink = document.getElementById("admin-home-link") as HTMLElement | null;
-const homeRoleStatus = document.getElementById("home-role-status") as HTMLElement | null;
 const isHomePage = document.body.dataset.page === "home";
 const isAdminPage = document.body.dataset.page === "admin";
 const statusText = document.getElementById("admin-status") as HTMLElement;
-const identity = document.getElementById("admin-identity") as HTMLElement;
-const signOut = document.getElementById("sign-out") as HTMLButtonElement;
+const identity = document.getElementById("admin-identity") as HTMLElement | null;
+const signOut = document.getElementById("sign-out") as HTMLButtonElement | null;
 const homeSignInLink = document.getElementById("home-sign-in-link") as HTMLElement | null;
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -60,12 +58,11 @@ function signedOut(message: string): void {
   clearPlayerSession();
   if (loginPanel) loginPanel.hidden = false;
   if (googleButton) googleButton.hidden = !isHomePage;
-  if (adminPanel) adminPanel.hidden = true;
+  if (adminWorkspace) adminWorkspace.hidden = true;
+  if (adminDenied) adminDenied.hidden = true;
   if (signedInPanel) signedInPanel.hidden = true;
-  if (adminLink) adminLink.hidden = true;
-  if (adminHomeLink) adminHomeLink.hidden = true;
   if (homeSignInLink) homeSignInLink.hidden = false;
-  identity.textContent = "";
+  if (identity) identity.textContent = "";
   statusText.textContent = message;
 }
 async function request(path: string, body?: unknown) {
@@ -89,21 +86,21 @@ async function showSession(): Promise<void> {
   const isAdministrator = user.role === "administrator";
   rememberPlayerSession(user, verifiedCredential);
   verifiedCredential = undefined;
+  if (isHomePage) {
+    window.location.replace("./player.html");
+    return;
+  }
   if (isAdministrator && isAdminPage) await request("/api/admin/capabilities");
   if (loginPanel) loginPanel.hidden = true;
   if (googleButton) googleButton.hidden = true;
   if (signedInPanel) signedInPanel.hidden = false;
-  if (adminPanel) adminPanel.hidden = !isAdministrator;
-  if (adminLink) adminLink.hidden = !isAdministrator;
-  if (adminHomeLink) adminHomeLink.hidden = !isAdministrator;
+  if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
+  if (adminDenied) adminDenied.hidden = isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;
-  identity.textContent = `Signed in as ${typeof user.email === "string" ? user.email : "your Google account"}.`;
-  if (homeRoleStatus) homeRoleStatus.textContent = isAdministrator
-    ? "Your account has administrator access and player access."
-    : "Your player profile is ready.";
+  if (identity) identity.textContent = `Signed in as ${typeof user.email === "string" ? user.email : "your Google account"}.`;
   statusText.textContent = isAdministrator
-    ? "Signed in with administrator access."
-    : (isAdminPage ? "This Google account is not listed as a BucHunt administrator." : "Signed in.");
+    ? "Administrator access verified."
+    : "";
   clearTimeout(expiryTimer);
   if (typeof user.expiresAt === "number") {
     expiryTimer = setTimeout(() => {
@@ -143,7 +140,7 @@ async function prepareGoogle(): Promise<void> {
     shape: "pill", text: "signin_with", width: 280,
   });
 }
-signOut.addEventListener("click", async () => {
+signOut?.addEventListener("click", async () => {
   signOut.disabled = true;
   try {
     await request("/api/auth/logout", {});

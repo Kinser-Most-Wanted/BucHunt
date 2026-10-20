@@ -61,17 +61,15 @@ export function createHuntRepository(): HuntRepository {
       identity: PlayerIdentity,
     ): Promise<OperationResult<PlayerHunt[]>> {
       try {
-        const response = await fetch(
-          "/api/player/hunts",
-          {
-            headers: { Authorization: `Bearer ${identity.idToken}` },
-          },
-        );
+        const response = await fetch("/api/player/hunts", {
+          headers: { Authorization: `Bearer ${identity.idToken}` },
+        });
         if (response.status === 404 || response.status === 405) {
           return {
             ok: false,
             code: "not-implemented",
-            message: "The active-hunts API is not part of the Sprint 2 static site yet.",
+            message:
+              "The active-hunts API is not part of the Sprint 2 static site yet.",
           };
         }
         if (!response.ok) {
@@ -84,7 +82,9 @@ export function createHuntRepository(): HuntRepository {
         const payload: unknown = await response.json();
         const hunts = Array.isArray(payload)
           ? payload
-          : typeof payload === "object" && payload !== null && "hunts" in payload
+          : typeof payload === "object" &&
+              payload !== null &&
+              "hunts" in payload
             ? (payload as { hunts: unknown }).hunts
             : null;
         if (!Array.isArray(hunts)) {
@@ -99,7 +99,8 @@ export function createHuntRepository(): HuntRepository {
         return {
           ok: false,
           code: "not-implemented",
-          message: "The active-hunts API is not available in this static-site prototype.",
+          message:
+            "The active-hunts API is not available in this static-site prototype.",
         };
       }
     },
@@ -133,7 +134,10 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     }
     return {
       id: item.id,
-      huntId: typeof item.huntId === "string" ? item.huntId : candidate.id as string,
+      huntId:
+        typeof item.huntId === "string"
+          ? item.huntId
+          : (candidate.id as string),
       displayLabel: item.displayLabel,
       completed: item.completed,
     };
@@ -145,4 +149,3 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     tasks,
   };
 }
-

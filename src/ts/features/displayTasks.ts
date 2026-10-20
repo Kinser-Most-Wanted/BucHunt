@@ -17,12 +17,20 @@ interface GoogleIdentityApi {
         callback(response: GoogleCredentialResponse): void;
       }): void;
       prompt(): void;
-      renderButton(parent: HTMLElement, options: { theme: "outline"; size: "large"; shape: "pill"; text: "signin_with"; width: number }): void;
+      renderButton(
+        parent: HTMLElement,
+        options: {
+          theme: "outline";
+          size: "large";
+          shape: "pill";
+          text: "signin_with";
+          width: number;
+        },
+      ): void;
       disableAutoSelect(): void;
     };
   };
 }
-
 
 declare global {
   interface Window {
@@ -73,7 +81,9 @@ function decodeGoogleCredential(
 
 function storedDisplayName(accountId: string): string | null {
   try {
-    const value = localStorage.getItem(`${PLAYER_PROFILE_KEY_PREFIX}${accountId}`)?.trim();
+    const value = localStorage
+      .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${accountId}`)
+      ?.trim();
     return value || null;
   } catch {
     return null;
@@ -124,10 +134,6 @@ function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
     list.append(item);
   }
 }
-
-
-
-
 
 export function mountDisplayTasks(
   root: HTMLElement,
@@ -207,13 +213,16 @@ export function mountDisplayTasks(
     !copyAccountId ||
     !nameForm ||
     !nameInput
-  ) return;
+  )
+    return;
 
   const googleClientId =
     window.BUCHUNT_GOOGLE_CLIENT_ID ?? root.dataset.googleClientId ?? "";
   let googleInitialized = false;
   let googleButtonRendered = false;
-  const googleButtonHost = root.querySelector<HTMLElement>(`[data-testid="google-sign-in-host"]`);
+  const googleButtonHost = root.querySelector<HTMLElement>(
+    `[data-testid="google-sign-in-host"]`,
+  );
 
   const setGoogleSignInEnabled = (enabled: boolean): void => {
     if (googleButtonHost) {
@@ -334,7 +343,9 @@ export function mountDisplayTasks(
     const reveal = value.hidden;
     value.hidden = !reveal;
     copyButton.hidden = !reveal;
-    toggle.textContent = reveal ? `Hide Google account ${label}` : `Show Google account ${label}`;
+    toggle.textContent = reveal
+      ? `Hide Google account ${label}`
+      : `Show Google account ${label}`;
     toggle.setAttribute("aria-expanded", String(reveal));
   };
 
@@ -384,8 +395,13 @@ export function mountDisplayTasks(
   };
 
   const configureGoogle = (): void => {
-    if (googleInitialized || !window.google || !googleClientId ||
-        googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER) return;
+    if (
+      googleInitialized ||
+      !window.google ||
+      !googleClientId ||
+      googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER
+    )
+      return;
     window.google.accounts.id.initialize({
       client_id: googleClientId,
       callback: acceptGoogleCredential,
@@ -394,7 +410,11 @@ export function mountDisplayTasks(
     if (googleButtonHost && !googleButtonRendered) {
       googleButtonHost.replaceChildren();
       window.google.accounts.id.renderButton(googleButtonHost, {
-        theme: "outline", size: "large", shape: "pill", text: "signin_with", width: 280,
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        width: 280,
       });
       googleButtonRendered = true;
     }
@@ -407,11 +427,11 @@ export function mountDisplayTasks(
 
   googleSignIn.addEventListener("click", () => {
     providerStatus.hidden = false;
-    providerStatus.textContent = googleClientId && googleClientId !== GOOGLE_CLIENT_ID_PLACEHOLDER
-      ? "Google sign-in is still loading. Try again in a moment."
-      : "Google sign-in needs a Google OAuth client ID.";
+    providerStatus.textContent =
+      googleClientId && googleClientId !== GOOGLE_CLIENT_ID_PLACEHOLDER
+        ? "Google sign-in is still loading. Try again in a moment."
+        : "Google sign-in needs a Google OAuth client ID.";
   });
-
 
   providerStatus.hidden = true;
   const previousIdentity = storedIdentity();
@@ -452,6 +472,7 @@ export function mountDisplayTasks(
         : "This Hunt has no tasks yet.";
       for (const task of result.value.tasks) {
         const item = document.createElement("li");
+        item.dataset.testid = "player-task";
         const label = document.createElement("strong");
         label.textContent = task.displayLabel;
         const state = document.createElement("p");
@@ -484,7 +505,8 @@ export function mountDisplayTasks(
               );
               const payload = await response.json();
               if (!response.ok || !payload.ok) {
-                message.textContent = payload.message ?? "Answer could not be submitted.";
+                message.textContent =
+                  payload.message ?? "Answer could not be submitted.";
                 return;
               }
               await loadHunt(huntId);
@@ -521,4 +543,3 @@ export function mountDisplayTasks(
     showSignedOut("Choose Google to sign in and see your active Hunts.");
   });
 }
-

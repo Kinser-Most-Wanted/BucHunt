@@ -58,27 +58,8 @@
           Task details are submitted through the hunt service. A task is shown
           as saved only after the service confirms it.
         </p>
-        <section class="access-panel" aria-labelledby="creator-heading">
-          <h2 id="creator-heading">Your creator profile</h2>
-          <p>
-            No administrator token is needed. This temporary profile belongs to
-            this browser. This browser profile is separate from Google
-            administrator sign-in; clearing cookies loses access to this
-            profile.
-          </p>
-          <p>
-            Your creator ID:
-            <code data-testid="creator-id" style="overflow-wrap: anywhere"
-              >Starting your profile…</code
-            >
-          </p>
-          <button type="button" data-testid="copy-creator-id">
-            Copy creator ID
-          </button>
-          <p class="field-help">
-            Share your creator ID with a hunt owner if you want to contribute.
-          </p>
-          <h3>My hunts</h3>
+        <section class="access-panel" aria-labelledby="my-hunts-heading">
+          <h2 id="my-hunts-heading">My hunts</h2>
           <button type="button" data-testid="refresh-my-hunts">
             Refresh my hunts
           </button>
@@ -334,6 +315,24 @@
             ></ol>
           </div>
         </section>
+        <details class="more-options" data-testid="creator-profile-details">
+          <summary>Creator ID and sharing</summary>
+          <p class="field-help">
+            This browser-based ID identifies hunt ownership and contributors.
+          </p>
+          <p>
+            Your creator ID:
+            <code data-testid="creator-id" style="overflow-wrap: anywhere"
+              >Starting your profile…</code
+            >
+          </p>
+          <button type="button" data-testid="copy-creator-id">
+            Copy creator ID
+          </button>
+          <p class="field-help">
+            Share your creator ID with a hunt owner if you want to contribute.
+          </p>
+        </details>
       </div>
     </main>
     <footer>BucHunt · Create memorable campus discoveries</footer>

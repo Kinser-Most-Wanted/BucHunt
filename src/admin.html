@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hunt Studio | BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
   </head>
   <body>
     <header>
@@ -190,34 +196,54 @@
               autocomplete="off"
               placeholder="The answer participants must submit"
             />
-            <div class="field-grid">
-              <div>
-                <label for="task-latitude">Latitude</label>
-                <input
-                  id="task-latitude"
-                  name="latitude"
-                  type="number"
-                  min="-90"
-                  max="90"
-                  step="any"
-                  required
-                  placeholder="36.302"
-                />
+            <section
+              class="task-location-picker"
+              aria-labelledby="task-location-heading"
+            >
+              <h3 id="task-location-heading">Choose the task location</h3>
+              <p class="field-help">
+                Search for a place or address, or click the map. Drag the pin to
+                fine-tune the location.
+              </p>
+              <div class="task-location-map-shell">
+                <div
+                  class="task-location-search"
+                  data-testid="task-location-search-form"
+                  role="search"
+                >
+                  <label for="task-location-query">Search the map</label>
+                  <input
+                    id="task-location-query"
+                    data-testid="task-location-query"
+                    type="search"
+                    autocomplete="off"
+                    placeholder="Place or address"
+                  />
+                  <button type="button">Search</button>
+                </div>
+                <div
+                  class="task-location-map"
+                  data-testid="task-location-map"
+                  role="region"
+                  aria-label="Interactive map for choosing the task location"
+                ></div>
               </div>
-              <div>
-                <label for="task-longitude">Longitude</label>
-                <input
-                  id="task-longitude"
-                  name="longitude"
-                  type="number"
-                  min="-180"
-                  max="180"
-                  step="any"
-                  required
-                  placeholder="-82.369"
-                />
-              </div>
-            </div>
+              <p
+                class="field-help"
+                data-testid="task-location-status"
+                role="status"
+                aria-live="polite"
+              >
+                Loading the map…
+              </p>
+              <output
+                class="task-location-coordinates"
+                data-testid="task-location-coordinates"
+                hidden
+              ></output>
+              <input type="hidden" id="task-latitude" name="latitude" />
+              <input type="hidden" id="task-longitude" name="longitude" />
+            </section>
             <p class="field-help">
               Coordinates are stored with the task. Location verification is
               handled separately.
@@ -281,6 +307,12 @@
       </section>
     </main>
     <footer>BucHunt · Create memorable campus discoveries</footer>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+      defer
+    ></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>

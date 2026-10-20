@@ -1,8 +1,98 @@
 import { test, expect } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
+
+async function installMapMock(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    let clickListener:
+      ((event: { latlng: { lat: number; lng: number } }) => void) | undefined;
+    class MockMap {
+      addLayer() {
+        return this;
+      }
+      invalidateSize() {}
+      on(_event: string, listener: typeof clickListener) {
+        clickListener = listener;
+        return this;
+      }
+      removeLayer() {
+        return this;
+      }
+      setView() {
+        return this;
+      }
+    }
+    class MockMarker {
+      private point: { lat: number; lng: number };
+      private dragListener: (() => void) | undefined;
+      constructor(point: [number, number]) {
+        this.point = { lat: point[0], lng: point[1] };
+      }
+      addTo() {
+        return this;
+      }
+      getLatLng() {
+        return this.point;
+      }
+      on(_event: string, listener: () => void) {
+        this.dragListener = listener;
+        return this;
+      }
+      setLatLng(point: { lat: number; lng: number }) {
+        this.point = point;
+        return this;
+      }
+    }
+    Object.defineProperty(window, "L", {
+      configurable: true,
+      value: {
+        map: () => new MockMap(),
+        marker: (point: [number, number]) => new MockMarker(point),
+        tileLayer: () => ({ addTo() {} }),
+      },
+    });
+    Object.defineProperty(window, "__testMapClick", {
+      configurable: true,
+      value: (lat: number, lng: number) =>
+        clickListener?.({ latlng: { lat, lng } }),
+    });
+  });
+  await context.route(
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+    (route) =>
+      route.fulfill({ contentType: "application/javascript", body: "" }),
+  );
+  await context.route(
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+    (route) => route.fulfill({ contentType: "text/css", body: "" }),
+  );
+  await context.route("https://nominatim.openstreetmap.org/search**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          lat: "36.304",
+          lon: "-82.368",
+          display_name: "Student Center, Johnson City",
+        },
+      ]),
+    }),
+  );
+}
+
+async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
+  await page.evaluate(
+    ({ latitude, longitude }) =>
+      (
+        window as unknown as { __testMapClick(lat: number, lng: number): void }
+      ).__testMapClick(latitude, longitude),
+    { latitude: lat, longitude: lng },
+  );
+}
 
 test("create hunt, save task, reload configuration and persist player completion", async ({
   page,
 }) => {
+  await installMapMock(page.context());
   await page.route("https://accounts.google.com/gsi/client", (route) =>
     route.fulfill({ contentType: "application/javascript", body: "" }),
   );
@@ -64,8 +154,17 @@ test("create hunt, save task, reload configuration and persist player completion
     .fill("Find the fountain");
   await page.getByLabel("Clue and instructions").fill("Read the plaque");
   await page.getByLabel("Required answer", { exact: true }).fill("Bucky");
-  await page.getByLabel("Latitude", { exact: true }).fill("36.302");
-  await page.getByLabel("Longitude", { exact: true }).fill("-82.369");
+  await page.getByTestId("task-location-query").fill("Student Center");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByTestId("task-location-coordinates")).toContainText(
+    "36.304000, -82.368000",
+  );
+  await page.evaluate(() => {
+    (window as unknown as { __testMapClick(lat: number, lng: number): void })
+      .__testMapClick(36.302, -82.369);
+  });
+  await expect(page.locator('[name="latitude"]')).toHaveValue("36.302");
+  await expect(page.locator('[name="longitude"]')).toHaveValue("-82.369");
   await page.getByRole("button", { name: "Add task to hunt" }).click();
   await expect(page.getByTestId("task-status")).toContainText(
     "was saved and appears",
@@ -107,6 +206,7 @@ test("only owners and contributors can configure a hunt through the creator work
   browser,
   baseURL,
 }) => {
+  await installMapMock(page.context());
   await page.goto("/admin.html");
   await expect(page.getByTestId("creator-id")).toHaveText(
     /^browser:[a-f0-9]{64}$/,
@@ -124,6 +224,7 @@ test("only owners and contributors can configure a hunt through the creator work
   const stranger = await browser.newContext({ baseURL });
   try {
     const member = await contributor.newPage();
+    await installMapMock(contributor);
     await member.goto("/admin.html");
     await expect(member.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,
@@ -160,8 +261,12 @@ test("only owners and contributors can configure a hunt through the creator work
       .fill("Collaborator task");
     await member.getByLabel("Clue and instructions").fill("Look nearby");
     await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
-    await member.getByLabel("Latitude", { exact: true }).fill("36");
-    await member.getByLabel("Longitude", { exact: true }).fill("-82");
+    await member.evaluate(() => {
+      (window as unknown as { __testMapClick(lat: number, lng: number): void })
+        .__testMapClick(36, -82);
+    });
+    await expect(member.locator('[name="latitude"]')).toHaveValue("36");
+    await expect(member.locator('[name="longitude"]')).toHaveValue("-82");
     await member.getByRole("button", { name: "Add task to hunt" }).click();
     await expect(member.getByTestId("task-status")).toContainText(
       "was saved and appears",

@@ -17,15 +17,10 @@
     <main>
       <h1>Hunt tasks</h1>
       <p class="notice">
-        Sign in with Google to see your active Hunts. This prototype identifies
-        your account in the browser; the server must verify provider tokens
-        before it can protect account data.
+        Sign in with Google to see your active Hunts. BucHunt verifies your
+        Google account on the server and keeps your sign-in in a secure session.
       </p>
-      <section
-        id="display-tasks"
-        data-testid="display-tasks"
-        data-google-client-id="436661871708-p5g867dkf2lk0vlon4dialct09j1m70c.apps.googleusercontent.com"
-      >
+      <section id="display-tasks" data-testid="display-tasks">
         <h2 data-testid="player-heading">Sign in to see active Hunts</h2>
         <p data-testid="player-account" class="player-account" hidden>
           Signed in as <strong data-testid="player-display-name"></strong>
@@ -186,12 +181,6 @@
       </section>
     </main>
     <footer>Sprint 2 foundation · Features awaiting implementation</footer>
-    <script
-      id="google-identity-script"
-      src="https://accounts.google.com/gsi/client"
-      async
-      defer
-    ></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>

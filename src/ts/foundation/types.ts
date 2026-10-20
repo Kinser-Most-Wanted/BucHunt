@@ -52,15 +52,16 @@ export interface PlayerIdentity {
   email: string;
   accountId: string;
   provider: "google";
-  idToken: string;
 }
-export interface AdminCredentials {
-  username: string;
-  password: string;
+export interface GoogleAuthConfig {
+  clientId: string;
+  nonce: string;
 }
 export interface AdminSession {
-  authenticated: boolean;
-  username: string;
+  subject: string;
+  email: string;
+  expiresAt: number;
+  role: "administrator" | "user";
 }
 export interface ValidationIssue {
   field: string;

@@ -58,11 +58,11 @@ export function createHuntRepository(): HuntRepository {
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
     async listActiveHunts(
-      identity: PlayerIdentity,
+      _identity: PlayerIdentity,
     ): Promise<OperationResult<PlayerHunt[]>> {
       try {
         const response = await fetch("/api/player/hunts", {
-          headers: { Authorization: `Bearer ${identity.idToken}` },
+          credentials: "same-origin",
         });
         if (response.status === 404 || response.status === 405) {
           return {

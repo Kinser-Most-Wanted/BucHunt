@@ -172,7 +172,7 @@ async function initialize(): Promise<void> {
     await showSession();
     return;
   } catch {
-    signedOut(isHomePage ? "Sign in with Google to continue." : "Sign in from the BucHunt home page to continue.");
+    signedOut(isHomePage ? "" : "Sign in from the BucHunt home page to continue.");
   }
   if (isHomePage) await prepareGoogle();
 }

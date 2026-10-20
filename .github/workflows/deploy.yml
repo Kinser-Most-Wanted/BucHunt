@@ -72,7 +72,7 @@ jobs:
         id: release
         env:
           ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
-          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_ID: "436661871708-p5g867dkf2lk0vlon4dialct09j1m70c.apps.googleusercontent.com"
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
       - run: pnpm exec playwright install chromium

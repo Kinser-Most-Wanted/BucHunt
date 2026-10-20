@@ -492,7 +492,7 @@ export function mountDisplayTasks(
       // The visible state still signs out for this page view.
     }
     pendingIdentity = null;
-    void fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" })
+    void fetch("/api/auth/logout", {\n      method: "POST",\n      credentials: "same-origin",\n    })
       .catch(() => undefined)
       .finally(() => window.location.assign("./index.html"));
   });

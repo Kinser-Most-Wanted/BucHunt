@@ -1,34 +1,229 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="referrer" content="same-origin">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; style-src 'self' https://accounts.google.com/gsi/style; base-uri 'none'; form-action 'self'; object-src 'none'">
-    <title>BucHunt Sign In</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administration | BucHunt</title>
+    <meta name="referrer" content="same-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; style-src 'self' https://accounts.google.com/gsi/style 'unsafe-inline'; base-uri 'none'; form-action 'self'; object-src 'none'" />
     <script type="module" src="./js/admin.js"></script>
-</head>
-<body data-page="admin">
-    <main>
-        <h1>BucHunt</h1>
+    <link rel="stylesheet" href="./css/foundation.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./index.html">BucHunt</a>
+      <nav aria-label="Main navigation">
+        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
+        ><a href="./player.html">Player tasks</a>
+      </nav>
+    </header>
+    <main class="admin-page">
+      <div class="page-heading">
+        <p class="eyebrow">HUNT STUDIO</p>
+        <h1>Build your hunt</h1>
+        <p class="page-intro">
+          Add clear clues, the answer participants need to find, and the
+          coordinates that connect each task to a place.
+        </p>
+      </div>
+      <p class="notice">
+        Task details are submitted through the hunt service. A task is shown as
+        saved only after the service confirms it.
+      </p>
+      <section id="admin-access" data-testid="admin-access" class="access-panel">
+        <h2>Google Sign-In</h2>
         <section id="admin-login">
-            <p>Sign in with your Google account.</p>
-            <div id="google-sign-in"></div>
+          <p>Sign in with your Google account.</p>
+          <div id="google-sign-in"></div>
         </section>
-        <p id="admin-status" role="status" aria-live="polite">Checking session…</p>
+        <p id="admin-status" role="status" aria-live="polite">Checking session...</p>
         <section id="user-panel" hidden>
-            <h2>Signed in to BucHunt</h2>
-            <p>This account has regular user access. Administrative capabilities require administrator access.</p>
-        </section>
-        <section id="admin-panel" hidden>
-            <h2>Administrative access</h2>
-            <p>Your administrative session is active. Hunt and task management will appear here when those capabilities are implemented.</p>
+          <p>Signed in as a regular user. Administrator access is required to manage hunts.</p>
         </section>
         <section id="signed-in" hidden>
-            <p id="admin-identity"></p>
-            <p><a href="./index.html">Return to BucHunt</a></p>
-            <button id="sign-out" type="button">Sign out</button>
+          <p id="admin-identity"></p>
+          <button id="sign-out" type="button">Sign out</button>
         </section>
+      </section>
+      <div id="admin-panel" hidden>
+      <section id="create-hunt" data-testid="create-hunt" class="integration-panel">
+        <div class="section-heading">
+          <span class="step-number" aria-hidden="true">01</span>
+          <div>
+            <p class="eyebrow">START HERE</p>
+            <h2>Create a hunt</h2>
+          </div>
+        </div>
+        <p class="section-copy">
+          Create a hunt first, then use its ID below to attach tasks. The hunt
+          creation flow is being developed separately.
+        </p>
+        <form data-testid="hunt-form">
+          <fieldset disabled>
+            <legend>Hunt details · #31</legend>
+            <label for="hunt-name">Hunt name</label
+            ><input id="hunt-name" name="name" />
+            <label for="hunt-description">Description</label
+            ><textarea id="hunt-description" name="description"></textarea>
+            <button type="submit">Create hunt</button>
+          </fieldset>
+        </form>
+        <p role="status" data-testid="hunt-status">
+          Hunt creation awaits integration with the shared repository.
+        </p>
+      </section>
+      <section id="define-task" data-testid="define-task" class="task-panel">
+        <div class="section-heading">
+          <span class="step-number" aria-hidden="true">02</span>
+          <div>
+            <p class="eyebrow">TASK DETAILS</p>
+            <h2>Define a task</h2>
+          </div>
+        </div>
+        <p class="section-copy">
+          Add a task to an existing hunt. The hunt ID ties the task and its
+          location to the correct participant journey.
+        </p>
+        <form data-testid="task-form">
+          <fieldset>
+            <legend>What participants will discover</legend>
+            <label for="task-hunt-id">Hunt ID</label>
+            <input
+              id="task-hunt-id"
+              name="huntId"
+              autocomplete="off"
+              required
+              aria-describedby="hunt-id-help"
+              placeholder="Paste the ID of the hunt"
+            />
+            <span id="hunt-id-help" class="field-help">
+              Use the ID returned by the hunt creation service.
+            </span>
+            <div class="field-grid">
+              <div>
+                <label for="task-label">Display label</label>
+                <input
+                  id="task-label"
+                  name="displayLabel"
+                  required
+                  maxlength="100"
+                  placeholder="e.g. The Old Fountain"
+                />
+              </div>
+              <div>
+                <label for="task-order">Task order</label>
+                <input
+                  id="task-order"
+                  name="order"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="1"
+                  required
+                />
+              </div>
+            </div>
+            <label for="task-description">Clue and instructions</label>
+            <textarea
+              id="task-description"
+              name="description"
+              rows="3"
+              required
+              placeholder="Tell participants what to look for"
+            ></textarea>
+            <label for="task-answer">Required answer</label>
+            <input
+              id="task-answer"
+              name="requiredAnswer"
+              required
+              autocomplete="off"
+              placeholder="The answer participants must submit"
+            />
+            <div class="field-grid">
+              <div>
+                <label for="task-latitude">Latitude</label>
+                <input
+                  id="task-latitude"
+                  name="latitude"
+                  type="number"
+                  min="-90"
+                  max="90"
+                  step="any"
+                  required
+                  placeholder="36.302"
+                />
+              </div>
+              <div>
+                <label for="task-longitude">Longitude</label>
+                <input
+                  id="task-longitude"
+                  name="longitude"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  step="any"
+                  required
+                  placeholder="-82.369"
+                />
+              </div>
+            </div>
+            <p class="field-help">
+              Coordinates are stored with the task. Location verification is
+              handled separately.
+            </p>
+            <details class="more-options">
+              <summary>More task options</summary>
+              <div class="field-grid">
+                <div>
+                  <label for="task-points">Points</label>
+                  <input
+                    id="task-points"
+                    name="points"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="0"
+                  />
+                </div>
+                <div class="checkbox-field">
+                  <input
+                    id="task-case-sensitive"
+                    name="answerCaseSensitive"
+                    type="checkbox"
+                  />
+                  <label for="task-case-sensitive">Answer is case-sensitive</label>
+                </div>
+              </div>
+              <label for="task-hint">Optional hint</label>
+              <input
+                id="task-hint"
+                name="hint"
+                placeholder="A gentle nudge for participants"
+              />
+            </details>
+            <button type="submit" class="primary-button">Add task to hunt</button>
+          </fieldset>
+        </form>
+        <p role="status" data-testid="task-status" aria-live="polite">
+          Fill in the task details to add it to a hunt.
+        </p>
+        <ul
+          class="validation-errors"
+          data-testid="validation-errors"
+          aria-live="polite"
+          aria-label="Validation errors"
+        ></ul>
+        <div class="task-list-panel" aria-live="polite">
+          <div class="task-list-heading">
+            <h3>Tasks in this hunt</h3>
+            <span class="list-caption">Updated after a successful save</span>
+          </div>
+          <ol data-testid="defined-task-list" aria-label="Defined hunt tasks"></ol>
+        </div>
+      </section>
+      </div>
     </main>
-</body>
+    <footer>BucHunt · Create memorable campus discoveries</footer>
+    <script type="module" src="./js/foundation/bootstrap.js"></script>
+  </body>
 </html>

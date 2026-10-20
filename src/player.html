@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Player tasks | BucHunt</title>
+    <link rel="stylesheet" href="./css/foundation.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./index.html">BucHunt</a>
+      <nav aria-label="Main navigation">
+        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
+        ><a href="./player.html">Player tasks</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Hunt tasks</h1>
+      <p class="notice">
+        Player task display awaiting implementation. No hunt has been loaded.
+      </p>
+      <section id="display-tasks" data-testid="display-tasks">
+        <h2 data-testid="player-hunt-name">Selected hunt</h2>
+        <p role="status" data-testid="player-task-status">No tasks loaded.</p>
+        <ul data-testid="player-task-list" aria-label="Hunt tasks"></ul>
+        <template id="player-task-template"
+          ><li data-testid="player-task">
+            <span data-task-label></span> <span data-task-completion></span></li
+        ></template>
+      </section>
+    </main>
+    <footer>Sprint 2 foundation · Features awaiting implementation</footer>
+    <script type="module" src="./js/foundation/bootstrap.js"></script>
+  </body>
+</html>

@@ -4,85 +4,6 @@ import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 const PLAYER_HUNTS_KEY_PREFIX = "buchunt.player-hunts.";
-const GOOGLE_CLIENT_ID_PLACEHOLDER = "YOUR_GOOGLE_CLIENT_ID";
-
-interface GoogleCredentialResponse {
-  credential: string;
-}
-
-interface GoogleIdentityApi {
-  accounts: {
-    id: {
-      initialize(options: {
-        client_id: string;
-        callback(response: GoogleCredentialResponse): void;
-      }): void;
-      prompt(): void;
-      renderButton(
-        parent: HTMLElement,
-        options: {
-          theme: "outline";
-          size: "large";
-          shape: "pill";
-          text: "signin_with";
-          width: number;
-        },
-      ): void;
-      disableAutoSelect(): void;
-    };
-  };
-}
-
-declare global {
-  interface Window {
-    BUCHUNT_GOOGLE_CLIENT_ID?: string;
-  }
-}
-
-function playerGoogleIdentity(): GoogleIdentityApi | undefined {
-  return (window as unknown as { google?: GoogleIdentityApi }).google;
-}
-
-function decodeClaims(token: string): Record<string, unknown> | null {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return null;
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-    const bytes = Uint8Array.from(atob(padded), (character) =>
-      character.charCodeAt(0),
-    );
-    const claims = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    return typeof claims === "object" && claims !== null
-      ? (claims as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function decodeGoogleCredential(
-  token: string,
-  expectedClientId: string,
-): PlayerIdentity | null {
-  const claims = decodeClaims(token);
-  if (
-    !claims ||
-    claims.aud !== expectedClientId ||
-    typeof claims.email !== "string" ||
-    claims.email_verified !== true ||
-    typeof claims.sub !== "string"
-  ) {
-    return null;
-  }
-  return {
-    email: claims.email,
-    accountId: claims.sub,
-    provider: "google",
-    idToken: token,
-  };
-}
-
 function storedDisplayName(accountId: string): string | null {
   try {
     const value = localStorage
@@ -273,14 +194,6 @@ export function mountDisplayTasks(
   )
     return;
 
-  const googleClientId =
-    window.BUCHUNT_GOOGLE_CLIENT_ID ?? root.dataset.googleClientId ?? "";
-  let googleInitialized = false;
-  let googleButtonRendered = false;
-  const googleButtonHost = root.querySelector<HTMLElement>(
-    `[data-testid="google-sign-in-host"]`,
-  );
-
   const setGoogleSignInEnabled = (enabled: boolean): void => {
     if (googleButtonHost) {
       googleButtonHost.hidden = !enabled;
@@ -439,62 +352,8 @@ export function mountDisplayTasks(
     void copySensitiveValue(accountIdValue, "ID");
   });
 
-  const acceptGoogleCredential = (response: GoogleCredentialResponse): void => {
-    const player = decodeGoogleCredential(response.credential, googleClientId);
-    if (!player) {
-      showSignedOut("Google did not return a verified account ID and email.");
-      return;
-    }
-    try {
-      sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(player));
-    } catch {
-      showSignedOut("This browser could not keep the player session.");
-      return;
-    }
-    providerStatus.hidden = true;
-    const savedName = storedDisplayName(player.accountId);
-    if (savedName) void loadHunts(player, savedName);
-    else requestDisplayName(player);
-  };
-
-  const configureGoogle = (): void => {
-    const google = playerGoogleIdentity();
-    if (
-      googleInitialized ||
-      !google ||
-      !googleClientId ||
-      googleClientId === GOOGLE_CLIENT_ID_PLACEHOLDER
-    )
-      return;
-    google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: acceptGoogleCredential,
-    });
-    googleInitialized = true;
-    if (googleButtonHost && !googleButtonRendered) {
-      googleButtonHost.replaceChildren();
-      google.accounts.id.renderButton(googleButtonHost, {
-        theme: "outline",
-        size: "large",
-        shape: "pill",
-        text: "signin_with",
-        width: 280,
-      });
-      googleButtonRendered = true;
-    }
-  };
-
-  configureGoogle();
-  document
-    .getElementById("google-identity-script")
-    ?.addEventListener("load", configureGoogle, { once: true });
-
   googleSignIn.addEventListener("click", () => {
-    providerStatus.hidden = false;
-    providerStatus.textContent =
-      googleClientId && googleClientId !== GOOGLE_CLIENT_ID_PLACEHOLDER
-        ? "Google sign-in is still loading. Try again in a moment."
-        : "Google sign-in needs a Google OAuth client ID.";
+    window.location.assign("./index.html");
   });
 
   providerStatus.hidden = true;
@@ -628,8 +487,9 @@ export function mountDisplayTasks(
     } catch {
       // The visible state still signs out for this page view.
     }
-    playerGoogleIdentity()?.accounts.id.disableAutoSelect();
     pendingIdentity = null;
-    showSignedOut("Choose Google to sign in and see your active Hunts.");
+    void fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" })
+      .catch(() => undefined)
+      .finally(() => window.location.assign("./index.html"));
   });
 }

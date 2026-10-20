@@ -137,6 +137,32 @@ test("create hunt, save task, reload configuration and persist player completion
       },
     });
   });
+  let authenticated = false;
+  const playerSession = {
+    subject: "google-account-123",
+    email: "player@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "user",
+  };
+  await page.route("**/api/auth/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/auth/config") {
+      await route.fulfill({ json: { clientId: "test-client-id", nonce: "test-nonce" } });
+    } else if (path === "/api/auth/session") {
+      await route.fulfill({
+        status: authenticated ? 200 : 401,
+        json: authenticated ? { user: playerSession } : { error: "Sign in required." },
+      });
+    } else if (path === "/api/auth/login") {
+      authenticated = true;
+      await route.fulfill({ json: { user: playerSession } });
+    } else if (path === "/api/auth/logout") {
+      authenticated = false;
+      await route.fulfill({ json: { signedOut: true } });
+    } else {
+      await route.fulfill({ status: 404, json: { error: "Not found." } });
+    }
+  });
   await page.goto("/admin.html");
   await page
     .getByLabel("Hunt name", { exact: true })
@@ -173,9 +199,11 @@ test("create hunt, save task, reload configuration and persist player completion
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await expect(page.locator("#admin-status")).toHaveText("Signed in.");
   await page.goto(`/player.html?huntId=${id}`);
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
-  await page.getByRole("button", { name: "Sign in with Google" }).click();
   await page.getByTestId("player-display-name-input").fill("Baja");
   await page.getByRole("button", { name: "Save name and continue" }).click();
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();

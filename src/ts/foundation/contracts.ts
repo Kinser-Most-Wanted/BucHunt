@@ -4,6 +4,7 @@ import type {
   HuntDefinition,
   HuntInput,
   OperationResult,
+  PlayerIdentity,
   PlayerHunt,
   TaskDefinition,
   TaskInput,
@@ -27,8 +28,10 @@ export interface HuntRepository {
   ): Promise<OperationResult<TaskDefinition>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
+  listActiveHunts(identity: PlayerIdentity): Promise<OperationResult<PlayerHunt[]>>;
 }
 export interface FoundationServices {
   authentication: AuthenticationService;
   repository: HuntRepository;
 }
+

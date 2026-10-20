@@ -1,10 +1,37 @@
 # BucHunt
-BucHunt is a customizable, location-based scavenger hunt platform designed to engage, educate, and entertain the East Tennessee State University community and its many sub-groups.
+
+BucHunt is a customizable scavenger hunt platform for the East Tennessee State University community.
+
+The integrated sprint supports creating hunts, defining tasks with answers and coordinates, saving and retrieving server-side JSON configuration, and displaying player tasks with persisted completion. Hunt creators can create hunts immediately, manage their own hunts, and contribute to hunts shared with them. Google account integration and access-code joining remain future work.
+
+## Local development
+
+Use Node.js 22+ and pnpm 10.33.0.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm serve
+```
+
+Open `http://127.0.0.1:3000/admin.html` (Hunt Studio). No API token or AWS access is needed. Create a hunt, add tasks, and follow the player link. Use **My hunts** to reopen hunts you own or contribute to.
+
+For collaboration, a contributor opens Hunt Studio and copies their creator ID. The hunt owner selects the hunt and adds that ID under **Contributors**. Contributors can add tasks; only the owner can grant or remove contributor access.
+
+Until Google sign-in is implemented, an automatic private browser cookie identifies each creator. The UI labels this as a temporary profile. Use the same browser profile to return to your hunts; clearing cookies or using another browser creates a different identity. This is not Google authentication. Server saves update `data/hunts.json`; contributor grants and player progress are stored separately. Use `DATA_DIRECTORY` to select a different private data directory.
+
+```sh
+pnpm lint
+pnpm format:check
+pnpm exec playwright install --with-deps chromium
+pnpm test
+```
+
+See [Hunt configuration](Documentation/hunt_configuration.md) for the JSON format, API, persistence guarantees, deployment requirements and recovery limitations. The AWS deployment now needs an application server and persistent disk; the previous static-hosting permissions alone are insufficient. Build, test, peer review, deployment, and deployed verification must succeed before the sprint is considered Done.
 
 ## Google sign-in and administrative access (PBI 7)
 
-Open `/admin.html` on the deployed HTTPS site and select **Sign in with Google**.
-Anyone with a Google account and verified email can sign in as a regular user.
+Open `/admin.html` on the deployed HTTPS site and use the **Administrator sign-in** panel. The Stage creator profile remains available on the same page for hunt management.
 Accounts whose verified email appears in the server's `AdminEmails` allowlist
 also receive administrator access. The shared sign-in page displays the account's
 email and role; administrator controls appear only for administrators. BucHunt has
@@ -111,78 +138,4 @@ session gains or loses administrator permission after that deployment without
 requiring another login. Google authenticates the user, and this server-side list
 determines whether that user is an administrator.
 
-### Deploy
-
-The infrastructure adds a private DynamoDB session table, Lambda and HTTP API.
-CloudFront forwards `/api/auth*` and `/api/admin*` requests to that API with cookies
-and Origin, with caching disabled. API errors retain their actual status codes;
-the previous static-site 403/404-to-200 fallback is removed so it cannot mask API
-denials.
-
-The existing `deploy/deploy.sh` is unchanged and does not supply the new code
-parameters or IAM capability. Use the following commands instead. They require
-AWS CLI credentials with CloudFormation/IAM/Lambda/DynamoDB/API Gateway/S3 and
-CloudFront deployment permissions, a private artifact bucket in the stack's
-region, and `zip`. Use a unique immutable object key for every backend release.
-The example uses Bash; keep the working directory at the repository root.
-
-```sh
-STACK_NAME=BucHunt
-ARTIFACT_BUCKET=your-private-artifact-bucket
-RELEASE_KEY=admin/pbi7-google-v1.zip
-GOOGLE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
-ADMIN_EMAILS=admin@example.com,second-admin@example.com
-STAGING_DIR="$(mktemp -d)"
-
-pnpm build:admin "$STAGING_DIR/backend"
-npm install --omit=dev --prefix "$STAGING_DIR/backend" \
-  @aws-sdk/client-dynamodb@3.1152.0 google-auth-library@10.9.1
-(cd "$STAGING_DIR/backend" && zip -r "$STAGING_DIR/admin.zip" .)
-aws s3 cp "$STAGING_DIR/admin.zip" "s3://$ARTIFACT_BUCKET/$RELEASE_KEY"
-aws cloudformation validate-template --template-body file://deploy/infrastructure.yml
-aws cloudformation deploy --stack-name "$STACK_NAME" \
-  --template-file deploy/infrastructure.yml --capabilities CAPABILITY_IAM \
-  --parameter-overrides AdminCodeBucket="$ARTIFACT_BUCKET" AdminCodeKey="$RELEASE_KEY" \
-    GoogleClientId="$GOOGLE_CLIENT_ID" AdminEmails="$ADMIN_EMAILS"
-
-pnpm exec tsc --outDir "$STAGING_DIR/site/js"
-cp src/index.html src/game.html src/admin.html "$STAGING_DIR/site/"
-cp -R src/assets src/css "$STAGING_DIR/site/"
-BUCKET_NAME="$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
-  --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)"
-DISTRIBUTION_ID="$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
-  --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)"
-aws s3 sync "$STAGING_DIR/site" "s3://$BUCKET_NAME" --delete
-aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*'
-```
-
-Only the staged public files are uploaded; backend source/tests and frontend
-TypeScript are excluded. The Lambda archive contains CommonJS `admin.js` at its
-root and the production dependencies installed in staging. Do not copy the
-repository's `package.json` into this archive: its `type: module` setting does not
-match the compiled Lambda. The cookie requires HTTPS, so the static local
-`pnpm serve` command cannot exercise authentication. The configured allowed
-Origin is the distribution's HTTPS domain; custom domains require an explicit
-backend Origin configuration change.
-
-### Deployed smoke checks
-
-1. Request `/api/admin/capabilities` without a cookie: expect 401 JSON.
-2. Submit an invalid or expired Google credential after starting login: expect
-   denial and no session. Reusing a consumed login nonce must also be denied.
-3. Sign in with an allowlisted Google account: expect the administrative panel and
-   role `administrator` from `/api/auth/session`; inspect the cookie flags and
-   verify the capabilities response identifies that user.
-4. Sign in with a verified Google account outside `AdminEmails`: expect successful
-   login, role `user` from `/api/auth/session`, and 403 from
-   `/api/admin/capabilities`. No administrative controls should appear.
-5. Sign out, then replay the previous cookie against either protected API: expect
-   401.
-6. Send a login/logout POST with a different Origin: expect 403.
-7. Remove an administrator email from the configured allowlist and deploy the
-   update: the existing session becomes role `user` and administrative requests
-   return 403. Restore the email and deploy: that session regains role
-   `administrator`. Expired sessions return 401 regardless of role.
-8. Configure an empty `AdminEmails`: regular sign-in still works and all users
-   receive 403 from administrative routes. An empty `GoogleClientId` still returns
-   503 and prevents sign-in.
+The Stage deployment workflow builds and deploys the authentication Lambda alongside the hunt application. Configure the `ADMIN_ARTIFACT_BUCKET`, `GOOGLE_CLIENT_ID`, and `ADMIN_EMAILS` GitHub Actions variables before deployment. Hunt Studio's existing creator session continues to manage hunts independently of Google administrator access.

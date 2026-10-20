@@ -1,68 +1,87 @@
-
 name: Deploy
-
 on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
     branches: [main, stage]
-
 permissions:
   id-token: write
   contents: read
-
+concurrency:
+  group: deploy-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: false
 jobs:
-  deploy:
+  verify:
     runs-on: ubuntu-latest
-
-    concurrency:
-      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
-      cancel-in-progress: false
-
     steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm check:admin
+      - run: pnpm test:admin
+      - run: pnpm format:check
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pre-deployment-test-results
+          path: test-results/
+  deploy:
+    needs: verify
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Determine stack name
         id: stack
-        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "stack_name=bucstop-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
-            echo "stack_name=bucstop" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref_name }}" == "stage" ]]; then
-            echo "stack_name=bucstop-stage" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "stack_name=bucstop-pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          elif [[ "$REF_NAME" == main ]]; then
+            echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
+          elif [[ "$REF_NAME" == stage ]]; then
+            echo 'stack_name=bucstop-stage' >> "$GITHUB_OUTPUT"
           else
-            echo "Unsupported ref/event"
             exit 1
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-1
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Deploy
+      - name: Deploy application and durable storage
+        id: release
         env:
           ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
-        run: |
-          chmod +x ./deploy/deploy.sh
-          ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+        run: bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify deployed hunt creation, persistence, and player workflow
+        env:
+          BASE_URL: ${{ steps.release.outputs.site_url }}
+        run: pnpm exec playwright test tests/deployment.spec.ts tests/huntConfiguration.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: deployed-test-results
+          path: test-results/

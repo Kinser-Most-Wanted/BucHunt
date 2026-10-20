@@ -12,11 +12,10 @@ test("navigation links to player and Hunt Studio", async ({ page }) => {
     page.getByRole("button", { name: "Sign in from BucHunt home" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Administration", exact: true }).click();
-  await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await expect(page.getByTestId("admin-workspace")).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Go to BucHunt sign-in" }),
   ).toBeVisible();
-  await expect(page.getByTestId("task-form")).toBeVisible();
 });
 
 test("shared Google sign-in checks the server admin role", async ({ page }) => {
@@ -102,14 +101,36 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await expect(page).toHaveURL(/player\.html$/);
+  await expect(page.getByTestId("player-task-status")).toBeVisible();
+  await page.getByRole("link", { name: "Administration", exact: true }).click();
   await expect(page.locator("#admin-status")).toHaveText(
-    "Signed in with administrator access.",
+    "Administrator access verified.",
   );
-  await expect(page.locator("#admin-panel")).toBeVisible();
-  await page.getByRole("link", { name: "Open Hunt Studio" }).click();
+  await expect(page.locator("#admin-workspace")).toBeVisible();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
-  await expect(page.locator("#admin-panel")).toBeVisible();
   await page.locator("#sign-out").click();
+  await expect(page.locator("#admin-workspace")).toBeHidden();
   await expect(page.locator("#admin-login")).toBeVisible();
   await expect(page.locator("#home-sign-in-link")).toBeVisible();
+});
+
+test("non-admin Google accounts cannot view Hunt Studio tools", async ({
+  page,
+}) => {
+  const visitor = {
+    subject: "google-subject-visitor",
+    email: "visitor@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "user",
+  };
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: visitor } }),
+  );
+
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-denied")).toBeVisible();
+  await expect(page.getByTestId("admin-workspace")).toBeHidden();
+  await expect(page.getByTestId("hunt-form")).toBeHidden();
+  await expect(page.locator("#sign-out")).toBeVisible();
 });

@@ -47,7 +47,7 @@ RELEASE="$(date -u +%Y%m%d%H%M%S)-$(git -C "$PROJECT_ROOT" rev-parse --short HEA
 ARCHIVE="$(mktemp)"
 PARAMETERS="$(mktemp)"
 # Neither source configuration nor runtime data is uploaded to the public app.
-tar -czf "$ARCHIVE" -C "$PROJECT_ROOT" package.json -C src index.html admin.html player.html css js
+tar -czf "$ARCHIVE" -C "$PROJECT_ROOT" package.json -C src index.html admin.html player.html css js assets
 aws s3 cp "$ARCHIVE" "s3://$BUCKET/releases/$RELEASE.tar.gz" --only-show-errors
 # Wait for SSM registration and cloud-init; never start against a partial release.
 for attempt in $(seq 1 60); do
@@ -70,7 +70,7 @@ tar -xzf /tmp/buchunt-release.tar.gz -C /opt/buchunt/releases/{release}
 # Archive contains frontend files at its root; serve them under src/.
 cd /opt/buchunt/releases/{release}
 mkdir src
-mv index.html admin.html player.html css js src/
+mv index.html admin.html player.html css js assets src/
 TOKEN=$(aws secretsmanager get-secret-value --secret-id {secret} --query SecretString --output text)
 umask 077
 printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\n' "$TOKEN" > /etc/buchunt.env

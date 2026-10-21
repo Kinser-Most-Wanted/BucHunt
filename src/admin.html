@@ -48,7 +48,7 @@
       <div id="admin-workspace" data-testid="admin-workspace" hidden>
         <div class="page-heading">
           <p class="eyebrow">HUNT STUDIO</p>
-          <h1>Build your hunt</h1>
+          <h1>Bring a new hunt to life.</h1>
           <p class="page-intro">
             Add clear clues, the answer participants need to find, and the
             coordinates that connect each task to a place.
@@ -58,8 +58,9 @@
           Task details are submitted through the hunt service. A task is shown
           as saved only after the service confirms it.
         </p>
-        <section class="access-panel" aria-labelledby="my-hunts-heading">
+        <section class="access-panel manage-hunts-panel" aria-labelledby="my-hunts-heading">
           <h2 id="my-hunts-heading">My hunts</h2>
+          <p class="section-copy">Select a hunt to continue editing its tasks or manage its contributors.</p>
           <button type="button" data-testid="refresh-my-hunts">
             Refresh my hunts
           </button>
@@ -88,7 +89,7 @@
         <section
           id="create-hunt"
           data-testid="create-hunt"
-          class="integration-panel"
+          class="integration-panel hunt-editor-panel"
         >
           <div class="section-heading">
             <span class="step-number" aria-hidden="true">01</span>
@@ -98,8 +99,8 @@
             </div>
           </div>
           <p class="section-copy">
-            Create a hunt and add its tasks below. Return to My hunts whenever
-            you want to continue.
+            Set up a new adventure with a name, a time window, and a way for players to explore.
+            
           </p>
           <form data-testid="hunt-form">
             <fieldset>
@@ -136,7 +137,7 @@
             >Open this hunt in player view</a
           >
         </section>
-        <section id="define-task" data-testid="define-task" class="task-panel">
+        <section id="define-task" data-testid="define-task" class="task-panel hunt-editor-panel">
           <div class="section-heading">
             <span class="step-number" aria-hidden="true">02</span>
             <div>
@@ -145,7 +146,7 @@
             </div>
           </div>
           <p class="section-copy">
-            Choose a hunt from My hunts, then add its tasks here.
+            Choose a hunt above, then add the clues, answers, and locations that bring it to life.
           </p>
           <form data-testid="task-form">
             <button type="button" data-testid="load-admin-hunt">

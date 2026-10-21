@@ -3,27 +3,83 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sign in | BucHunt</title>
+    <meta name="theme-color" content="#10141d" />
+    <title>Welcome to BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
   <body data-page="home">
-    <header>
-      <a class="brand" href="./index.html">BucHunt</a>
+    <header class="home-header">
+      <a class="brand" href="./index.html" aria-label="BucHunt home">
+        <span class="brand-mark" aria-hidden="true">B</span>
+        <span>Buc<span class="brand-highlight">Hunt</span></span>
+      </a>
       <nav aria-label="Main navigation">
-        <a href="./index.html">Home</a>
+        <a class="nav-active" href="./index.html">Home</a>
         <a href="./player.html">Player tasks</a>
       </nav>
+      <span class="header-badge"><span aria-hidden="true"></span> YOUR NEXT ADVENTURE</span>
     </header>
-    <main class="admin-page">
-      <section class="access-panel" aria-labelledby="welcome-heading">
-        <p class="eyebrow">WELCOME TO BUCHUNT</p>
-        <h1 id="welcome-heading">One sign-in. Your whole BucHunt.</h1>
-        <p>Use your Google account to open your player profile. Administrator access is checked securely after sign-in.</p>
-        <section id="admin-login" aria-label="Google sign-in">
-          <div id="google-sign-in" data-testid="google-sign-in"></div>
-        </section>
-        <p id="admin-status" role="status" aria-live="polite">Preparing Google sign-in…</p>
+    <main class="home-main">
+      <section class="welcome-layout" aria-labelledby="welcome-heading">
+        <div class="welcome-copy">
+          <p class="eyebrow"><span class="eyebrow-line"></span> CAMPUS, UNLOCKED</p>
+          <h1 id="welcome-heading">Find your next<br /><span>great adventure.</span></h1>
+          <p class="welcome-description">
+            Follow the clues. Explore the unexpected. BucHunt turns familiar places into a whole new game.
+          </p>
+          <div class="welcome-points" aria-label="What you can do">
+            <div class="welcome-point">
+              <span class="point-icon point-icon-map" aria-hidden="true">↗</span>
+              <span><strong>Get out there</strong><small>Discover hunts around you</small></span>
+            </div>
+            <div class="welcome-point">
+              <span class="point-icon point-icon-spark" aria-hidden="true">✦</span>
+              <span><strong>Crack the clues</strong><small>Every find brings a new story</small></span>
+            </div>
+          </div>
+          <div class="sign-in-card">
+            <div class="sign-in-card-heading">
+              <span class="sign-in-icon" aria-hidden="true">↗</span>
+              <span><strong>Ready when you are</strong><small>Sign in to jump into the hunt.</small></span>
+            </div>
+            <section id="admin-login" aria-label="Google sign-in">
+              <div id="google-sign-in" data-testid="google-sign-in"></div>
+            </section>
+            <p id="admin-status" role="status" aria-live="polite">Preparing Google sign-in…</p>
+            <p class="sign-in-privacy">Your account keeps your progress in one place.</p>
+          </div>
+        </div>
+        <div class="adventure-art" aria-label="Illustration of a treasure hunt map">
+          <div class="art-glow"></div>
+          <div class="art-topline"><span>THE WORLD IS YOUR PLAYGROUND</span><span class="live-dot">LIVE</span></div>
+          <div class="map-scene" aria-hidden="true">
+            <div class="map-grid"></div>
+            <div class="map-route route-one"></div>
+            <div class="map-route route-two"></div>
+            <span class="map-street street-one">COLLEGE AVE</span>
+            <span class="map-street street-two">DISCOVERY WAY</span>
+            <span class="map-street street-three">PINE STREET</span>
+            <span class="map-block block-one"></span>
+            <span class="map-block block-two"></span>
+            <span class="map-block block-three"></span>
+            <span class="map-block block-four"></span>
+            <span class="map-block block-five"></span>
+            <span class="map-block block-six"></span>
+            <span class="map-pin pin-start"><i></i></span>
+            <span class="map-pin pin-end"><i></i></span>
+            <span class="map-star star-one">✦</span>
+            <span class="map-star star-two">✦</span>
+          </div>
+          <div class="map-caption">
+            <span class="caption-marker" aria-hidden="true">⌖</span>
+            <span><small>YOUR NEXT CLUE IS OUT THERE</small><strong>Adventure starts here.</strong></span>
+            <span class="caption-arrow" aria-hidden="true">↗</span>
+          </div>
+          <div class="floating-chip chip-top"><span>✦</span> A LITTLE MYSTERY</div>
+          <div class="floating-chip chip-bottom"><span class="chip-pulse"></span> EXPLORE SOMETHING NEW</div>
+        </div>
       </section>
+      <p class="home-footer-note"><span>BUILT FOR THE CURIOUS</span><span>One sign-in. Endless ways to explore.</span></p>
     </main>
     <footer>Find your next adventure with BucHunt.</footer>
     <script type="module" src="./js/admin.js"></script>

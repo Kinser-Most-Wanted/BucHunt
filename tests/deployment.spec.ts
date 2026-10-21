@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// The deployment workflow supplies its HTTPS output as BASE_URL.
+test.use({ baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000" });
+
 test("landing page keeps player navigation behind sign-in", async ({
   page,
 }) => {
@@ -124,4 +127,29 @@ test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   await expect(page.getByTestId("admin-workspace")).toBeHidden();
   await expect(page.getByTestId("hunt-form")).toBeHidden();
   await expect(page.locator("#sign-out")).toBeVisible();
+});
+
+test("player account endpoints require bearer identity and never issue cookies", async ({
+  request,
+}) => {
+  const config = await request.get("/api/player/account/config");
+  expect(config.headers()["set-cookie"]).toBeUndefined();
+  const payload = await config.json();
+  if (process.env.BASE_URL || process.env.GOOGLE_CLIENT_ID) {
+    expect(config.status()).toBe(200);
+    expect(payload).toEqual({
+      ok: true,
+      value: { clientId: expect.any(String) },
+    });
+    expect(payload.value.clientId).not.toBe("");
+  } else {
+    expect(config.status()).toBe(503);
+    expect(payload.ok).toBe(false);
+  }
+  const response = await request.get("/api/player/account/hunts", {
+    headers: { Cookie: "buchunt-player=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+  });
+  expect(response.status()).toBe(401);
+  expect(response.headers()["set-cookie"]).toBeUndefined();
+  expect((await response.json()).code).toBe("unauthorized");
 });

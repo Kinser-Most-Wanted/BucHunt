@@ -31,6 +31,12 @@ export class PlayerProgressStore {
       progress,
     );
   }
+  async huntsWithProgress(player: string): Promise<string[]> {
+    const data = await this.file.get();
+    return Object.hasOwn(data.players, player)
+      ? Object.keys(data.players[player])
+      : [];
+  }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
     return Object.hasOwn(data.players, player) &&

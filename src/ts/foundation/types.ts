@@ -36,6 +36,7 @@ export interface TaskDefinition extends TaskInput {
   id: string;
 }
 export interface PlayerTask {
+  description?: string;
   id: string;
   huntId: string;
   displayLabel: string;

@@ -47,7 +47,7 @@ RELEASE="$(date -u +%Y%m%d%H%M%S)-$(git -C "$PROJECT_ROOT" rev-parse --short HEA
 ARCHIVE="$(mktemp)"
 PARAMETERS="$(mktemp)"
 # Neither source configuration nor runtime data is uploaded to the public app.
-tar -czf "$ARCHIVE" -C "$PROJECT_ROOT" package.json -C src index.html admin.html player.html css js assets
+tar -czf "$ARCHIVE" -C "$PROJECT_ROOT" package.json -C "$ADMIN_BUILD" node_modules -C "$PROJECT_ROOT/src" index.html admin.html player.html css js assets
 aws s3 cp "$ARCHIVE" "s3://$BUCKET/releases/$RELEASE.tar.gz" --only-show-errors
 # Wait for SSM registration and cloud-init; never start against a partial release.
 for attempt in $(seq 1 60); do
@@ -56,11 +56,15 @@ for attempt in $(seq 1 60); do
   if [[ "$attempt" == 60 ]]; then echo "Instance did not register with SSM"; exit 1; fi
   sleep 5
 done
-export BUCKET INSTANCE SECRET RELEASE
+export BUCKET INSTANCE SECRET RELEASE GOOGLE_CLIENT_ID
 python3 - "$PARAMETERS" <<'PY'
 import json, os, sys
 bucket, secret, release = (os.environ[k] for k in ('BUCKET','SECRET','RELEASE'))
 region = os.environ['AWS_DEFAULT_REGION']
+google_client_id = os.environ['GOOGLE_CLIENT_ID']
+import re
+if not re.fullmatch(r'[A-Za-z0-9._-]*', google_client_id):
+    raise SystemExit('Invalid GOOGLE_CLIENT_ID')
 script = f'''set -eu
 export AWS_DEFAULT_REGION={region}
 cloud-init status --wait
@@ -73,7 +77,7 @@ mkdir src
 mv index.html admin.html player.html css js assets src/
 TOKEN=$(aws secretsmanager get-secret-value --secret-id {secret} --query SecretString --output text)
 umask 077
-printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\n' "$TOKEN" > /etc/buchunt.env
+printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\nGOOGLE_CLIENT_ID={google_client_id}\\n' "$TOKEN" > /etc/buchunt.env
 ln -sfn /opt/buchunt/releases/{release} /opt/buchunt/next
 mv -Tf /opt/buchunt/next /opt/buchunt/current
 systemctl restart buchunt

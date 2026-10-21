@@ -30,10 +30,21 @@ export interface HuntRepository {
   ): Promise<OperationResult<TaskDefinition>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
-  listActiveHunts(identity: PlayerIdentity): Promise<OperationResult<PlayerHunt[]>>;
+  getAccountHunt(
+    huntId: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerHunt>>;
+  answerAccountTask(
+    huntId: string,
+    taskId: string,
+    answer: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ completed: boolean }>>;
+  listActiveHunts(
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerHunt[]>>;
 }
 export interface FoundationServices {
   authentication: AuthenticationService;
   repository: HuntRepository;
 }
-

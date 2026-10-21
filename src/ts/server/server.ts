@@ -1,3 +1,5 @@
+import { OAuth2Client } from "google-auth-library";
+import type { HuntDefinition, PlayerHunt } from "../foundation/types.js";
 import {
   createServer,
   type IncomingMessage,
@@ -14,6 +16,9 @@ interface ServerOptions {
   dataDirectory?: string;
   staticDirectory?: string;
   originToken?: string;
+  googleClientId?: string;
+  // Tests inject the identity verifier; production always uses Google's verifier.
+  verifyPlayerToken?: (token: string) => Promise<string>;
 }
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -60,6 +65,61 @@ export function createApplication(options: ServerOptions = {}) {
   const progress = new PlayerProgressStore(
     resolve(directory, "player-progress.json"),
   );
+  const accountProgress = new PlayerProgressStore(
+    resolve(directory, "account-player-progress.json"),
+  );
+  const google = new OAuth2Client(options.googleClientId);
+  async function playerId(request: IncomingMessage): Promise<string | null> {
+    const match = /^Bearer ([^\s]{1,16384})$/.exec(
+      request.headers.authorization ?? "",
+    );
+    if (!match) return null;
+    let subject: string;
+    try {
+      if (options.verifyPlayerToken)
+        subject = await options.verifyPlayerToken(match[1]);
+      else {
+        if (!options.googleClientId) return null;
+        const ticket = await google.verifyIdToken({
+          idToken: match[1],
+          audience: options.googleClientId,
+        });
+        const claims = ticket.getPayload();
+        if (
+          !claims?.sub ||
+          claims.email_verified !== true ||
+          (claims.azp && claims.azp !== options.googleClientId)
+        )
+          return null;
+        subject = claims.sub;
+      }
+      if (!subject) return null;
+    } catch {
+      return null;
+    }
+    return "google-" + createHash("sha256").update(subject).digest("hex");
+  }
+  async function playerHunt(
+    player: string,
+    hunt: HuntDefinition,
+  ): Promise<PlayerHunt> {
+    const completed = await accountProgress.completed(player, hunt.id);
+    return {
+      id: hunt.id,
+      name: hunt.name,
+      description: hunt.description,
+      tasks: [...hunt.tasks]
+        .sort((a, b) => a.order - b.order)
+        .map((task) => ({
+          id: task.id,
+          huntId: hunt.id,
+          displayLabel: task.displayLabel,
+          description: task.description,
+          location: task.location,
+          completed: completed.includes(task.id),
+        })),
+    };
+  }
   return createServer(async (request, response) => {
     if (
       options.originToken &&
@@ -77,6 +137,96 @@ export function createApplication(options: ServerOptions = {}) {
       const method = request.method ?? "GET";
       if (path === "/api/health" && method === "GET") {
         json(response, 200, { ok: true, value: { status: "ready" } });
+        return;
+      }
+      // This account flow uses only bearer tokens, never reads or sets cookies.
+      if (path.startsWith("/api/player/account/")) {
+        if (path === "/api/player/account/config" && method === "GET") {
+          if (!options.googleClientId) {
+            json(response, 503, {
+              ok: false,
+              code: "network",
+              message: "Player Google sign-in is not configured.",
+            });
+          } else
+            json(response, 200, {
+              ok: true,
+              value: { clientId: options.googleClientId },
+            });
+          return;
+        }
+        const player = await playerId(request);
+        if (!player) {
+          json(response, 401, {
+            ok: false,
+            code: "unauthorized",
+            message: "Sign in with Google again to access saved progress.",
+          });
+          return;
+        }
+        if (path === "/api/player/account/hunts" && method === "GET") {
+          const savedHunts = await accountProgress.huntsWithProgress(player);
+          const definitions = await hunts.list();
+          // Read every hunt with saved progress before returning; storage failures must not
+          // masquerade as an empty list or reset incomplete/completed states.
+          const available = definitions.filter((hunt) =>
+            savedHunts.includes(hunt.id),
+          );
+          if (available.length !== savedHunts.length)
+            throw new StoreError(
+              "storage",
+              "A hunt with saved progress could not be restored. Contact the hunt creator.",
+            );
+          json(response, 200, {
+            ok: true,
+            value: await Promise.all(
+              available.map((hunt) => playerHunt(player, hunt)),
+            ),
+          });
+          return;
+        }
+        const accountMatch =
+          /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)(?:\/tasks\/([a-zA-Z0-9-]+)\/answer)?$/.exec(
+            path,
+          );
+        if (accountMatch) {
+          const hunt = await hunts.get(accountMatch[1]);
+          if (method === "GET" && !accountMatch[2]) {
+            json(response, 200, {
+              ok: true,
+              value: await playerHunt(player, hunt),
+            });
+            return;
+          }
+          if (method === "POST" && accountMatch[2]) {
+            const task = hunt.tasks.find((task) => task.id === accountMatch[2]);
+            if (!task) throw new StoreError("not-found", "Task not found.");
+            const input = await body(request);
+            const answer =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).answer
+                : undefined;
+            if (typeof answer !== "string" || !answer.trim())
+              throw new StoreError("validation", "Enter an answer.");
+            const normalize = (answer: string) =>
+              task.answerCaseSensitive
+                ? answer.trim()
+                : answer.trim().toLowerCase();
+            if (normalize(answer) !== normalize(task.requiredAnswer))
+              throw new StoreError(
+                "validation",
+                "That answer did not match. Try again.",
+              );
+            await accountProgress.complete(player, hunt.id, task.id);
+            json(response, 200, { ok: true, value: { completed: true } });
+            return;
+          }
+        }
+        json(response, 404, {
+          ok: false,
+          code: "not-found",
+          message: "Player account route not found.",
+        });
         return;
       }
       if (path.startsWith("/api/admin/")) {
@@ -347,6 +497,7 @@ if (
   const app = createApplication({
     dataDirectory: process.env.DATA_DIRECTORY,
     originToken: process.env.ORIGIN_TOKEN,
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
   });
   app.listen(Number(process.env.PORT ?? 3000), host, () =>
     console.log("BucHunt server ready"),

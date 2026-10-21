@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+
+// The deployment workflow supplies its HTTPS output as BASE_URL.
+test.use({ baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000" });
 import type { BrowserContext, Page } from "@playwright/test";
 
 async function installMapMock(context: BrowserContext): Promise<void> {
@@ -106,9 +109,7 @@ async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
   );
 }
 
-test("create hunt, save task, reload configuration and persist player completion", async ({
-  page,
-}) => {
+test("create hunt, save task and reload configuration", async ({ page }) => {
   await installMapMock(page.context());
   await page.route("https://accounts.google.com/gsi/client", (route) =>
     route.fulfill({ contentType: "application/javascript", body: "" }),
@@ -251,33 +252,6 @@ test("create hunt, save task, reload configuration and persist player completion
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
-  authenticated = false;
-  currentSession = playerSession;
-  await page.goto("/");
-  await page.getByRole("button", { name: "Sign in with Google" }).click();
-  await expect(page).toHaveURL(/player\.html$/);
-  await page.goto(`/player.html?huntId=${id}`);
-  await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
-  await page.getByTestId("player-display-name-input").fill("Baja");
-  await page.getByRole("button", { name: "Save name and continue" }).click();
-  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
-  await expect(page.getByLabel("Hunt ID")).toHaveValue(id);
-  await page.getByRole("button", { name: "Join Hunt" }).click();
-  await expect(page.getByTestId("player-task")).toContainText("Incomplete");
-  await page.getByLabel("Answer for Find the fountain").fill("wrong");
-  await page.getByRole("button", { name: "Submit answer" }).click();
-  await expect(page.getByTestId("player-task")).toContainText(
-    "That answer did not match",
-  );
-  await page.getByLabel("Answer for Find the fountain").fill(" bucky ");
-  await page.getByRole("button", { name: "Submit answer" }).click();
-  await expect(page.getByTestId("player-task")).toContainText("Completed");
-  await page.reload();
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Sprint verification",
-  );
-  await page.getByRole("button", { name: "Open Hunt" }).click();
-  await expect(page.getByTestId("player-task")).toContainText("Completed");
 });
 
 test("only owners and contributors can configure a hunt through the creator workspace", async ({

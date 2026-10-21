@@ -1,9 +1,9 @@
+import { loadGoogleIdentity } from "./adminAccess.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
-const PLAYER_HUNTS_KEY_PREFIX = "buchunt.player-hunts.";
 function storedDisplayName(accountId: string): string | null {
   try {
     const value = localStorage
@@ -13,28 +13,6 @@ function storedDisplayName(accountId: string): string | null {
   } catch {
     return null;
   }
-}
-
-function storedHuntIds(accountId: string): string[] {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(`${PLAYER_HUNTS_KEY_PREFIX}${accountId}`) ?? "[]",
-    ) as unknown;
-    return Array.isArray(value)
-      ? value.filter((id): id is string => typeof id === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHuntId(accountId: string, huntId: string): void {
-  const ids = storedHuntIds(accountId);
-  if (!ids.includes(huntId)) ids.push(huntId);
-  localStorage.setItem(
-    `${PLAYER_HUNTS_KEY_PREFIX}${accountId}`,
-    JSON.stringify(ids),
-  );
 }
 
 function storedIdentity(): PlayerIdentity | null {
@@ -257,25 +235,89 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     list.replaceChildren();
     huntLookup.hidden = false;
-    status.textContent = "Loading your Hunts�w^~)�v";
-    const ids = storedHuntIds(signedIn.accountId);
-    const hunts = await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const result = await repository.getPlayerHunt(id);
-          return result.ok ? result.value : null;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const available = hunts.filter((hunt): hunt is PlayerHunt => hunt !== null);
-    renderHunts(list, available);
-    status.textContent = available.length
-      ? `${available.length} saved Hunt${available.length === 1 ? "" : "s"}.`
-      : "You have no saved Hunts yet. Join one with its ID below.";
+    status.textContent = "Loading your hunts...";
+    const result = await repository.listActiveHunts(signedIn);
+    if (!result.ok) {
+      status.textContent = result.message;
+      if (result.code === "unauthorized") void preparePlayerSignIn();
+      return;
+    }
+    renderHunts(list, result.value);
+    status.textContent = result.value.length
+      ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
+      : "You have no saved hunts yet. Open one with its hunt ID below.";
   };
 
+  const preparePlayerSignIn = async (): Promise<void> => {
+    setGoogleSignInEnabled(true);
+    if (!googleButtonHost) return;
+    try {
+      const response = await fetch("/api/player/account/config", {
+        credentials: "omit",
+        cache: "no-store",
+      });
+      const config = await response.json();
+      if (!response.ok || !config.ok)
+        throw new Error(config.message ?? "Player sign-in is unavailable.");
+      const google = await loadGoogleIdentity();
+      google.accounts.id.initialize({
+        client_id: config.value.clientId,
+        nonce: crypto.randomUUID(),
+        auto_select: false,
+        callback: ({ credential }) => {
+          void acceptCredential(credential);
+        },
+      });
+      googleButtonHost.replaceChildren();
+      google.accounts.id.renderButton(googleButtonHost, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        width: 280,
+      });
+    } catch (error) {
+      providerStatus.hidden = false;
+      providerStatus.textContent =
+        error instanceof Error
+          ? error.message
+          : "Player sign-in is unavailable.";
+    }
+  };
+  const acceptCredential = async (credential: string): Promise<void> => {
+    try {
+      // Claims here label the UI only. Every API request verifies the signed
+      // token server-side and derives its own storage key from Google's subject.
+      const encoded = credential
+        .split(".")[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+      const payload = JSON.parse(
+        new TextDecoder().decode(
+          Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
+        ),
+      );
+      if (typeof payload.sub !== "string" || typeof payload.email !== "string")
+        throw new Error("Invalid Google identity.");
+      const identity: PlayerIdentity = {
+        provider: "google",
+        accountId: payload.sub,
+        email: payload.email,
+        idToken: credential,
+      };
+      const verified = await repository.listActiveHunts(identity);
+      if (!verified.ok) throw new Error(verified.message);
+      sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(identity));
+      const name = storedDisplayName(identity.accountId);
+      if (name) await loadHunts(identity, name);
+      else requestDisplayName(identity);
+    } catch (error) {
+      providerStatus.hidden = false;
+      providerStatus.textContent =
+        error instanceof Error ? error.message : "Google sign-in failed.";
+    }
+  };
   let pendingIdentity: PlayerIdentity | null = null;
 
   const requestDisplayName = (signedIn: PlayerIdentity): void => {
@@ -357,7 +399,7 @@ export function mountDisplayTasks(
   });
 
   googleSignIn.addEventListener("click", () => {
-    window.location.assign("./index.html");
+    void preparePlayerSignIn();
   });
 
   providerStatus.hidden = true;
@@ -386,34 +428,25 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       huntTasks.replaceChildren();
-      huntStatus.textContent = "Loading Hunt�w^~)�v";
-      const result = await repository.getPlayerHunt(huntId);
+      huntStatus.textContent = "Loading hunt...";
+      const identity = storedIdentity();
+      if (!identity) {
+        huntStatus.textContent = "Sign in with Google first.";
+        return;
+      }
+      const result = await repository.getAccountHunt(huntId, identity);
       if (requestId !== huntRequest) return;
       if (!result.ok) {
         huntStatus.textContent = result.message;
+        if (result.code === "unauthorized") void preparePlayerSignIn();
         return;
       }
-      const identity = storedIdentity();
-      if (identity) {
-        try {
-          saveHuntId(identity.accountId, huntId);
-          const saved = await Promise.all(
-            storedHuntIds(identity.accountId).map(async (id) => {
-              const savedResult = await repository.getPlayerHunt(id);
-              return savedResult.ok ? savedResult.value : null;
-            }),
-          );
-          renderHunts(
-            list,
-            saved.filter((hunt): hunt is PlayerHunt => hunt !== null),
-          );
-          const savedCount = storedHuntIds(identity.accountId).length;
-          status.textContent = `${savedCount} saved Hunt${savedCount === 1 ? "" : "s"}.`;
-        } catch {
-          huntStatus.textContent =
-            "Hunt opened, but this browser could not save it to your profile.";
-        }
-      }
+      huntId = result.value.id;
+      await loadHunts(
+        identity,
+        storedDisplayName(identity.accountId) ?? identity.email,
+      );
+      if (requestId !== huntRequest) return;
       huntName.textContent = result.value.name;
       huntStatus.textContent = result.value.tasks.length
         ? `${result.value.tasks.length} tasks loaded.`
@@ -426,6 +459,11 @@ export function mountDisplayTasks(
         const state = document.createElement("p");
         state.textContent = task.completed ? "Completed" : "Incomplete";
         item.append(label, state);
+        if (task.description) {
+          const description = document.createElement("p");
+          description.textContent = task.description;
+          item.append(description);
+        }
         const location = taskLocationElement(task.location);
         if (location) item.append(location);
         if (!task.completed) {
@@ -445,18 +483,15 @@ export function mountDisplayTasks(
             event.preventDefault();
             submit.disabled = true;
             try {
-              const response = await fetch(
-                `/api/player/hunts/${encodeURIComponent(huntId)}/tasks/${encodeURIComponent(task.id)}/answer`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ answer: answer.value }),
-                },
+              const result = await repository.answerAccountTask(
+                huntId,
+                task.id,
+                answer.value,
+                identity,
               );
-              const payload = await response.json();
-              if (!response.ok || !payload.ok) {
-                message.textContent =
-                  payload.message ?? "Answer could not be submitted.";
+              if (!result.ok) {
+                message.textContent = result.message;
+                if (result.code === "unauthorized") void preparePlayerSignIn();
                 return;
               }
               await loadHunt(huntId);
@@ -482,7 +517,7 @@ export function mountDisplayTasks(
       if (button) void loadHunt(button.dataset.huntId ?? "");
     });
     const selectedHunt = new URLSearchParams(location.search).get("huntId");
-    if (selectedHunt) huntInput.value = selectedHunt;
+    if (selectedHunt && previousIdentity) void loadHunt(selectedHunt);
   }
 
   signOut.addEventListener("click", () => {

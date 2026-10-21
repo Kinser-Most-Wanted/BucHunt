@@ -1,5 +1,6 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import { getCreatorSession, request } from "./huntRepository.js";
+import { openHuntDetails } from "./huntDetails.js";
 interface HuntSummary {
   id: string;
   name: string;
@@ -34,6 +35,7 @@ export function mountCreateHunt(
     '#define-task [name="huntId"]',
   )!;
   let selected: HuntSummary | undefined;
+  let availableHunts: HuntSummary[] = [];
   let querySelectionApplied = false;
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
@@ -101,6 +103,16 @@ export function mountCreateHunt(
         ?.click();
     if (hunt.role === "owner") void renderContributors();
   }
+  document.addEventListener("hunt-details-edit", (event: Event) => {
+    const huntId = (event as CustomEvent<{ huntId?: string }>).detail?.huntId;
+    const hunt = availableHunts.find((item) => item.id === huntId);
+    if (!hunt) return;
+    select(hunt, true);
+    document.getElementById("define-task")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
   async function refresh(): Promise<void> {
     const session = await getCreatorSession();
     if (!session.ok) {
@@ -113,23 +125,24 @@ export function mountCreateHunt(
       workspaceStatus.textContent = result.message;
       return;
     }
+    availableHunts = result.value;
     list.replaceChildren();
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
       : "No hunts yet. Create your first hunt below.";
     for (const hunt of result.value) {
       const item = document.createElement("li");
-      const link = document.createElement("a");
-      link.className = "hunt-list-link";
-      const detailUrl = new URL("./hunt-details.html", window.location.href);
-      detailUrl.searchParams.set("huntId", hunt.id);
-      detailUrl.searchParams.set("role", hunt.role);
-      link.href = detailUrl.toString();
-      link.textContent = hunt.name;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hunt-list-link";
+      button.textContent = hunt.name;
       const role = document.createElement("span");
       role.textContent = `(${hunt.role})`;
-      link.append(role);
-      item.append(link);
+      button.append(role);
+      button.addEventListener("click", () => {
+        void openHuntDetails(hunt.id, hunt.role);
+      });
+      item.append(button);
       list.append(item);
     }
     if (!querySelectionApplied && requestedHuntId) {

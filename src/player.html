@@ -6,19 +6,32 @@
     <title>Player tasks | BucHunt</title>
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
-  <body>
+  <body data-page="player">
     <header>
-      <a class="brand" href="./index.html">BucHunt</a>
+      <a class="brand" href="./index.html">
+        <img
+          src="./assets/buchunt-logo.svg"
+          alt="BucHunt"
+          width="170"
+          height="57"
+        />
+      </a>
       <nav aria-label="Main navigation">
-        <a href="./index.html">Home</a><a href="./admin.html">Administration</a
-        ><a href="./player.html">Player tasks</a>
+        <a href="./admin.html">Administration</a>
+        <a href="./player.html">Player tasks</a>
       </nav>
     </header>
-    <main>
-      <h1>Hunt tasks</h1>
-      <p class="notice">
-        Sign in once from the BucHunt home page to see your active Hunts. Your
-        account session is verified by the server.
+    <main class="player-page">
+      <div class="page-heading player-heading">
+        <p class="eyebrow">PLAYER LOUNGE</p>
+        <h1>Your next adventure awaits.</h1>
+        <p class="page-intro">
+          Pick up where you left off, explore your active hunts, and follow each
+          clue to the next discovery.
+        </p>
+      </div>
+      <p class="notice player-notice">
+        Your hunt progress is saved to your BucHunt account.
       </p>
       <section id="display-tasks" data-testid="display-tasks">
         <h2 data-testid="player-heading">Sign in to see active Hunts</h2>
@@ -158,7 +171,7 @@
         </section>
       </section>
     </main>
-    <footer>Sprint 2 foundation · Features awaiting implementation</footer>
+    <footer>© 2026 Kinser-Most-Wanted · BucHunt</footer>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>

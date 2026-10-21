@@ -1,21 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-test("navigation links to player and Hunt Studio", async ({ page }) => {
+test("landing page keeps player navigation behind sign-in", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/BucHunt/);
   await expect(page.getByTestId("google-sign-in")).toBeAttached();
-  await page.getByRole("link", { name: "Player tasks", exact: true }).click();
-  await expect(page.getByTestId("player-task-status")).toHaveText(
-    "No tasks loaded.",
-  );
-  await expect(
-    page.getByRole("button", { name: "Sign in from BucHunt home" }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Administration", exact: true }).click();
-  await expect(page.getByTestId("admin-workspace")).toBeHidden();
-  await expect(
-    page.getByRole("link", { name: "Go to BucHunt sign-in" }),
-  ).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
 });
 
 test("shared Google sign-in checks the server admin role", async ({ page }) => {

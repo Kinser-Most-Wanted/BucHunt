@@ -14,10 +14,17 @@
   </head>
   <body data-page="admin">
     <header>
-      <a class="brand" href="./index.html">BucHunt</a>
+      <a class="brand" href="./index.html">
+        <img
+          src="./assets/buchunt-logo.svg"
+          alt="BucHunt"
+          width="170"
+          height="57"
+        />
+      </a>
       <nav aria-label="Main navigation">
-        <a href="./index.html">Home</a><a href="./admin.html">Hunt Studio</a
-        ><a href="./player.html">Player tasks</a>
+        <a href="./admin.html">Hunt Studio</a>
+        <a href="./player.html">Player tasks</a>
       </nav>
     </header>
     <main class="admin-page">
@@ -48,7 +55,7 @@
       <div id="admin-workspace" data-testid="admin-workspace" hidden>
         <div class="page-heading">
           <p class="eyebrow">HUNT STUDIO</p>
-          <h1>Build your hunt</h1>
+          <h1>Bring a new hunt to life.</h1>
           <p class="page-intro">
             Add clear clues, the answer participants need to find, and the
             coordinates that connect each task to a place.
@@ -58,37 +65,35 @@
           Task details are submitted through the hunt service. A task is shown
           as saved only after the service confirms it.
         </p>
-        <section class="access-panel" aria-labelledby="my-hunts-heading">
-          <h2 id="my-hunts-heading">My hunts</h2>
-          <button type="button" data-testid="refresh-my-hunts">
-            Refresh my hunts
-          </button>
+        <section
+          class="access-panel manage-hunts-panel"
+          aria-labelledby="my-hunts-heading"
+        >
+          <div class="manage-hunts-heading">
+            <div>
+              <p class="eyebrow">YOUR ADVENTURES</p>
+              <h2 id="my-hunts-heading">My hunts</h2>
+            </div>
+            <button
+              type="button"
+              class="refresh-button"
+              data-testid="refresh-my-hunts"
+            >
+              ↻ Refresh
+            </button>
+          </div>
+          <p class="section-copy">
+            Select a hunt to continue editing its tasks or manage its
+            contributors.
+          </p>
           <p role="status" data-testid="creator-status"></p>
           <ul data-testid="my-hunts" aria-label="My hunts"></ul>
         </section>
-        <section data-testid="contributors-panel" hidden>
-          <h2>Contributors</h2>
-          <p>
-            As the owner, you can let another creator manage this hunt's tasks.
-          </p>
-          <form data-testid="contributor-form">
-            <label for="contributor-id">Contributor creator ID</label
-            ><input id="contributor-id" name="creatorId" required /><button
-              type="submit"
-            >
-              Add contributor
-            </button>
-          </form>
-          <p role="status" data-testid="contributor-status"></p>
-          <ul
-            data-testid="contributor-list"
-            aria-label="Hunt contributors"
-          ></ul>
-        </section>
+
         <section
           id="create-hunt"
           data-testid="create-hunt"
-          class="integration-panel"
+          class="integration-panel hunt-editor-panel"
         >
           <div class="section-heading">
             <span class="step-number" aria-hidden="true">01</span>
@@ -98,8 +103,8 @@
             </div>
           </div>
           <p class="section-copy">
-            Create a hunt and add its tasks below. Return to My hunts whenever
-            you want to continue.
+            Set up a new adventure with a name, a time window, and a way for
+            players to explore.
           </p>
           <form data-testid="hunt-form">
             <fieldset>
@@ -136,7 +141,11 @@
             >Open this hunt in player view</a
           >
         </section>
-        <section id="define-task" data-testid="define-task" class="task-panel">
+        <section
+          id="define-task"
+          data-testid="define-task"
+          class="task-panel hunt-editor-panel"
+        >
           <div class="section-heading">
             <span class="step-number" aria-hidden="true">02</span>
             <div>
@@ -145,7 +154,8 @@
             </div>
           </div>
           <p class="section-copy">
-            Choose a hunt from My hunts, then add its tasks here.
+            Choose a hunt above, then add the clues, answers, and locations that
+            bring it to life.
           </p>
           <form data-testid="task-form">
             <button type="button" data-testid="load-admin-hunt">
@@ -315,6 +325,25 @@
             ></ol>
           </div>
         </section>
+        <details class="more-options" data-testid="contributors-panel" hidden>
+          <summary>Contributors</summary>
+          <p>
+            As the owner, you can let another creator manage this hunt's tasks.
+          </p>
+          <form data-testid="contributor-form">
+            <label for="contributor-id">Contributor creator ID</label
+            ><input id="contributor-id" name="creatorId" required /><button
+              type="submit"
+            >
+              Add contributor
+            </button>
+          </form>
+          <p role="status" data-testid="contributor-status"></p>
+          <ul
+            data-testid="contributor-list"
+            aria-label="Hunt contributors"
+          ></ul>
+        </details>
         <details class="more-options" data-testid="creator-profile-details">
           <summary>Creator ID and sharing</summary>
           <p class="field-help">
@@ -333,6 +362,106 @@
             Share your creator ID with a hunt owner if you want to contribute.
           </p>
         </details>
+        <dialog
+          class="hunt-details-dialog"
+          data-testid="hunt-details-dialog"
+          aria-labelledby="hunt-details-title"
+        >
+          <div class="hunt-details-dialog-heading">
+            <p class="eyebrow">HUNT OVERVIEW</p>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-hunt-details"
+              aria-label="Close hunt details"
+            >
+              ×
+            </button>
+          </div>
+          <p
+            class="details-status"
+            data-testid="hunt-detail-status"
+            role="status"
+            aria-live="polite"
+          >
+            Loading hunt details…
+          </p>
+          <h2 id="hunt-details-title" data-testid="hunt-detail-name">
+            Your adventure
+          </h2>
+          <p
+            class="details-description"
+            data-testid="hunt-detail-description"
+          ></p>
+          <div class="details-actions">
+            <button
+              type="button"
+              class="hunt-id-toggle"
+              data-testid="hunt-id-toggle"
+              aria-expanded="false"
+              aria-controls="hunt-detail-id"
+            >
+              Reveal hunt ID
+            </button>
+            <output
+              id="hunt-detail-id"
+              data-testid="hunt-detail-id"
+              hidden
+            ></output>
+            <button
+              type="button"
+              class="action details-edit-link"
+              data-testid="edit-hunt-link"
+            >
+              Edit hunt tasks
+            </button>
+            <a
+              class="action details-player-link"
+              data-testid="player-hunt-link"
+            >
+              Preview player view
+            </a>
+          </div>
+          <section class="details-overview" aria-labelledby="overview-heading">
+            <div class="details-section-heading">
+              <p class="eyebrow">THE BIG PICTURE</p>
+              <h3 id="overview-heading">Hunt overview</h3>
+            </div>
+            <dl class="hunt-facts" data-testid="hunt-facts"></dl>
+          </section>
+          <section class="details-creators" aria-labelledby="creators-heading">
+            <div class="details-section-heading">
+              <p class="eyebrow">THE TEAM</p>
+              <h3 id="creators-heading">Hunt creators</h3>
+            </div>
+            <ul data-testid="hunt-creators" class="creator-list"></ul>
+            <p
+              data-testid="contributors-load-status"
+              class="details-muted"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </section>
+          <section class="details-tasks" aria-labelledby="tasks-heading">
+            <div class="details-section-heading">
+              <p class="eyebrow">THE ADVENTURE</p>
+              <h3 id="tasks-heading">Hunt tasks</h3>
+            </div>
+            <ol
+              data-testid="hunt-detail-tasks"
+              class="hunt-detail-task-list"
+            ></ol>
+            <p data-testid="empty-tasks" class="details-muted" hidden>
+              This hunt has no tasks yet. Add its first task in Hunt Studio.
+            </p>
+          </section>
+          <p
+            class="details-error"
+            data-testid="hunt-detail-error"
+            role="alert"
+            hidden
+          ></p>
+        </dialog>
       </div>
     </main>
     <footer>BucHunt · Create memorable campus discoveries</footer>

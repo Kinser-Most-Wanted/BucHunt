@@ -1,5 +1,6 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import { getCreatorSession, request } from "./huntRepository.js";
+import { openHuntDetails } from "./huntDetails.js";
 interface HuntSummary {
   id: string;
   name: string;
@@ -20,7 +21,7 @@ export function mountCreateHunt(
     '[data-testid="creator-status"]',
   )!;
   const list = document.querySelector<HTMLElement>('[data-testid="my-hunts"]')!;
-  const panel = document.querySelector<HTMLElement>(
+  const panel = document.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   )!;
   const memberList = panel.querySelector<HTMLElement>(
@@ -34,6 +35,11 @@ export function mountCreateHunt(
     '#define-task [name="huntId"]',
   )!;
   let selected: HuntSummary | undefined;
+  let availableHunts: HuntSummary[] = [];
+  let querySelectionApplied = false;
+  const requestedHuntId = new URLSearchParams(window.location.search).get(
+    "huntId",
+  );
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
@@ -81,6 +87,7 @@ export function mountCreateHunt(
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
     panel.hidden = hunt.role !== "owner";
+    panel.open = hunt.role === "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
     const link = root.querySelector<HTMLAnchorElement>(
@@ -96,6 +103,16 @@ export function mountCreateHunt(
         ?.click();
     if (hunt.role === "owner") void renderContributors();
   }
+  document.addEventListener("hunt-details-edit", (event: Event) => {
+    const huntId = (event as CustomEvent<{ huntId?: string }>).detail?.huntId;
+    const hunt = availableHunts.find((item) => item.id === huntId);
+    if (!hunt) return;
+    select(hunt, true);
+    document.getElementById("define-task")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
   async function refresh(): Promise<void> {
     const session = await getCreatorSession();
     if (!session.ok) {
@@ -108,6 +125,7 @@ export function mountCreateHunt(
       workspaceStatus.textContent = result.message;
       return;
     }
+    availableHunts = result.value;
     list.replaceChildren();
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
@@ -116,10 +134,23 @@ export function mountCreateHunt(
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = `${hunt.name} (${hunt.role})`;
-      button.addEventListener("click", () => select(hunt, true));
+      button.className = "hunt-list-link";
+      button.textContent = hunt.name;
+      const role = document.createElement("span");
+      role.textContent = `(${hunt.role})`;
+      button.append(role);
+      button.addEventListener("click", () => {
+        void openHuntDetails(hunt.id, hunt.role);
+      });
       item.append(button);
       list.append(item);
+    }
+    if (!querySelectionApplied && requestedHuntId) {
+      const requestedHunt = result.value.find(
+        (hunt) => hunt.id === requestedHuntId,
+      );
+      querySelectionApplied = true;
+      if (requestedHunt) select(requestedHunt, true);
     }
     if (selected && !result.value.some((hunt) => hunt.id === selected?.id)) {
       selected = undefined;

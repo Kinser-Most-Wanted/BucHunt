@@ -14,7 +14,8 @@
     "format:check": "prettier --check src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts",
     "build:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --outDir",
     "check:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --noEmit",
-    "test:admin": "node --experimental-strip-types --test src/server/admin.test.ts"
+    "test:admin": "node --experimental-strip-types --test src/server/admin.test.ts",
+    "format": "prettier --write src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts"
   },
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {

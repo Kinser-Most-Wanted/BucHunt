@@ -1180,10 +1180,12 @@ body[data-page="player"] .notice {
   color: #c4c9b7;
 }
 body[data-page="admin"] .manage-hunts-panel { margin: 0; padding: 1.3rem; }
+body[data-page="admin"] .manage-hunts-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+body[data-page="admin"] .manage-hunts-heading .eyebrow { margin: 0 0 0.3rem; }
 body[data-page="admin"] .manage-hunts-panel h2,
 body[data-page="admin"] .section-heading h2 { margin: 0; color: #f5f6f8; font-size: 1.25rem; letter-spacing: -0.03em; }
 body[data-page="admin"] .manage-hunts-panel > .section-copy { margin: 0.5rem 0 1rem; }
-body[data-page="admin"] .manage-hunts-panel > button { float: right; margin: 0; }
+body[data-page="admin"] .manage-hunts-panel .refresh-button { margin: 0; white-space: nowrap; }
 body[data-page="admin"] [data-testid="creator-status"],
 body[data-page="admin"] [data-testid="hunt-status"],
 body[data-page="admin"] [data-testid="task-status"],

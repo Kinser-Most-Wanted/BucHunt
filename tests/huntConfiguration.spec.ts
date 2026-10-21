@@ -234,12 +234,20 @@ test("create hunt, save task, reload configuration and persist player completion
   );
   await page.reload();
   await page
-    .getByRole("link", { name: "Sprint verification (owner)", exact: true })
+    .getByRole("button", { name: "Sprint verification (owner)", exact: true })
     .click();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
   await expect(page.getByTestId("hunt-detail-name")).toHaveText(
     "Sprint verification",
   );
-  await page.getByRole("link", { name: "Edit hunt tasks" }).click();
+  await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
+  await page.getByTestId("hunt-id-toggle").click();
+  await expect(page.getByTestId("hunt-detail-id")).toHaveText(id);
+  await expect(page.getByTestId("hunt-detail-tasks")).toContainText(
+    "Find the fountain",
+  );
+  await page.getByRole("button", { name: "Edit hunt tasks" }).click();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeHidden();
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
@@ -327,9 +335,9 @@ test("only owners and contributors can configure a hunt through the creator work
     );
     await member.getByTestId("refresh-my-hunts").click();
     await member
-      .getByRole("link", { name: "Shared hunt (contributor)", exact: true })
+      .getByRole("button", { name: "Shared hunt (contributor)", exact: true })
       .click();
-    await expect(member).toHaveURL(/hunt-details\.html/);
+    await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
     await expect(member.getByTestId("hunt-detail-name")).toHaveText(
       "Shared hunt",
     );
@@ -337,8 +345,9 @@ test("only owners and contributors can configure a hunt through the creator work
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
-    await member.getByRole("link", { name: "Edit hunt tasks" }).click();
-    await expect(member).toHaveURL(/admin\.html\?huntId=/);
+    await member.getByRole("button", { name: "Edit hunt tasks" }).click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await expect(member).toHaveURL(/admin\.html$/);
     await expect(member.getByTestId("contributors-panel")).toBeHidden();
     await member
       .getByLabel("Display label", { exact: true })

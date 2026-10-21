@@ -59,11 +59,14 @@
           as saved only after the service confirms it.
         </p>
         <section class="access-panel manage-hunts-panel" aria-labelledby="my-hunts-heading">
-          <h2 id="my-hunts-heading">My hunts</h2>
+          <div class="manage-hunts-heading">
+            <div>
+              <p class="eyebrow">YOUR ADVENTURES</p>
+              <h2 id="my-hunts-heading">My hunts</h2>
+            </div>
+            <button type="button" class="refresh-button" data-testid="refresh-my-hunts">↻ Refresh</button>
+          </div>
           <p class="section-copy">Select a hunt to continue editing its tasks or manage its contributors.</p>
-          <button type="button" data-testid="refresh-my-hunts">
-            Refresh my hunts
-          </button>
           <p role="status" data-testid="creator-status"></p>
           <ul data-testid="my-hunts" aria-label="My hunts"></ul>
         </section>

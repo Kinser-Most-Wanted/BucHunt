@@ -118,7 +118,10 @@ export function mountCreateHunt(
       const item = document.createElement("li");
       const link = document.createElement("a");
       link.className = "hunt-list-link";
-      link.href = `./hunt-details.html?huntId=${encodeURIComponent(hunt.id)}&role=${hunt.role}`;
+      const detailUrl = new URL("./hunt-details.html", window.location.href);
+      detailUrl.searchParams.set("huntId", hunt.id);
+      detailUrl.searchParams.set("role", hunt.role);
+      link.href = detailUrl.toString();
       link.textContent = hunt.name;
       const role = document.createElement("span");
       role.textContent = hunt.role;

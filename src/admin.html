@@ -355,35 +355,105 @@
             Share your creator ID with a hunt owner if you want to contribute.
           </p>
         </details>
-        <dialog class="hunt-details-dialog" data-testid="hunt-details-dialog" aria-labelledby="hunt-details-title">
+        <dialog
+          class="hunt-details-dialog"
+          data-testid="hunt-details-dialog"
+          aria-labelledby="hunt-details-title"
+        >
           <div class="hunt-details-dialog-heading">
             <p class="eyebrow">HUNT OVERVIEW</p>
-            <button type="button" class="dialog-close-button" data-testid="close-hunt-details" aria-label="Close hunt details">×</button>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-hunt-details"
+              aria-label="Close hunt details"
+            >
+              ×
+            </button>
           </div>
-          <p class="details-status" data-testid="hunt-detail-status" role="status" aria-live="polite">Loading hunt details…</p>
-          <h2 id="hunt-details-title" data-testid="hunt-detail-name">Your adventure</h2>
-          <p class="details-description" data-testid="hunt-detail-description"></p>
+          <p
+            class="details-status"
+            data-testid="hunt-detail-status"
+            role="status"
+            aria-live="polite"
+          >
+            Loading hunt details…
+          </p>
+          <h2 id="hunt-details-title" data-testid="hunt-detail-name">
+            Your adventure
+          </h2>
+          <p
+            class="details-description"
+            data-testid="hunt-detail-description"
+          ></p>
           <div class="details-actions">
-            <button type="button" class="hunt-id-toggle" data-testid="hunt-id-toggle" aria-expanded="false" aria-controls="hunt-detail-id">Reveal hunt ID</button>
-            <output id="hunt-detail-id" data-testid="hunt-detail-id" hidden></output>
-            <button type="button" class="action details-edit-link" data-testid="edit-hunt-link">Edit hunt tasks</button>
-            <a class="action details-player-link" data-testid="player-hunt-link">Preview player view</a>
+            <button
+              type="button"
+              class="hunt-id-toggle"
+              data-testid="hunt-id-toggle"
+              aria-expanded="false"
+              aria-controls="hunt-detail-id"
+            >
+              Reveal hunt ID
+            </button>
+            <output
+              id="hunt-detail-id"
+              data-testid="hunt-detail-id"
+              hidden
+            ></output>
+            <button
+              type="button"
+              class="action details-edit-link"
+              data-testid="edit-hunt-link"
+            >
+              Edit hunt tasks
+            </button>
+            <a
+              class="action details-player-link"
+              data-testid="player-hunt-link"
+            >
+              Preview player view
+            </a>
           </div>
           <section class="details-overview" aria-labelledby="overview-heading">
-            <div class="details-section-heading"><p class="eyebrow">THE BIG PICTURE</p><h3 id="overview-heading">Hunt overview</h3></div>
+            <div class="details-section-heading">
+              <p class="eyebrow">THE BIG PICTURE</p>
+              <h3 id="overview-heading">Hunt overview</h3>
+            </div>
             <dl class="hunt-facts" data-testid="hunt-facts"></dl>
           </section>
           <section class="details-creators" aria-labelledby="creators-heading">
-            <div class="details-section-heading"><p class="eyebrow">THE TEAM</p><h3 id="creators-heading">Hunt creators</h3></div>
+            <div class="details-section-heading">
+              <p class="eyebrow">THE TEAM</p>
+              <h3 id="creators-heading">Hunt creators</h3>
+            </div>
             <ul data-testid="hunt-creators" class="creator-list"></ul>
-            <p data-testid="contributors-load-status" class="details-muted" role="status" aria-live="polite"></p>
+            <p
+              data-testid="contributors-load-status"
+              class="details-muted"
+              role="status"
+              aria-live="polite"
+            ></p>
           </section>
           <section class="details-tasks" aria-labelledby="tasks-heading">
-            <div class="details-section-heading"><p class="eyebrow">THE ADVENTURE</p><h3 id="tasks-heading">Hunt tasks</h3></div>
-            <ol data-testid="hunt-detail-tasks" class="hunt-detail-task-list"></ol>
-            <p data-testid="empty-tasks" class="details-muted" hidden>This hunt has no tasks yet. Add its first task in Hunt Studio.</p>
+            <div class="details-section-heading">
+              <p class="eyebrow">THE ADVENTURE</p>
+              <h3 id="tasks-heading">Hunt tasks</h3>
+            </div>
+            <ol
+              data-testid="hunt-detail-tasks"
+              class="hunt-detail-task-list"
+            ></ol>
+            <p data-testid="empty-tasks" class="details-muted" hidden>
+              This hunt has no tasks yet. Add its first task in Hunt Studio.
+            </p>
           </section>
-          <p class="details-error" data-testid="hunt-detail-error" role="alert" hidden></p>
+          <p
+            class="details-error"
+            data-testid="hunt-detail-error"
+            role="alert"
+            hidden
+          ></p>
         </dialog>
       </div>
     </main>

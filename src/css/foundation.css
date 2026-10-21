@@ -1533,3 +1533,120 @@ body[data-page="hunt-details"] > footer { color: #858e9e; }
   .details-actions > * { flex: 1 1 auto; text-align: center; }
   .hunt-detail-task { grid-template-columns: 1fr; }
 }
+
+
+body[data-page="admin"] [data-testid="my-hunts"] button.hunt-list-link {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.8rem 0.9rem;
+  margin: 0;
+  background: transparent;
+  color: #f4f5f9;
+  text-align: left;
+}
+body[data-page="admin"] [data-testid="my-hunts"] button.hunt-list-link:hover {
+  border-color: rgb(216 255 106 / 28%);
+  background: rgb(216 255 106 / 5%);
+  color: #d8ff6a;
+}
+body[data-page="admin"] .hunt-list-link span {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgb(216 255 106 / 20%);
+  border-radius: 999px;
+  color: #d8ff6a;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+body[data-page="admin"] dialog.hunt-details-dialog {
+  position: fixed;
+  width: min(68rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(88dvh, 58rem);
+  margin: auto;
+  padding: clamp(1rem, 3vw, 2rem);
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(ellipse at 92% 5%, rgb(216 255 106 / 8%), transparent 25rem),
+    linear-gradient(145deg, #272d3b, #1b202c);
+  box-shadow: 0 32px 100px rgb(0 0 0 / 55%);
+  color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
+  background: rgb(6 9 14 / 76%);
+  backdrop-filter: blur(8px);
+}
+.hunt-details-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.hunt-details-dialog-heading .eyebrow { margin: 0; color: #d8ff6a; }
+body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #e8ebf0;
+  font-size: 1.5rem;
+}
+.hunt-details-dialog > h2 {
+  margin: 0.25rem 0 0.4rem;
+  color: #f7f7fa;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: -0.05em;
+}
+.hunt-details-dialog .details-description,
+.hunt-details-dialog .details-muted { color: #aab3c1; }
+.hunt-details-dialog .details-actions { margin: 1rem 0; }
+body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle,
+body[data-page="admin"] dialog.hunt-details-dialog .details-edit-link,
+body[data-page="admin"] dialog.hunt-details-dialog .details-player-link {
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.65rem;
+  background: #303949;
+  color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
+  border-color: rgb(216 255 106 / 26%);
+  background: rgb(216 255 106 / 10%);
+  color: #d8ff6a;
+}
+.hunt-details-dialog > section {
+  margin: 1rem 0 0;
+  padding: 1.1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 3%);
+  color: #f4f5f9;
+}
+.hunt-details-dialog .details-section-heading .eyebrow {
+  margin: 0 0 0.35rem;
+  color: #d8ff6a;
+}
+.hunt-details-dialog .details-section-heading h3 {
+  margin: 0;
+  color: #f5f6f8;
+  font-size: 1.1rem;
+}
+.hunt-details-dialog .hunt-detail-task h4 {
+  margin: 0;
+  color: #f4f5f9;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] dialog.hunt-details-dialog {
+    width: calc(100vw - 1rem);
+    max-height: 94dvh;
+    padding: 1rem;
+    border-radius: 0.9rem;
+  }
+  .hunt-details-dialog .details-actions > * { flex: 1 1 100%; }
+}

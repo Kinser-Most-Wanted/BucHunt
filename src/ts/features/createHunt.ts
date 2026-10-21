@@ -34,6 +34,8 @@ export function mountCreateHunt(
     '#define-task [name="huntId"]',
   )!;
   let selected: HuntSummary | undefined;
+  let querySelectionApplied = false;
+  const requestedHuntId = new URLSearchParams(window.location.search).get("huntId");
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
@@ -114,12 +116,20 @@ export function mountCreateHunt(
       : "No hunts yet. Create your first hunt below.";
     for (const hunt of result.value) {
       const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = `${hunt.name} (${hunt.role})`;
-      button.addEventListener("click", () => select(hunt, true));
-      item.append(button);
+      const link = document.createElement("a");
+      link.className = "hunt-list-link";
+      link.href = `./hunt-details.html?huntId=${encodeURIComponent(hunt.id)}&role=${hunt.role}`;
+      link.textContent = hunt.name;
+      const role = document.createElement("span");
+      role.textContent = hunt.role;
+      link.append(role);
+      item.append(link);
       list.append(item);
+    }
+    if (!querySelectionApplied && requestedHuntId) {
+      const requestedHunt = result.value.find((hunt) => hunt.id === requestedHuntId);
+      querySelectionApplied = true;
+      if (requestedHunt) select(requestedHunt, true);
     }
     if (selected && !result.value.some((hunt) => hunt.id === selected?.id)) {
       selected = undefined;

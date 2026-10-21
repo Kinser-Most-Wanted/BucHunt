@@ -1071,3 +1071,260 @@ body[data-page="home"] button:focus-visible {
     50% { translate: 0 -5px; }
   }
 }
+
+/* Shared dark workspace styling for the admin and player pages. */
+body[data-page="admin"],
+body[data-page="player"] {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #f4f5f9;
+  background:
+    radial-gradient(ellipse at 12% 15%, rgb(33 94 112 / 16%), transparent 32rem),
+    radial-gradient(ellipse at 88% 82%, rgb(82 57 107 / 12%), transparent 34rem),
+    #10141d;
+}
+body[data-page="admin"] > header,
+body[data-page="player"] > header {
+  position: relative;
+  z-index: 2;
+  min-height: 5.25rem;
+  padding: 0.8rem max(5%, calc((100vw - 76rem) / 2));
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  background: rgb(16 20 29 / 82%);
+  backdrop-filter: blur(18px);
+}
+body[data-page="admin"] .brand,
+body[data-page="player"] .brand { color: #f4f5f9; font-size: 1.1rem; letter-spacing: -0.04em; }
+body[data-page="admin"] nav,
+body[data-page="player"] nav { align-items: center; gap: 0.35rem; }
+body[data-page="admin"] nav a,
+body[data-page="player"] nav a {
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  color: #a5acba;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: color 150ms ease, background 150ms ease;
+}
+body[data-page="admin"] nav a:hover,
+body[data-page="player"] nav a:hover,
+body[data-page="admin"] nav a[href="./admin.html"],
+body[data-page="player"] nav a[href="./player.html"] { background: rgb(255 255 255 / 7%); color: #f4f5f9; }
+body[data-page="admin"] main,
+body[data-page="player"] main { max-width: 76rem; padding: clamp(2rem, 5vw, 4rem) 1.5rem 3rem; }
+body[data-page="admin"] .admin-page { max-width: 76rem; }
+body[data-page="admin"] #admin-access,
+body[data-page="admin"] #admin-workspace > section,
+body[data-page="player"] #display-tasks {
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 1.1rem;
+  background: linear-gradient(145deg, rgb(39 45 59 / 92%), rgb(27 32 44 / 94%));
+  box-shadow: 0 18px 55px rgb(0 0 0 / 18%), inset 0 1px rgb(255 255 255 / 4%);
+  color: #f4f5f9;
+}
+body[data-page="admin"] #admin-access { max-width: 40rem; margin: 3rem auto; padding: 1.5rem; }
+body[data-page="admin"] #admin-access h2 { margin-top: 0; color: #f4f5f9; }
+body[data-page="admin"] #admin-access p,
+body[data-page="admin"] #admin-access a { color: #c6ced8; }
+body[data-page="admin"] #admin-login,
+body[data-page="admin"] #signed-in {
+  margin: 0.75rem 0;
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 3%);
+}
+body[data-page="admin"] #admin-workspace {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.1rem;
+}
+body[data-page="admin"] #admin-workspace[hidden] { display: none; }
+body[data-page="admin"] #admin-workspace > .page-heading,
+body[data-page="admin"] #admin-workspace > .notice,
+body[data-page="admin"] #admin-workspace > .manage-hunts-panel,
+body[data-page="admin"] #admin-workspace > [data-testid="contributors-panel"],
+body[data-page="admin"] #admin-workspace > [data-testid="creator-profile-details"] { grid-column: 1 / -1; }
+body[data-page="admin"] #admin-workspace > .page-heading { padding: 0.5rem 0 0.25rem; }
+body[data-page="admin"] #admin-workspace .eyebrow,
+body[data-page="player"] .player-heading .eyebrow {
+  margin: 0 0 0.45rem;
+  color: #d8ff6a;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+body[data-page="admin"] #admin-workspace > .page-heading h1,
+body[data-page="player"] .player-heading h1 {
+  margin: 0.2rem 0 0.55rem;
+  color: #f7f7fa;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-weight: 760;
+  letter-spacing: -0.065em;
+  line-height: 1.03;
+}
+body[data-page="admin"] .page-intro,
+body[data-page="admin"] .section-copy,
+body[data-page="admin"] .field-help,
+body[data-page="admin"] .list-caption { color: #9ca5b4; line-height: 1.6; }
+body[data-page="admin"] .page-intro { max-width: 47rem; }
+body[data-page="admin"] .notice,
+body[data-page="player"] .notice {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(216 255 106 / 17%);
+  border-left: 3px solid #d8ff6a;
+  border-radius: 0.7rem;
+  background: rgb(216 255 106 / 6%);
+  color: #c4c9b7;
+}
+body[data-page="admin"] .manage-hunts-panel { margin: 0; padding: 1.3rem; }
+body[data-page="admin"] .manage-hunts-panel h2,
+body[data-page="admin"] .section-heading h2 { margin: 0; color: #f5f6f8; font-size: 1.25rem; letter-spacing: -0.03em; }
+body[data-page="admin"] .manage-hunts-panel > .section-copy { margin: 0.5rem 0 1rem; }
+body[data-page="admin"] .manage-hunts-panel > button { float: right; margin: 0; }
+body[data-page="admin"] [data-testid="creator-status"],
+body[data-page="admin"] [data-testid="hunt-status"],
+body[data-page="admin"] [data-testid="task-status"],
+body[data-page="admin"] [data-testid="contributor-status"] { color: #9ca5b4; }
+body[data-page="admin"] [data-testid="my-hunts"],
+body[data-page="admin"] [data-testid="contributor-list"] {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+body[data-page="admin"] [data-testid="my-hunts"] > li,
+body[data-page="admin"] [data-testid="contributor-list"] > li {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 3%);
+  color: #e8ebf0;
+}
+body[data-page="admin"] [data-testid="my-hunts"] button { margin: 0.35rem 0.35rem 0 0; }
+body[data-page="admin"] .hunt-editor-panel {
+  min-width: 0;
+  margin: 0;
+  padding: 1.3rem;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 1.1rem;
+  background: linear-gradient(145deg, rgb(39 45 59 / 92%), rgb(27 32 44 / 94%));
+  box-shadow: 0 18px 55px rgb(0 0 0 / 18%), inset 0 1px rgb(255 255 255 / 4%);
+}
+body[data-page="admin"] .step-number { border: 1px solid rgb(216 255 106 / 20%); background: rgb(216 255 106 / 10%); color: #d8ff6a; }
+body[data-page="admin"] .hunt-editor-panel .section-copy { margin: 0.9rem 0 1.2rem; }
+body[data-page="admin"] legend { color: #d7dce4; }
+body[data-page="admin"] label { color: #cbd1dc; }
+body[data-page="admin"] input,
+body[data-page="admin"] textarea,
+body[data-page="admin"] select {
+  border-color: rgb(255 255 255 / 14%);
+  background: #1b2230;
+  color: #f4f5f9;
+}
+body[data-page="admin"] input::placeholder,
+body[data-page="admin"] textarea::placeholder { color: #788394; }
+body[data-page="admin"] input:hover,
+body[data-page="admin"] textarea:hover,
+body[data-page="admin"] select:hover { border-color: rgb(216 255 106 / 48%); }
+body[data-page="admin"] button,
+body[data-page="admin"] .action,
+body[data-page="player"] button {
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.65rem;
+  background: #303949;
+  color: #f1f3f6;
+  transition: transform 150ms ease, filter 150ms ease;
+}
+body[data-page="admin"] button:hover:not(:disabled),
+body[data-page="player"] button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+body[data-page="admin"] .primary-button,
+body[data-page="admin"] #create-hunt button[type="submit"],
+body[data-page="admin"] .refresh-button,
+body[data-page="player"] .player-name-form .primary-button {
+  border: 0;
+  background: linear-gradient(135deg, #d8ff6a, #a8ed78);
+  color: #1c2719;
+}
+body[data-page="admin"] .refresh-button { margin: 0; white-space: nowrap; }
+body[data-page="admin"] .more-options,
+body[data-page="admin"] [data-testid="creator-profile-details"] {
+  border-color: rgb(255 255 255 / 10%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 3%);
+  color: #d8dce4;
+}
+body[data-page="admin"] .more-options summary { color: #d8ff6a; }
+body[data-page="admin"] .task-location-picker,
+body[data-page="player"] .player-hunt-lookup {
+  margin-top: 1.2rem;
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 3%);
+}
+body[data-page="admin"] .task-location-picker h3,
+body[data-page="admin"] .task-list-heading h3,
+body[data-page="player"] .player-hunt-lookup h2,
+body[data-page="player"] .player-hunt-lookup h3 { color: #f0f2f6; }
+body[data-page="admin"] .task-location-search { border-color: rgb(255 255 255 / 13%); background: #202838; }
+body[data-page="admin"] .task-location-search input { background: #151b27; }
+body[data-page="admin"] .task-location-coordinates,
+body[data-page="admin"] .task-order { color: #d8ff6a; }
+body[data-page="admin"] .task-list-panel { border-top-color: rgb(255 255 255 / 10%); }
+body[data-page="admin"] .defined-task { border-color: rgb(255 255 255 / 8%); border-radius: 0.7rem; background: rgb(255 255 255 / 3%); }
+body[data-page="admin"] .task-summary span { color: #aab2c0; }
+body[data-page="player"] main { max-width: 68rem; }
+body[data-page="player"] .player-heading { padding: 0.5rem 0 1rem; }
+body[data-page="player"] .player-heading .page-intro { max-width: 42rem; color: #aab1be; font-size: 1.03rem; line-height: 1.7; }
+body[data-page="player"] .player-notice { margin-bottom: 1.1rem; }
+body[data-page="player"] #display-tasks { margin: 0; padding: clamp(1.1rem, 3vw, 2rem); }
+body[data-page="player"] #display-tasks > h2,
+body[data-page="player"] [data-testid="player-hunt-name"] { color: #f2f4f7; }
+body[data-page="player"] [data-testid="player-account"] { color: #aab2c0; }
+body[data-page="player"] [data-testid="player-account"] strong { color: #d8ff6a; }
+body[data-page="player"] .player-sensitive-detail output { color: #d8ff6a; }
+body[data-page="player"] .player-name-form,
+body[data-page="player"] .player-hunt {
+  border-color: rgb(255 255 255 / 9%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 4%);
+  color: #e5e9ef;
+}
+body[data-page="player"] .player-name-form label,
+body[data-page="player"] .player-hunt-lookup label { color: #cbd1dc; }
+body[data-page="player"] .player-name-form input,
+body[data-page="player"] .player-hunt-lookup input {
+  border-color: rgb(255 255 255 / 14%);
+  background: #1b2230;
+  color: #f4f5f9;
+}
+body[data-page="player"] .player-sign-in-options { margin: 1rem 0; }
+body[data-page="player"] .google-sign-in-button { border-color: rgb(255 255 255 / 16%); background: #f7f8fa; color: #27313e; }
+body[data-page="player"] .player-hunt > p,
+body[data-page="player"] .player-hunt li .task-completion,
+body[data-page="player"] [data-testid="player-task-status"],
+body[data-page="player"] [data-testid="player-provider-status"] { color: #aab2c0; }
+body[data-page="admin"] footer,
+body[data-page="player"] footer { color: #727d8d; }
+body[data-page="admin"] a:focus-visible,
+body[data-page="admin"] button:focus-visible,
+body[data-page="admin"] input:focus-visible,
+body[data-page="admin"] textarea:focus-visible,
+body[data-page="admin"] select:focus-visible,
+body[data-page="player"] a:focus-visible,
+body[data-page="player"] button:focus-visible,
+body[data-page="player"] input:focus-visible { outline-color: #d8ff6a; }
+@media (max-width: 55rem) {
+  body[data-page="admin"] #admin-workspace { grid-template-columns: 1fr; }
+  body[data-page="admin"] #admin-workspace > * { grid-column: 1; }
+}
+@media (max-width: 44rem) {
+  body[data-page="admin"] > header,
+  body[data-page="player"] > header { padding: 0.8rem 1.1rem; }
+  body[data-page="admin"] main,
+  body[data-page="player"] main { padding: 2.5rem 1.1rem; }
+}

@@ -20,7 +20,7 @@ export function mountCreateHunt(
     '[data-testid="creator-status"]',
   )!;
   const list = document.querySelector<HTMLElement>('[data-testid="my-hunts"]')!;
-  const panel = document.querySelector<HTMLElement>(
+  const panel = document.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   )!;
   const memberList = panel.querySelector<HTMLElement>(

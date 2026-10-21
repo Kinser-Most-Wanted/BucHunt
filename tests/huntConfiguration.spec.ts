@@ -234,8 +234,12 @@ test("create hunt, save task, reload configuration and persist player completion
   );
   await page.reload();
   await page
-    .getByRole("button", { name: "Sprint verification (owner)", exact: true })
+    .getByRole("link", { name: "Sprint verification (owner)", exact: true })
     .click();
+  await expect(page.getByTestId("hunt-detail-name")).toHaveText(
+    "Sprint verification",
+  );
+  await page.getByRole("link", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );

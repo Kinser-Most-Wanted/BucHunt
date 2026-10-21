@@ -83,6 +83,7 @@ export function mountCreateHunt(
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
     panel.hidden = hunt.role !== "owner";
+    panel.open = hunt.role === "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
     const link = root.querySelector<HTMLAnchorElement>(
@@ -124,7 +125,7 @@ export function mountCreateHunt(
       link.href = detailUrl.toString();
       link.textContent = hunt.name;
       const role = document.createElement("span");
-      role.textContent = hunt.role;
+      role.textContent = `(${hunt.role})`;
       link.append(role);
       item.append(link);
       list.append(item);

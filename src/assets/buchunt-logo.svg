@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="84" viewBox="0 0 360 84" role="img" aria-labelledby="title desc">
+  <title id="title">BucHunt</title>
+  <desc id="desc">Buc in white and Hunt in gold, framed by a dotted blue map route.</desc>
+  <path d="M22 44C31 12 91 4 180 4s149 8 158 40c-9 32-69 40-158 40S31 76 22 44Z" fill="none" stroke="#8bbcff" stroke-dasharray="1 10" stroke-linecap="round" stroke-width="3" opacity=".9"/>
+  <circle cx="21" cy="44" r="4" fill="#8bbcff"/>
+  <path d="M339 38v6a8 8 0 1 1-8-8" fill="none" stroke="#8bbcff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
+  <circle cx="331" cy="36" r="2.4" fill="#8bbcff"/>
+  <text x="180" y="57" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="43" font-weight="800" letter-spacing="-2"><tspan fill="#ffffff">Buc</tspan><tspan fill="#ffc72c">Hunt</tspan></text>
+</svg>

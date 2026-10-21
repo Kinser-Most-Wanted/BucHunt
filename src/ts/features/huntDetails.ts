@@ -1,12 +1,11 @@
 import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
 import { createHuntRepository, getCreatorSession, request } from "./huntRepository.js";
 
-const parameters = new URLSearchParams(window.location.search);
-const huntId = parameters.get("huntId")?.trim() ?? "";
-const role = parameters.get("role");
-const status = document.querySelector<HTMLElement>('[data-testid="hunt-detail-status"]')!;
-const error = document.querySelector<HTMLElement>('[data-testid="hunt-detail-error"]')!;
+const dialog = document.querySelector<HTMLDialogElement>(
+  '[data-testid="hunt-details-dialog"]',
+);
 const repository = createHuntRepository();
+let activeRequest = 0;
 
 function addFact(list: HTMLElement, label: string, value: string): void {
   const item = document.createElement("div");
@@ -38,7 +37,7 @@ function renderTask(task: TaskDefinition): HTMLLIElement {
   number.textContent = String(task.order).padStart(2, "0");
   const content = document.createElement("div");
   content.className = "hunt-detail-task-content";
-  const heading = document.createElement("h3");
+  const heading = document.createElement("h4");
   heading.textContent = task.displayLabel;
   const description = document.createElement("p");
   description.textContent = task.description;
@@ -53,42 +52,102 @@ function renderTask(task: TaskDefinition): HTMLLIElement {
   return item;
 }
 
-function renderHunt(hunt: HuntDefinition): void {
-  document.title = `${hunt.name} | BucHunt`;
-  document.querySelector<HTMLElement>('[data-testid="hunt-detail-name"]')!.textContent = hunt.name;
-  document.querySelector<HTMLElement>('[data-testid="hunt-detail-description"]')!.textContent = hunt.description || "A BucHunt adventure.";
-  const idOutput = document.querySelector<HTMLOutputElement>('[data-testid="hunt-detail-id"]')!;
+function resetDialog(): void {
+  const facts = dialog?.querySelector<HTMLElement>('[data-testid="hunt-facts"]');
+  const creators = dialog?.querySelector<HTMLElement>('[data-testid="hunt-creators"]');
+  const tasks = dialog?.querySelector<HTMLOListElement>(
+    '[data-testid="hunt-detail-tasks"]',
+  );
+  facts?.replaceChildren();
+  creators?.replaceChildren();
+  tasks?.replaceChildren();
+  const idOutput = dialog?.querySelector<HTMLOutputElement>(
+    '[data-testid="hunt-detail-id"]',
+  );
+  if (idOutput) {
+    idOutput.textContent = "";
+    idOutput.hidden = true;
+  }
+  const toggle = dialog?.querySelector<HTMLButtonElement>(
+    '[data-testid="hunt-id-toggle"]',
+  );
+  if (toggle) {
+    toggle.textContent = "Reveal hunt ID";
+    toggle.setAttribute("aria-expanded", "false");
+  }
+  const error = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-error"]',
+  );
+  if (error) {
+    error.textContent = "";
+    error.hidden = true;
+  }
+  const contributorsStatus = dialog?.querySelector<HTMLElement>(
+    '[data-testid="contributors-load-status"]',
+  );
+  if (contributorsStatus) contributorsStatus.textContent = "";
+}
+
+function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
+  if (!dialog) return;
+  dialog.querySelector<HTMLElement>('[data-testid="hunt-detail-name"]')!.textContent =
+    hunt.name;
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-description"]',
+  )!.textContent = hunt.description || "A BucHunt adventure.";
+  const idOutput = dialog.querySelector<HTMLOutputElement>(
+    '[data-testid="hunt-detail-id"]',
+  )!;
   idOutput.textContent = hunt.id;
-  const toggle = document.querySelector<HTMLButtonElement>('[data-testid="hunt-id-toggle"]')!;
-  toggle.addEventListener("click", () => {
+  const toggle = dialog.querySelector<HTMLButtonElement>(
+    '[data-testid="hunt-id-toggle"]',
+  )!;
+  toggle.onclick = () => {
     idOutput.hidden = !idOutput.hidden;
     toggle.setAttribute("aria-expanded", String(!idOutput.hidden));
     toggle.textContent = idOutput.hidden ? "Reveal hunt ID" : "Hide hunt ID";
-  });
-  document.querySelector<HTMLAnchorElement>('[data-testid="edit-hunt-link"]')!.href =
-    `./admin.html?huntId=${encodeURIComponent(hunt.id)}`;
-  document.querySelector<HTMLAnchorElement>('[data-testid="player-hunt-link"]')!.href =
-    `./player.html?huntId=${encodeURIComponent(hunt.id)}`;
+  };
+  const playerLink = dialog.querySelector<HTMLAnchorElement>(
+    '[data-testid="player-hunt-link"]',
+  )!;
+  playerLink.href = `./player.html?huntId=${encodeURIComponent(hunt.id)}`;
 
-  const facts = document.querySelector<HTMLElement>('[data-testid="hunt-facts"]')!;
+  const facts = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-facts"]',
+  )!;
   addFact(facts, "Status", hunt.status);
-  addFact(facts, "Task order", hunt.taskOrderMode === "sequential" ? "Sequential" : "Any order");
+  addFact(
+    facts,
+    "Task order",
+    hunt.taskOrderMode === "sequential" ? "Sequential" : "Any order",
+  );
   addFact(facts, "Begins", formatDate(hunt.beginsAt));
   addFact(facts, "Ends", formatDate(hunt.endsAt));
   addFact(facts, "Created", formatDate(hunt.createdAt));
   addFact(facts, "Last updated", formatDate(hunt.updatedAt));
-  addFact(facts, "Access code", hunt.accessCode ? hunt.accessCode : "Not set");
+  addFact(
+    facts,
+    "Access code",
+    hunt.accessCode ? hunt.accessCode : "Not set",
+  );
 
-  const creators = document.querySelector<HTMLElement>('[data-testid="hunt-creators"]')!;
+  const creators = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-creators"]',
+  )!;
   const owner = document.createElement("li");
   owner.className = "creator-chip creator-owner";
   owner.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
   creators.append(owner);
-  const contributorStatus = document.querySelector<HTMLElement>('[data-testid="contributors-load-status"]')!;
+  const contributorsStatus = dialog.querySelector<HTMLElement>(
+    '[data-testid="contributors-load-status"]',
+  )!;
   if (role === "owner") {
-    void request<string[]>(`/api/admin/hunts/${encodeURIComponent(hunt.id)}/contributors`).then(result => {
+    void request<string[]>(
+      `/api/admin/hunts/${encodeURIComponent(hunt.id)}/contributors`,
+    ).then((result) => {
+      if (!dialog.open || dialog.dataset.huntId !== hunt.id) return;
       if (!result.ok) {
-        contributorStatus.textContent = result.message;
+        contributorsStatus.textContent = result.message;
         return;
       }
       for (const creatorId of result.value) {
@@ -97,48 +156,83 @@ function renderHunt(hunt: HuntDefinition): void {
         contributor.textContent = `Contributor · ${creatorId}`;
         creators.append(contributor);
       }
-      contributorStatus.textContent = result.value.length ? "" : "No contributors have been added yet.";
+      contributorsStatus.textContent = result.value.length
+        ? ""
+        : "No contributors have been added yet.";
     });
   } else {
-    contributorStatus.textContent = "Contributor details are visible to the hunt owner.";
+    contributorsStatus.textContent =
+      "Contributor details are visible to the hunt owner.";
   }
 
-  const taskList = document.querySelector<HTMLOListElement>('[data-testid="hunt-detail-tasks"]')!;
-  const emptyTasks = document.querySelector<HTMLElement>('[data-testid="empty-tasks"]')!;
-  for (const task of [...hunt.tasks].sort((left, right) => left.order - right.order)) {
+  const taskList = dialog.querySelector<HTMLOListElement>(
+    '[data-testid="hunt-detail-tasks"]',
+  )!;
+  const emptyTasks = dialog.querySelector<HTMLElement>(
+    '[data-testid="empty-tasks"]',
+  )!;
+  for (const task of [...hunt.tasks].sort(
+    (left, right) => left.order - right.order,
+  )) {
     taskList.append(renderTask(task));
   }
   emptyTasks.hidden = hunt.tasks.length !== 0;
-  status.textContent = `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-status"]',
+  )!.textContent = `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
 }
 
-async function initialize(): Promise<void> {
-  if (!huntId) {
-    error.textContent = "This page needs a hunt ID. Return to My hunts and select a hunt to continue.";
-    error.hidden = false;
-    status.textContent = "";
-    return;
-  }
-  const creator = await getCreatorSession();
-  if (!creator.ok) {
-    error.textContent = creator.message;
-    error.hidden = false;
-    status.textContent = "";
-    return;
-  }
-  const result = await repository.getAdminHunt(huntId);
-  if (!result.ok) {
-    error.textContent = result.message;
-    error.hidden = false;
-    status.textContent = "";
-    return;
-  }
-  renderHunt(result.value);
-}
-
-void initialize().catch(() => {
-  status.textContent = "";
-  error.textContent = "Hunt details could not be loaded. Return to Hunt Studio and try again.";
-  error.hidden = false;
+dialog?.querySelector<HTMLButtonElement>(
+  '[data-testid="close-hunt-details"]',
+)?.addEventListener("click", () => dialog.close());
+dialog?.querySelector<HTMLButtonElement>(
+  '[data-testid="edit-hunt-link"]',
+)?.addEventListener("click", () => {
+  const huntId = dialog.dataset.huntId;
+  if (!huntId) return;
+  dialog.close();
+  document.dispatchEvent(
+    new CustomEvent("hunt-details-edit", { detail: { huntId } }),
+  );
 });
-export {};
+dialog?.addEventListener("click", (event) => {
+  if (event.target === dialog) dialog.close();
+});
+
+export async function openHuntDetails(
+  huntId: string,
+  role: "owner" | "contributor",
+): Promise<void> {
+  if (!dialog) return;
+  const requestId = ++activeRequest;
+  resetDialog();
+  dialog.dataset.huntId = huntId;
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-name"]',
+  )!.textContent = "Loading hunt…";
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-status"]',
+  )!.textContent = "Loading hunt details…";
+  if (!dialog.open) dialog.showModal();
+  try {
+    const creator = await getCreatorSession();
+    if (!creator.ok) throw new Error(creator.message);
+    const result = await repository.getAdminHunt(huntId);
+    if (requestId !== activeRequest || !dialog.open) return;
+    if (!result.ok) throw new Error(result.message);
+    renderHunt(result.value, role);
+  } catch (cause) {
+    if (requestId !== activeRequest || !dialog.open) return;
+    const error = dialog.querySelector<HTMLElement>(
+      '[data-testid="hunt-detail-error"]',
+    )!;
+    error.textContent =
+      cause instanceof Error
+        ? cause.message
+        : "Hunt details could not be loaded. Try again.";
+    error.hidden = false;
+    dialog.querySelector<HTMLElement>(
+      '[data-testid="hunt-detail-status"]',
+    )!.textContent = "";
+  }
+}

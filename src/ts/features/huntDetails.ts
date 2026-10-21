@@ -1,6 +1,5 @@
 import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
-import { createHuntRepository } from "../foundation/adapters.js";
-import { getCreatorSession, request } from "./huntRepository.js";
+import { createHuntRepository, getCreatorSession, request } from "./huntRepository.js";
 
 const parameters = new URLSearchParams(window.location.search);
 const huntId = parameters.get("huntId")?.trim() ?? "";

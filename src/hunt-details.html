@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10141d" />
+    <title>Hunt details | BucHunt</title>
+    <link rel="stylesheet" href="./css/foundation.css" />
+  </head>
+  <body data-page="hunt-details">
+    <header class="details-header">
+      <a class="brand" href="./admin.html">BucHunt</a>
+      <nav aria-label="Main navigation">
+        <a href="./admin.html">Hunt Studio</a>
+        <a href="./player.html">Player tasks</a>
+      </nav>
+    </header>
+    <main class="hunt-details-page">
+      <a class="details-back-link" href="./admin.html">← Back to Hunt Studio</a>
+      <section class="details-hero" aria-labelledby="hunt-details-title">
+        <p class="eyebrow">HUNT OVERVIEW</p>
+        <p class="details-status" data-testid="hunt-detail-status" role="status" aria-live="polite">Loading hunt details…</p>
+        <h1 id="hunt-details-title" data-testid="hunt-detail-name">Your adventure</h1>
+        <p class="details-description" data-testid="hunt-detail-description"></p>
+        <div class="details-actions">
+          <button type="button" class="hunt-id-toggle" data-testid="hunt-id-toggle" aria-expanded="false" aria-controls="hunt-detail-id">Reveal hunt ID</button>
+          <output id="hunt-detail-id" data-testid="hunt-detail-id" hidden></output>
+          <a class="action details-edit-link" data-testid="edit-hunt-link" href="./admin.html">Edit hunt tasks</a>
+          <a class="action details-player-link" data-testid="player-hunt-link">Preview player view</a>
+        </div>
+      </section>
+      <section class="details-overview" aria-labelledby="overview-heading">
+        <div class="details-section-heading">
+          <p class="eyebrow">THE BIG PICTURE</p>
+          <h2 id="overview-heading">Hunt overview</h2>
+        </div>
+        <dl class="hunt-facts" data-testid="hunt-facts"></dl>
+      </section>
+      <section class="details-creators" aria-labelledby="creators-heading">
+        <div class="details-section-heading">
+          <p class="eyebrow">THE TEAM</p>
+          <h2 id="creators-heading">Hunt creators</h2>
+        </div>
+        <ul data-testid="hunt-creators" class="creator-list"></ul>
+        <p data-testid="contributors-load-status" class="details-muted" role="status" aria-live="polite"></p>
+      </section>
+      <section class="details-tasks" aria-labelledby="tasks-heading">
+        <div class="details-section-heading">
+          <p class="eyebrow">THE ADVENTURE</p>
+          <h2 id="tasks-heading">Hunt tasks</h2>
+        </div>
+        <ol data-testid="hunt-detail-tasks" class="hunt-detail-task-list"></ol>
+        <p data-testid="empty-tasks" class="details-muted" hidden>This hunt has no tasks yet. Add its first task in Hunt Studio.</p>
+      </section>
+      <p class="details-error" data-testid="hunt-detail-error" role="alert" hidden></p>
+    </main>
+    <footer>BucHunt · Create memorable campus discoveries</footer>
+    <script type="module" src="./js/features/huntDetails.js"></script>
+  </body>
+</html>

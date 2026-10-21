@@ -35,7 +35,9 @@ export function mountCreateHunt(
   )!;
   let selected: HuntSummary | undefined;
   let querySelectionApplied = false;
-  const requestedHuntId = new URLSearchParams(window.location.search).get("huntId");
+  const requestedHuntId = new URLSearchParams(window.location.search).get(
+    "huntId",
+  );
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
@@ -131,7 +133,9 @@ export function mountCreateHunt(
       list.append(item);
     }
     if (!querySelectionApplied && requestedHuntId) {
-      const requestedHunt = result.value.find((hunt) => hunt.id === requestedHuntId);
+      const requestedHunt = result.value.find(
+        (hunt) => hunt.id === requestedHuntId,
+      );
       querySelectionApplied = true;
       if (requestedHunt) select(requestedHunt, true);
     }

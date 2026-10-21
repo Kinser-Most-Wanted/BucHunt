@@ -329,7 +329,7 @@ test("only owners and contributors can configure a hunt through the creator work
     await member
       .getByRole("link", { name: "Shared hunt (contributor)", exact: true })
       .click();
-    await expect(member).toHaveURL(/hunt-details\\.html/);
+    await expect(member).toHaveURL(/hunt-details\.html/);
     await expect(member.getByTestId("hunt-detail-name")).toHaveText(
       "Shared hunt",
     );
@@ -338,7 +338,7 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
     await member.getByRole("link", { name: "Edit hunt tasks" }).click();
-    await expect(member).toHaveURL(/admin\\.html\\?huntId=/);
+    await expect(member).toHaveURL(/admin\.html\?huntId=/);
     await expect(member.getByTestId("contributors-panel")).toBeHidden();
     await member
       .getByLabel("Display label", { exact: true })

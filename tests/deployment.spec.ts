@@ -115,9 +115,14 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await expect(page.locator("#admin-status")).toHaveText(
     "Administrator access verified.",
   );
+  await expect(page.locator("#admin-access")).toBeHidden();
   await expect(page.locator("#admin-workspace")).toBeVisible();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
-  await page.locator("#sign-out").click();
+  await expect(page.getByTestId("admin-account-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-display-name")).toContainText("(Admin)");
+  await page.getByTestId("admin-account").click();
+  await expect(page.getByTestId("admin-sign-out")).toBeVisible();
+  await page.getByTestId("admin-sign-out").click();
   await expect(page.locator("#admin-workspace")).toBeHidden();
   await expect(page.locator("#admin-login")).toBeVisible();
   await expect(page.locator("#home-sign-in-link")).toBeVisible();
@@ -174,7 +179,12 @@ test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   await expect(page.locator("#admin-denied")).toBeVisible();
   await expect(page.getByTestId("admin-workspace")).toBeHidden();
   await expect(page.getByTestId("hunt-form")).toBeHidden();
-  await expect(page.locator("#sign-out")).toBeVisible();
+  await expect(page.getByTestId("admin-account-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-display-name")).not.toContainText(
+    "(Admin)",
+  );
+  await page.getByTestId("admin-account").click();
+  await expect(page.getByTestId("admin-sign-out")).toBeVisible();
 });
 
 test("player account endpoints require bearer identity and never issue cookies", async ({

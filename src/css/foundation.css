@@ -1288,9 +1288,10 @@ body[data-page="player"] #display-tasks > h2,
 body[data-page="player"] [data-testid="player-hunt-name"] { color: #f2f4f7; }
 body[data-page="player"] [data-testid="player-account"] { color: #aab2c0; }
 body[data-page="player"] [data-testid="player-account"] strong { color: #ffc72c; }
+body[data-page="admin"] .player-account strong { color: #ffc72c; }
 
-body[data-page="player"] .player-account-menu { position: relative; }
-body[data-page="player"] .player-account-menu > .player-account {
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu { position: relative; }
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu > .player-account {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -1303,14 +1304,14 @@ body[data-page="player"] .player-account-menu > .player-account {
   list-style: none;
   transition: color 150ms ease, background 150ms ease;
 }
-body[data-page="player"] .player-account-menu > .player-account::-webkit-details-marker { display: none; }
-body[data-page="player"] .player-account-menu > .player-account::after { content: "⌄"; color: #aab2c0; }
-body[data-page="player"] .player-account-menu[open] > .player-account,
-body[data-page="player"] .player-account-menu > .player-account:hover {
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu > .player-account::-webkit-details-marker { display: none; }
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu > .player-account::after { content: "⌄"; color: #aab2c0; }
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu[open] > .player-account,
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu > .player-account:hover {
   background: rgb(255 255 255 / 7%);
   color: #f4f5f9;
 }
-body[data-page="player"] .player-account-menu .player-account-dropdown {
+body:is([data-page="player"], [data-page="admin"]) .player-account-menu .player-account-dropdown {
   position: absolute;
   top: calc(100% + 0.6rem);
   right: 0;
@@ -1324,16 +1325,26 @@ body[data-page="player"] .player-account-menu .player-account-dropdown {
   background: #172238;
   box-shadow: 0 18px 45px rgb(0 0 0 / 35%);
 }
-body[data-page="player"] .player-account-dropdown .player-sensitive-detail {
+body:is([data-page="player"], [data-page="admin"]) .player-account-dropdown .player-sensitive-detail {
   margin: 0;
   padding: 0.7rem;
   border-radius: 0.65rem;
   background: rgb(255 255 255 / 4%);
 }
-body[data-page="player"] .player-account-dropdown .player-sensitive-detail button {
+body:is([data-page="player"], [data-page="admin"]) .player-account-dropdown .player-sensitive-detail button {
   margin-top: 0;
 }
-body[data-page="player"] .player-sensitive-detail output { color: #ffc72c; }
+body:is([data-page="player"], [data-page="admin"]) .player-sensitive-detail output { color: #ffc72c; }
+body:is([data-page="player"], [data-page="admin"]) .player-account-sign-out {
+  width: 100%;
+  margin-top: 0.1rem;
+  text-align: left;
+}
+body:is([data-page="player"], [data-page="admin"]) .player-account-status {
+  margin: 0;
+  color: #aab2c0;
+  font-size: 0.85rem;
+}
 body[data-page="player"] .player-name-form,
 body[data-page="player"] .player-hunt {
   border-color: rgb(255 255 255 / 9%);

@@ -318,7 +318,9 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   });
 
   await page.goto("/admin.html");
-  await expect(page.locator("#signed-in")).toBeVisible();
+  await expect(page.getByTestId("admin-account-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-display-name")).toHaveText("Baja");
+  await expect(page.locator("#admin-denied")).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -336,4 +338,3 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   );
   await expect(page).toHaveURL(/\/player\.html$/);
 });
-

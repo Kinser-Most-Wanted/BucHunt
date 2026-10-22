@@ -11,8 +11,24 @@ if [[ "$1" == reset-preview ]]; then
   RESET_PR="$3"
   RESET_INSTANCE=$(aws cloudformation describe-stacks --stack-name "$RESET_STACK" --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
   if [[ -z "$RESET_INSTANCE" || "$RESET_INSTANCE" == None ]]; then echo "Preview stack has no instance" >&2; exit 1; fi
-  RESET_SCRIPT="set -euo pipefail; DATA=/var/lib/buchunt; OWNER=\\$DATA/.preview-pr-owner; if [[ -f \\\"\\$OWNER\\\" ]] && [[ \\\"\\$(cat \\\"\\$OWNER\\\")\\\" == \\\"$RESET_PR\\\" ]]; then systemctl stop buchunt || true; find \\\"\\$DATA\\\" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; systemctl start buchunt; echo 'Cleared preview data for PR #$RESET_PR.'; else echo 'Preview is not owned by PR #$RESET_PR; no data was removed.'; fi"
-  RESET_PARAMETERS=$(jq -nc --arg command "$RESET_SCRIPT" '{commands: [$command]}')
+  RESET_PARAMETERS=$(python3 - "$RESET_PR" <<'PY'
+import json, sys
+pr = sys.argv[1]
+script = f"""set -euo pipefail
+DATA=/var/lib/buchunt
+OWNER="$DATA/.preview-pr-owner"
+if [[ -f "$OWNER" && "$(cat "$OWNER")" == "{pr}" ]]; then
+  systemctl stop buchunt || true
+  find "$DATA" -mindepth 1 -maxdepth 1 -exec rm -rf -- {{}} +
+  systemctl start buchunt
+  echo "Cleared preview data for closed PR #{pr}."
+else
+  echo "Preview is not owned by PR #{pr}; no data was removed."
+fi
+"""
+print(json.dumps({"commands": [script]}))
+PY
+)
   RESET_COMMAND=$(aws ssm send-command --instance-ids "$RESET_INSTANCE" --document-name AWS-RunShellScript --parameters "$RESET_PARAMETERS" --query Command.CommandId --output text)
   aws ssm wait command-executed --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE"
   aws ssm get-command-invocation --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE" --query StandardOutputContent --output text

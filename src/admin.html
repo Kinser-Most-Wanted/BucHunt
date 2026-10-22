@@ -25,6 +25,101 @@
       <nav aria-label="Main navigation">
         <a href="./admin.html">Hunt Studio</a>
         <a href="./player.html">Player tasks</a>
+        <details
+          id="admin-account-menu"
+          data-testid="admin-account-menu"
+          class="player-account-menu"
+          hidden
+        >
+          <summary data-testid="admin-account" class="player-account">
+            Signed in as <strong data-testid="admin-display-name"></strong>
+          </summary>
+          <div class="player-account-dropdown">
+            <div
+              data-testid="admin-google-email"
+              class="player-sensitive-detail"
+              hidden
+            >
+              <button
+                type="button"
+                data-testid="admin-email-toggle"
+                aria-expanded="false"
+                aria-controls="admin-email-value"
+              >
+                Show Google account email
+              </button>
+              <output
+                id="admin-email-value"
+                data-testid="admin-email-value"
+                hidden
+              ></output>
+              <button
+                type="button"
+                class="copy-icon-button"
+                data-testid="admin-copy-email"
+                aria-label="Copy Google account email"
+                title="Copy email"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                  <path
+                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <div
+              data-testid="admin-google-account-id"
+              class="player-sensitive-detail"
+              hidden
+            >
+              <button
+                type="button"
+                data-testid="admin-id-toggle"
+                aria-expanded="false"
+                aria-controls="admin-id-value"
+              >
+                Show Google account ID
+              </button>
+              <output
+                id="admin-id-value"
+                data-testid="admin-id-value"
+                hidden
+              ></output>
+              <button
+                type="button"
+                class="copy-icon-button"
+                data-testid="admin-copy-id"
+                aria-label="Copy Google account ID"
+                title="Copy account ID"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                  <path
+                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <p
+              data-testid="admin-account-status"
+              class="player-account-status"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
+            <button
+              id="sign-out"
+              data-testid="admin-sign-out"
+              class="player-account-sign-out"
+              type="button"
+            >
+              Sign out of BucHunt
+            </button>
+          </div>
+        </details>
       </nav>
     </header>
     <main class="admin-page">
@@ -33,6 +128,7 @@
         data-testid="admin-access"
         class="access-panel"
         aria-labelledby="admin-access-heading"
+        hidden
       >
         <h2 id="admin-access-heading">Hunt Studio access</h2>
         <section id="admin-login" hidden>
@@ -47,10 +143,6 @@
         <p id="admin-denied" role="status" hidden>
           You don't have administrator privileges to view Hunt Studio.
         </p>
-        <section id="signed-in" hidden>
-          <p id="admin-identity"></p>
-          <button id="sign-out" type="button">Sign out of BucHunt</button>
-        </section>
       </section>
       <div id="admin-workspace" data-testid="admin-workspace" hidden>
         <div class="page-heading">

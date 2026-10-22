@@ -56,13 +56,8 @@ jobs:
 
           SLOT=${SLOT_LABEL##*-}
           STACK_NAME="bucstop-preview-$SLOT"
-          INSTANCE=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text 2>/dev/null || true)
-          if [[ -n "$INSTANCE" && "$INSTANCE" != None ]]; then
-            PARAMETERS=$(jq -nc --arg pr "$PR_NUMBER" '{commands: ["set -euo pipefail; DATA=/var/lib/buchunt; OWNER=$DATA/.preview-pr-owner; if [[ -f \\\"$OWNER\\\" ]] && [[ \\\"$(cat \\\"$OWNER\\\")\\\" == \\\"\\($pr)\\\" ]]; then systemctl stop buchunt || true; find \\\"$DATA\\\" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; systemctl start buchunt; echo \\\"Cleared data for closed PR #\\($pr).\\\"; else echo \\\"Preview slot is not owned by PR #\\($pr); leaving data untouched.\\\"; fi"]}')
-            COMMAND=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript --parameters "$PARAMETERS" --query Command.CommandId --output text)
-            aws ssm wait command-executed --command-id "$COMMAND" --instance-id "$INSTANCE"
-            aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE" --query StandardOutputContent --output text
-          fi
+          STACK_NAME="bucstop-preview-$SLOT"
+          bash ./deploy/deploy.sh reset-preview "$STACK_NAME" "$PR_NUMBER"
 
           gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$SLOT_LABEL" >/dev/null || true
           echo "Released $SLOT_LABEL."

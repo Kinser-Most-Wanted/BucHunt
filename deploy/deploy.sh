@@ -17,6 +17,13 @@ if [[ "$1" == allocate-preview-slots ]]; then
     esac
     gh api --method POST "repos/$GITHUB_REPOSITORY/labels" -f "name=$SLOT_LABEL" -f "color=$COLOR" -f "description=Automatically assigned stable preview deployment slot" >/dev/null 2>&1 || true
   done
+  gh api --method POST "repos/$GITHUB_REPOSITORY/labels" -f "name=Queued" -f "color=FBCA04" -f "description=Waiting for an available preview deployment slot" >/dev/null 2>&1 || true
+  queue_pr() {
+    gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$1/labels" -f "labels[]=Queued" >/dev/null
+  }
+  unqueue_pr() {
+    gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$1/labels/Queued" >/dev/null 2>&1 || true
+  }
 
   OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
   USED_1=false
@@ -40,19 +47,21 @@ if [[ "$1" == allocate-preview-slots ]]; then
   while IFS= read -r PR_JSON; do
     [[ -n "$PR_JSON" ]] || continue
     [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
+    TARGET_PR=$(echo "$PR_JSON" | jq -r .number)
     SLOT_COUNT=$(echo "$PR_JSON" | jq '[.labels[] | select(test("^preview-slot-[123]$"))] | length')
     if [[ "$SLOT_COUNT" -ne 0 ]]; then
+      unqueue_pr "$TARGET_PR"
       if [[ "$SLOT_COUNT" -gt 1 ]]; then
-        echo "PR #$(echo "$PR_JSON" | jq -r .number) has multiple preview slot labels; leaving it unchanged." >&2
+        echo "PR #$TARGET_PR has multiple preview slot labels; leaving it unchanged." >&2
       fi
       continue
     fi
-    TARGET_PR=$(echo "$PR_JSON" | jq -r .number)
     if [[ "$TARGET_PR" != "${CURRENT_PR_NUMBER:-}" ]]; then
       TARGET_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
       WORKFLOW_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&status=completed&per_page=100")
       SUCCESSFUL_RUN=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$TARGET_HEAD" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
       if [[ -z "$SUCCESSFUL_RUN" ]]; then
+        queue_pr "$TARGET_PR"
         echo "PR #$TARGET_PR is waiting for its current checks to pass before receiving a preview slot."
         continue
       fi
@@ -62,12 +71,14 @@ if [[ "$1" == allocate-preview-slots ]]; then
     elif [[ "$USED_2" != true ]]; then SLOT=2; USED_2=true
     elif [[ "$USED_3" != true ]]; then SLOT=3; USED_3=true
     else
-      echo "Preview slots are full; PR #$(echo "$PR_JSON" | jq -r .number) remains queued."
+      queue_pr "$TARGET_PR"
+      echo "Preview slots are full; PR #$TARGET_PR remains queued."
       continue
     fi
     PR_NUMBER_TO_ASSIGN=$(echo "$PR_JSON" | jq -r .number)
     SLOT_LABEL="preview-slot-$SLOT"
     gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER_TO_ASSIGN/labels" -f "labels[]=$SLOT_LABEL" >/dev/null
+    unqueue_pr "$PR_NUMBER_TO_ASSIGN"
     echo "Assigned $SLOT_LABEL to PR #$PR_NUMBER_TO_ASSIGN."
     ASSIGNED_PRS+=("$PR_NUMBER_TO_ASSIGN")
   done <<< "$OPEN_PRS"

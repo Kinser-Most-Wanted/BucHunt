@@ -89,6 +89,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
   await expect(page.getByTestId("player-email")).toBeHidden();
   await expect(page.getByTestId("copy-email")).toBeHidden();
@@ -190,11 +191,11 @@ test("player sign-in uses the shared BucHunt home page", async ({ page }) => {
     });
   });
   await page.goto("/player.html");
-  await page
-    .getByRole("button", { name: "Sign in from BucHunt home" })
-    .click();
+  await page.getByRole("button", { name: "Sign in from BucHunt home" }).click();
   await expect(page).toHaveURL(/\/index\.html$/);
-  await expect(page.locator("#welcome-heading")).toContainText("Find your next");
+  await expect(page.locator("#welcome-heading")).toContainText(
+    "Find your next",
+  );
   await expect(
     page.getByRole("button", { name: "Sign in with Google" }),
   ).toBeVisible();
@@ -263,15 +264,12 @@ test("expired progress tokens return to the shared home sign-in", async ({
     page.getByRole("button", { name: "Sign in with Google" }),
   ).toBeVisible();
   expect(
-    await page.evaluate(() =>
-      sessionStorage.getItem("buchunt.player-session"),
-    ),
+    await page.evaluate(() => sessionStorage.getItem("buchunt.player-session")),
   ).toBeNull();
   expect(await page.context().cookies()).toContainEqual(
     expect.objectContaining({ name: "legacy", value: "unchanged" }),
   );
 });
-
 
 test("player sign-in survives visiting Hunt Studio and returning", async ({
   page,
@@ -287,10 +285,7 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
       "buchunt.player-session",
       JSON.stringify(savedIdentity),
     );
-    localStorage.setItem(
-      "buchunt.player-profile.google-account-123",
-      "Baja",
-    );
+    localStorage.setItem("buchunt.player-profile.google-account-123", "Baja");
   }, identity);
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -341,3 +336,4 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   );
   await expect(page).toHaveURL(/\/player\.html$/);
 });
+

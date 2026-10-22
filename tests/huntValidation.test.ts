@@ -177,3 +177,9 @@ test("collects errors across Hunt and embedded Tasks without revealing answers",
   expectInvalid(hunt, "tasks[1].description");
   expect(JSON.stringify(result)).not.toContain(hunt.tasks[0].requiredAnswer);
 });
+
+test("accepts generated access codes and legacy null codes", () => {
+  const hunt = fixture();
+  hunt.accessCode = "ABCD1234";
+  expect(validateHunt(hunt).ok).toBe(true);
+});

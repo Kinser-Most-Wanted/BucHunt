@@ -31,12 +31,27 @@ export class PlayerProgressStore {
       progress,
     );
   }
+  async huntsWithProgress(player: string): Promise<string[]> {
+    const data = await this.file.get();
+    return Object.hasOwn(data.players, player)
+      ? Object.keys(data.players[player])
+      : [];
+  }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
     return Object.hasOwn(data.players, player) &&
       Object.hasOwn(data.players[player], hunt)
       ? data.players[player][hunt]
       : [];
+  }
+  async join(player: string, hunt: string): Promise<void> {
+    if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
+      throw new StoreError("validation", "Invalid participation identifier.");
+    await this.file.update((data) => {
+      if (!Object.hasOwn(data.players, player)) data.players[player] = {};
+      if (!Object.hasOwn(data.players[player], hunt))
+        data.players[player][hunt] = [];
+    });
   }
   async complete(player: string, hunt: string, task: string): Promise<void> {
     if (![player, hunt, task].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))

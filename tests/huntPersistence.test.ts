@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApplication } from "../src/ts/server/server.js";
-import { HuntStore } from "../src/ts/server/huntStore.js";
+import { HuntStore, isHuntAvailable } from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
 
 const input = {
@@ -264,6 +264,11 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         })
       ).status,
     ).toBe(403);
+    const legacyPath = join(directory, "hunts.json");
+    const legacy = JSON.parse(await readFile(legacyPath, "utf8"));
+    legacy.hunts.find((hunt: { id: string }) => hunt.id === id).accessCode =
+      null;
+    await writeFile(legacyPath, JSON.stringify(legacy));
     const player = await fetch(base + `/api/player/hunts/${id}`);
     const playerCookie = player.headers.get("set-cookie")!.split(";")[0];
     const projection = await player.json();
@@ -415,6 +420,406 @@ test("ownership and contributor grants survive terminating the Node process", as
         ).json()
       ).value,
     ).toEqual([collaborator]);
+  } finally {
+    await stop();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+// These test tokens are accepted only by the injected test verifier. The
+// production server never reads identity or completion state from the client.
+const verifyPlayerToken = async (token: string): Promise<string> => {
+  const subjects: Record<string, string> = {
+    "player-a": "google-subject-a",
+    "player-a-new-token": "google-subject-a",
+    "player-b": "google-subject-b",
+  };
+  if (!Object.hasOwn(subjects, token)) throw new Error("Invalid token");
+  return subjects[token];
+};
+
+test("account task progress survives restart without cookies and isolates players", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-account-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  const first = await store.addTask(hunt.id, task);
+  await store.addTask(hunt.id, { ...task, order: 2 });
+  let app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+  const start = async () => {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  };
+  const stop = async () => {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+  };
+  let base = await start();
+  const call = async (
+    path: string,
+    token?: string,
+    body?: unknown,
+    cookie?: string,
+  ) => {
+    const response = await fetch(base + "/api/player/account" + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
+        "Content-Type": "application/json",
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    expect(response.headers.get("set-cookie")).toBeNull();
+    return { status: response.status, payload: await response.json() };
+  };
+  try {
+    expect((await call("/hunts")).status).toBe(401);
+    expect((await call("/hunts", "forged-token")).status).toBe(401);
+    expect(
+      (
+        await call(
+          "/hunts",
+          undefined,
+          undefined,
+          "buchunt-player=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        )
+      ).status,
+    ).toBe(401);
+    expect((await call(`/hunts/${hunt.id}`, "player-a")).status).toBe(403);
+    expect(
+      (await call("/join", "player-a", { accessCode: hunt.accessCode })).status,
+    ).toBe(200);
+    const opened = await call(`/hunts/${hunt.id}`, "player-a");
+    expect(opened.status).toBe(200);
+    expect(
+      opened.payload.value.tasks.map(
+        (task: { completed: boolean }) => task.completed,
+      ),
+    ).toEqual([false, false]);
+    expect(opened.payload.value.tasks[0].description).toBe(task.description);
+    expect(JSON.stringify(opened.payload)).not.toMatch(
+      /Bucky|ownerId|requiredAnswer/,
+    );
+    expect((await call("/hunts", "player-a")).payload.value).toHaveLength(1);
+    const answerPath = `/hunts/${hunt.id}/tasks/${first.id}/answer`;
+    expect(
+      (await call(answerPath, undefined, { answer: "Bucky" })).status,
+    ).toBe(401);
+    expect(
+      (await call(answerPath, "player-a", { answer: "wrong" })).status,
+    ).toBe(400);
+    expect(
+      (await call(answerPath, "player-a", { answer: " bucky " })).status,
+    ).toBe(200);
+    expect(
+      (await call("/join", "player-a", { accessCode: hunt.accessCode })).status,
+    ).toBe(200);
+    await stop();
+    app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+    base = await start();
+    const restored = await call("/hunts", "player-a-new-token");
+    expect(
+      restored.payload.value[0].tasks.map(
+        (task: { completed: boolean }) => task.completed,
+      ),
+    ).toEqual([true, false]);
+    expect((await call("/hunts", "player-b")).payload.value).toEqual([]);
+    expect(
+      (await call(`/hunts/${hunt.id}`, "player-a")).payload.value.tasks[0]
+        .completed,
+    ).toBe(true);
+    expect((await call(`/hunts/${hunt.id}`, "player-b")).status).toBe(403);
+    expect(
+      (await call("/join", "player-b", { accessCode: hunt.accessCode })).status,
+    ).toBe(200);
+    expect(
+      (await call(`/hunts/${hunt.id}`, "player-b")).payload.value.tasks[0]
+        .completed,
+    ).toBe(false);
+    const bytes = await readFile(
+      join(directory, "account-player-progress.json"),
+      "utf8",
+    );
+    expect(bytes).not.toMatch(/player-a|player-b|Bucky/);
+    await writeFile(join(directory, "account-player-progress.json"), "{broken");
+    const failure = await call("/hunts", "player-a");
+    expect(failure.status).toBe(500);
+    expect(failure.payload.code).toBe("storage");
+    expect(failure.payload.value).toBeUndefined();
+    expect(
+      (await call(answerPath, "player-a", { answer: "bucky" })).status,
+    ).toBe(500);
+    expect(
+      await readFile(join(directory, "account-player-progress.json"), "utf8"),
+    ).toBe("{broken");
+  } finally {
+    await stop();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("account browser answers tasks and restores progress in another browser", async ({
+  browser,
+}) => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-account-ui-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  await store.addTask(hunt.id, task);
+  await store.addTask(hunt.id, { ...task, displayLabel: "Library", order: 2 });
+  const app = createApplication({
+    dataDirectory: directory,
+    verifyPlayerToken,
+  });
+  await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  const contexts = [];
+  try {
+    for (const [index, token] of ["player-a", "player-a-new-token"].entries()) {
+      const context = await browser.newContext();
+      contexts.push(context);
+      // A pre-existing cookie must never accompany the new player API calls.
+      await context.addCookies([{ name: "legacy", value: "keep", url: base }]);
+      await context.addInitScript(
+        ({ token }) => {
+          sessionStorage.setItem(
+            "buchunt.player-session",
+            JSON.stringify({
+              provider: "google",
+              accountId: "google-subject-a",
+              email: "a@example.com",
+              idToken: token,
+            }),
+          );
+          localStorage.setItem(
+            "buchunt.player-profile.google-subject-a",
+            "Baja",
+          );
+        },
+        { token },
+      );
+      const page = await context.newPage();
+      const cookieHeaders: string[] = [];
+      page.on("request", (request) => {
+        if (request.url().includes("/api/player/account/")) {
+          if (request.headers().cookie)
+            cookieHeaders.push(request.headers().cookie);
+          expect(request.headers().authorization).toBe(`Bearer ${token}`);
+        }
+      });
+      await page.goto(base + "/player.html");
+      if (index === 0) {
+        await page.getByLabel("Access code").fill("00000000");
+        await page
+          .getByRole("button", { name: "Join Hunt", exact: true })
+          .click();
+        await expect(
+          page.getByTestId("player-hunt-lookup-status"),
+        ).toContainText("Invalid access code");
+        await page.getByLabel("Access code").fill(hunt.accessCode!);
+        await page
+          .getByRole("button", { name: "Join Hunt", exact: true })
+          .click();
+        await expect(page.getByTestId("player-hunt-name")).toHaveText(
+          input.name,
+        );
+        await page.getByLabel("Answer for Fountain").fill("bucky");
+        await page
+          .getByRole("button", { name: "Submit answer" })
+          .first()
+          .click();
+      } else {
+        await expect(page.getByTestId("player-hunt-list")).toContainText(
+          input.name,
+        );
+        await page
+          .getByRole("button", { name: "Open Hunt", exact: true })
+          .click();
+      }
+      await expect(page.getByTestId("player-task").first()).toContainText(
+        "Completed",
+      );
+      await expect(page.getByTestId("player-task").nth(1)).toContainText(
+        "Incomplete",
+      );
+      await page.reload();
+      await page
+        .getByRole("button", { name: "Open Hunt", exact: true })
+        .click();
+      await expect(page.getByTestId("player-task").first()).toContainText(
+        "Completed",
+      );
+      expect(cookieHeaders).toEqual([]);
+      expect(await context.cookies()).toEqual([
+        expect.objectContaining({ name: "legacy", value: "keep" }),
+      ]);
+    }
+  } finally {
+    for (const context of contexts) await context.close();
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("account progress reads and completion report storage failures without claiming success", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-account-write-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  const savedTask = await store.addTask(hunt.id, task);
+  const progressPath = join(directory, "account-player-progress.json");
+  const app = createApplication({
+    dataDirectory: directory,
+    verifyPlayerToken,
+  });
+  await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/player/account`;
+  const post = async (path: string, input: unknown) =>
+    fetch(base + path, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer player-a",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+  try {
+    await mkdir(progressPath);
+    const failedRead = await fetch(base + `/hunts/${hunt.id}`, {
+      headers: { Authorization: "Bearer player-a" },
+    });
+    expect(failedRead.status).toBe(500);
+    expect((await failedRead.json()).ok).toBe(false);
+    await rm(progressPath, { recursive: true });
+    const before = JSON.stringify({ schemaVersion: 1, players: {} });
+    await writeFile(progressPath, before);
+    await rm(progressPath);
+    await mkdir(progressPath);
+    const failedAnswer = await post(
+      `/hunts/${hunt.id}/tasks/${savedTask.id}/answer`,
+      { answer: "Bucky" },
+    );
+    expect(failedAnswer.status).toBe(500);
+    expect((await failedAnswer.json()).ok).toBe(false);
+    await rm(progressPath, { recursive: true });
+    await writeFile(progressPath, before);
+    expect((await post("/join", { accessCode: hunt.accessCode })).status).toBe(
+      200,
+    );
+    const restored = await fetch(base + `/hunts/${hunt.id}`, {
+      headers: { Authorization: "Bearer player-a" },
+    });
+    expect((await restored.json()).value.tasks[0].completed).toBe(false);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("access code joins persist before answers and reject unavailable hunts and bypasses", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-join-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(
+    { ...input, beginsAt: "2020-01-01T00:00:00Z" },
+    "owner",
+  );
+  await store.addTask(hunt.id, task);
+  const empty = await store.create(
+    { ...input, beginsAt: "2020-01-01T00:00:00Z" },
+    "owner",
+  );
+  const future = await store.create(
+    { ...input, beginsAt: "2099-01-01T00:00:00Z" },
+    "owner",
+  );
+  await store.addTask(future.id, task);
+  const ended = await store.create(
+    {
+      ...input,
+      beginsAt: "2020-01-01T00:00:00Z",
+      endsAt: "2021-01-01T00:00:00Z",
+    },
+    "owner",
+  );
+  await store.addTask(ended.id, task);
+  let app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+  const start = async () => {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  };
+  const stop = () => new Promise<void>((resolve) => app.close(() => resolve()));
+  let base = await start();
+  const joinHunt = (accessCode: unknown, token = "player-a") =>
+    fetch(base + "/api/player/account/join", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ accessCode }),
+    });
+  try {
+    expect(hunt.accessCode).toMatch(/^[A-F0-9]{8}$/);
+    expect(new Set((await store.list()).map((h) => h.accessCode)).size).toBe(4);
+    expect((await joinHunt(hunt.accessCode, "forged-token")).status).toBe(401);
+    for (const code of [
+      "wrong",
+      hunt.id,
+      null,
+      empty.accessCode,
+      future.accessCode,
+      ended.accessCode,
+    ]) {
+      const rejected = await joinHunt(code);
+      expect(rejected.status).toBe(400);
+      expect((await rejected.json()).message).toContain("Invalid access code");
+    }
+    expect((await fetch(base + `/api/player/hunts/${hunt.id}`)).status).toBe(
+      403,
+    );
+    expect((await joinHunt(` ${hunt.accessCode!.toLowerCase()} `)).status).toBe(
+      200,
+    );
+    expect((await joinHunt(hunt.accessCode)).status).toBe(200);
+    const concurrent = await Promise.all([
+      joinHunt(hunt.accessCode),
+      joinHunt(hunt.accessCode),
+    ]);
+    expect(concurrent.map((response) => response.status)).toEqual([200, 200]);
+    await stop();
+    app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+    base = await start();
+    const restored = await fetch(base + "/api/player/account/hunts", {
+      headers: { Authorization: "Bearer player-a-new-token" },
+    });
+    const saved = (await restored.json()).value;
+    expect(saved).toHaveLength(1);
+    expect(saved[0].tasks[0].completed).toBe(false);
+    expect(JSON.stringify(saved)).not.toContain(hunt.accessCode);
+    const definition = await store.get(hunt.id);
+    const begins = Date.parse(definition.beginsAt);
+    expect(isHuntAvailable(definition, begins)).toBe(true);
+    expect(isHuntAvailable(definition, begins - 1)).toBe(false);
+    expect(
+      isHuntAvailable(
+        { ...definition, endsAt: "2021-01-01T00:00:00Z" },
+        Date.parse("2021-01-01T00:00:00Z"),
+      ),
+    ).toBe(false);
+    expect(isHuntAvailable({ ...definition, status: "archived" })).toBe(false);
+    const path = join(directory, "hunts.json");
+    const legacy = JSON.parse(await readFile(path, "utf8"));
+    legacy.hunts[0].accessCode = null;
+    await writeFile(path, JSON.stringify(legacy));
+    const migrated = await Promise.all([
+      store.getWithAccessCode(hunt.id),
+      store.getWithAccessCode(hunt.id),
+    ]);
+    expect(migrated[0].accessCode).toBe(migrated[1].accessCode);
+    expect((await new HuntStore(path).get(hunt.id)).accessCode).toBe(
+      migrated[0].accessCode,
+    );
+    const progressPath = join(directory, "account-player-progress.json");
+    await writeFile(progressPath, "{broken");
+    expect((await joinHunt(migrated[0].accessCode)).status).toBe(500);
+    expect(await readFile(progressPath, "utf8")).toBe("{broken");
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });

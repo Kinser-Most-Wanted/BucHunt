@@ -151,3 +151,75 @@ The delivery workflow first requires build, lint, formatting, and all automated 
 | #36   | Static-only delivery without application verification | Writable runtime, required quality checks and deployed browser verification                 |
 
 The homepage and `Documentation/sprint_2_foundation.md` still describe the earlier skeleton because they were outside the authorized edit list. Their navigation remains usable; the administration and player pages describe the implemented behavior.
+
+## Google-account task progress (#40)
+
+The new player progress flow sends a Google ID token in the
+`Authorization: Bearer <token>` header and uses `credentials: "omit"` for every
+account API request. These endpoints never read or set application cookies.
+Existing creator sessions, shared login/logout, and anonymous player endpoints
+retain their previous cookie behavior. Anonymous progress is not migrated into
+Google accounts automatically.
+
+The backend verifies Google's signature, issuer, audience, expiry, verified email,
+and authorized party through `google-auth-library`. It derives the storage key
+from the verified Google subject, rather than trusting an account ID or email
+submitted by the browser. Set `GOOGLE_CLIENT_ID` to the same client ID used by the
+existing sign-in integration. The deployment script supplies it to EC2 and
+packages the existing authentication runtime dependencies. No additional AWS
+service or IAM permission is needed.
+
+Task completion is stored in the private
+`DATA_DIRECTORY/account-player-progress.json` (`/var/lib/buchunt` on AWS):
+
+```json
+{
+  "schemaVersion": 1,
+  "players": {
+    "google-<sha256 of verified Google subject>": {
+      "<hunt-id>": ["<completed-task-id>"]
+    }
+  }
+}
+```
+
+Correct answers are saved before success is returned. Missing task IDs remain
+incomplete. Returning with another valid token for the same Google account
+restores the same completion state, including from another browser or device.
+The saved-hunt list includes hunts with recorded task progress; opening a hunt
+without completing a task does not create a saved-progress record. Corrupt or
+unreadable progress, and missing hunt definitions referenced by saved progress,
+return errors without inventing completion states or overwriting invalid data.
+The existing single-writer, atomic-save, and backup requirements apply.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/player/account/config` | Public Google client ID; no token or cookie required |
+| GET | `/api/player/account/hunts` | Restore this account's hunts with saved progress |
+| GET | `/api/player/account/hunts/:id` | Read tasks and this account's completion state |
+| POST | `/api/player/account/hunts/:id/tasks/:taskId/answer` | Validate `{ "answer": "..." }` and persist completion |
+
+Except for config, these routes require a valid Google bearer token. They return
+`OperationResult` responses with 401 for invalid/expired identity, 400 for invalid
+answers, 404 for missing hunts/tasks, and 500 for storage failures. Config returns
+503 when Google sign-in is not configured. Responses disable caching; failure
+logs retain request IDs without recording tokens or answers.
+
+The player page preserves hunt-ID lookup and uses server progress instead of
+local hunt lists. If the token from the existing sign-in expires, or the old
+login restores only its cookie session, the player page offers Google
+reauthentication without using those cookies for progress. Tokens are held in
+`sessionStorage`; display names remain browser-local preferences.
+
+Access-code generation, validation, joining, participation management, publication,
+and availability rules are outside this change and are owned by the teammate's
+admission work. The existing reserved `accessCode: null` field and its schema are
+unchanged. Hunt-ID lookup retains the existing ability to read tasks and submit
+answers; admission checks can be integrated at the account route boundary later.
+
+Tests cover durable completion, restart recovery, fresh browser contexts,
+account isolation, incomplete-task preservation, invalid tokens, reauthentication,
+storage failures, and cookie omission. Tests inject a local identity verifier;
+production has no HTTP or environment switch to bypass Google verification.
+Live Google/AWS verification and the team's peer reviews remain required before
+merge.

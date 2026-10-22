@@ -57,54 +57,65 @@ export function createHuntRepository(): HuntRepository {
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
-    async listActiveHunts(
-      identity: PlayerIdentity,
-    ): Promise<OperationResult<PlayerHunt[]>> {
+    joinHunt: (accessCode, identity) =>
+      accountRequest("/api/player/account/join", identity, { accessCode }),
+    getAccountHunt: (id, identity) =>
+      accountRequest(
+        `/api/player/account/hunts/${encodeURIComponent(id)}`,
+        identity,
+      ),
+    answerAccountTask: (id, taskId, answer, identity) =>
+      accountRequest(
+        `/api/player/account/hunts/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/answer`,
+        identity,
+        { answer },
+      ),
+    async listActiveHunts(identity) {
+      const result = await accountRequest<unknown[]>(
+        "/api/player/account/hunts",
+        identity,
+      );
+      if (!result.ok) return result;
       try {
-        const response = await fetch("/api/player/hunts", {
-          headers: { Authorization: `Bearer ${identity.idToken}` },
-        });
-        if (response.status === 404 || response.status === 405) {
-          return {
-            ok: false,
-            code: "not-implemented",
-            message:
-              "The active-hunts API is not part of the Sprint 2 static site yet.",
-          };
-        }
-        if (!response.ok) {
-          return {
-            ok: false,
-            code: "network",
-            message: "Active Hunts could not be loaded. Try again later.",
-          };
-        }
-        const payload: unknown = await response.json();
-        const hunts = Array.isArray(payload)
-          ? payload
-          : typeof payload === "object" &&
-              payload !== null &&
-              "hunts" in payload
-            ? (payload as { hunts: unknown }).hunts
-            : null;
-        if (!Array.isArray(hunts)) {
-          return {
-            ok: false,
-            code: "network",
-            message: "The active-hunts service returned an invalid response.",
-          };
-        }
-        return { ok: true, value: hunts.map(toPlayerHunt) };
+        return { ok: true, value: result.value.map(toPlayerHunt) };
       } catch {
         return {
           ok: false,
-          code: "not-implemented",
-          message:
-            "The active-hunts API is not available in this static-site prototype.",
+          code: "network",
+          message: "The hunt service returned invalid saved progress.",
         };
       }
     },
   };
+}
+
+async function accountRequest<T>(
+  path: string,
+  identity: PlayerIdentity,
+  input?: unknown,
+): Promise<OperationResult<T>> {
+  try {
+    const response = await fetch(path, {
+      method: input === undefined ? "GET" : "POST",
+      credentials: "omit",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${identity.idToken}`,
+        "Content-Type": "application/json",
+      },
+      ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+    });
+    const result = await response.json();
+    if (!result || typeof result.ok !== "boolean" || result.ok !== response.ok)
+      throw new Error("Invalid service response");
+    return result as OperationResult<T>;
+  } catch {
+    return {
+      ok: false,
+      code: "network",
+      message: "Saved hunt progress could not be retrieved. Try again.",
+    };
+  }
 }
 
 function parseTaskLocation(
@@ -164,6 +175,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
           ? item.huntId
           : (candidate.id as string),
       displayLabel: item.displayLabel,
+      ...(typeof item.description === "string"
+        ? { description: item.description }
+        : {}),
       completed: item.completed,
       ...(item.location !== undefined
         ? { location: parseTaskLocation(item.location) }

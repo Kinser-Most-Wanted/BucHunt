@@ -209,10 +209,15 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       field: "taskOrderMode",
       message: "Must be sequential or any.",
     });
-  if (input.accessCode !== null)
+  if (
+    input.accessCode !== null &&
+    (typeof input.accessCode !== "string" ||
+      !/^[A-F0-9]{8}$/.test(input.accessCode))
+  )
     issues.push({
       field: "accessCode",
-      message: "Must be null until access codes are implemented.",
+      message:
+        "Must be an eight-character uppercase hexadecimal code or null for a legacy hunt.",
     });
   const beginsAt = checkTimestamp(input.beginsAt, "beginsAt", issues);
   const endsAt =

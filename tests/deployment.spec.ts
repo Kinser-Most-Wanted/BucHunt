@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { createHash, randomBytes } from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 // The deployment workflow supplies its HTTPS output as BASE_URL.
 test.use({ baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000" });
@@ -152,4 +154,138 @@ test("player account endpoints require bearer identity and never issue cookies",
   expect(response.status()).toBe(401);
   expect(response.headers()["set-cookie"]).toBeUndefined();
   expect((await response.json()).code).toBe("unauthorized");
+});
+
+test("live authentication routes persist nonces and reject invalid credentials", async ({
+  request,
+}) => {
+  test.skip(
+    !process.env.BASE_URL,
+    "Requires the deployed HTTPS authentication service.",
+  );
+  const table = process.env.AUTH_SESSION_TABLE;
+  expect(
+    table,
+    "Deployment must supply its real DynamoDB session table",
+  ).toBeTruthy();
+  const origin = new URL(process.env.BASE_URL!).origin;
+  const config = await request.get("/api/auth/config");
+  expect(config.status()).toBe(200);
+  expect(config.headers()["cache-control"]).toContain("no-store");
+  expect(config.headers()["set-cookie"]).toContain("__Host-buchunt-login=");
+  expect(config.headers()["set-cookie"]).toContain("Secure");
+  const { clientId, nonce } = await config.json();
+  expect(clientId).toBe(process.env.GOOGLE_CLIENT_ID);
+  expect(nonce).toMatch(/^[a-f0-9]{64}$/);
+  const key = {
+    id: { S: `login:${createHash("sha256").update(nonce).digest("hex")}` },
+  };
+  const readNonce = () =>
+    JSON.parse(
+      execFileSync(
+        "aws",
+        [
+          "dynamodb",
+          "get-item",
+          "--table-name",
+          table!,
+          "--key",
+          JSON.stringify(key),
+          "--consistent-read",
+          "--output",
+          "json",
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+  try {
+    expect(readNonce().Item).toBeTruthy();
+    const rejectedOrigin = await request.post("/api/auth/login", {
+      headers: { Origin: "https://invalid.example" },
+      data: { credential: "invalid" },
+    });
+    expect(rejectedOrigin.status()).toBe(403);
+    expect(readNonce().Item).toBeTruthy();
+    const invalid = await request.post("/api/auth/login", {
+      headers: { Origin: origin },
+      data: { credential: "invalid" },
+    });
+    expect(invalid.status()).toBe(401);
+    expect(readNonce().Item).toBeUndefined();
+    const session = await request.get("/api/auth/session");
+    expect(session.status()).toBe(401);
+  } finally {
+    execFileSync("aws", [
+      "dynamodb",
+      "delete-item",
+      "--table-name",
+      table!,
+      "--key",
+      JSON.stringify(key),
+    ]);
+  }
+});
+
+test("live session fixture verifies DynamoDB reads, authorization and logout", async ({
+  request,
+}) => {
+  test.skip(
+    !process.env.BASE_URL,
+    "Requires the deployed HTTPS authentication service.",
+  );
+  const table = process.env.AUTH_SESSION_TABLE;
+  expect(table).toBeTruthy();
+  const token = randomBytes(32).toString("hex");
+  const key = {
+    id: { S: `session:${createHash("sha256").update(token).digest("hex")}` },
+  };
+  const identity = {
+    kind: "session",
+    subject: `ci-smoke-${token}`,
+    email: `ci-${token}@invalid.example`,
+    expiresAt: Math.floor(Date.now() / 1000) + 120,
+  };
+  const item = {
+    ...key,
+    data: { S: JSON.stringify(identity) },
+    expiresAt: { N: String(identity.expiresAt) },
+  };
+  const headers = { Cookie: `__Host-buchunt-session=${token}` };
+  try {
+    // This fixture tests real application-session plumbing, not Google sign-in.
+    execFileSync("aws", [
+      "dynamodb",
+      "put-item",
+      "--table-name",
+      table!,
+      "--item",
+      JSON.stringify(item),
+    ]);
+    const session = await request.get("/api/auth/session", { headers });
+    expect(session.status()).toBe(200);
+    expect((await session.json()).user).toEqual({
+      subject: identity.subject,
+      email: identity.email,
+      expiresAt: identity.expiresAt,
+      role: "user",
+    });
+    const admin = await request.get("/api/admin/capabilities", { headers });
+    expect(admin.status()).toBe(403);
+    const logout = await request.post("/api/auth/logout", {
+      headers: { ...headers, Origin: new URL(process.env.BASE_URL!).origin },
+      data: {},
+    });
+    expect(logout.status()).toBe(200);
+    const replay = await request.get("/api/auth/session", { headers });
+    expect(replay.status()).toBe(401);
+  } finally {
+    execFileSync("aws", [
+      "dynamodb",
+      "delete-item",
+      "--table-name",
+      table!,
+      "--key",
+      JSON.stringify(key),
+    ]);
+  }
 });

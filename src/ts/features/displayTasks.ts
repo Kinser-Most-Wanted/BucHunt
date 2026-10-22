@@ -1,4 +1,3 @@
-import { loadGoogleIdentity } from "./adminAccess.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
@@ -249,73 +248,27 @@ export function mountDisplayTasks(
   };
 
   const preparePlayerSignIn = async (): Promise<void> => {
-    setGoogleSignInEnabled(true);
-    if (!googleButtonHost) return;
+    setGoogleSignInEnabled(false);
+    providerStatus.hidden = false;
+    providerStatus.textContent = "Returning to BucHunt sign-in...";
     try {
-      const response = await fetch("/api/player/account/config", {
-        credentials: "omit",
+      // Clear any cookie-backed login so the shared home page presents its
+      // single Google sign-in flow instead of redirecting back to this page.
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
         cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: "{}",
       });
-      const config = await response.json();
-      if (!response.ok || !config.ok)
-        throw new Error(config.message ?? "Player sign-in is unavailable.");
-      const google = await loadGoogleIdentity();
-      google.accounts.id.initialize({
-        client_id: config.value.clientId,
-        nonce: crypto.randomUUID(),
-        auto_select: false,
-        callback: ({ credential }) => {
-          void acceptCredential(credential);
-        },
-      });
-      googleButtonHost.replaceChildren();
-      google.accounts.id.renderButton(googleButtonHost, {
-        type: "standard",
-        theme: "outline",
-        size: "large",
-        shape: "pill",
-        text: "signin_with",
-        width: 280,
-      });
-    } catch (error) {
-      providerStatus.hidden = false;
+      if (!response.ok && response.status !== 401)
+        throw new Error("The current sign-in could not be refreshed.");
+      sessionStorage.removeItem(PLAYER_SESSION_KEY);
+      window.location.assign("./index.html");
+    } catch {
       providerStatus.textContent =
-        error instanceof Error
-          ? error.message
-          : "Player sign-in is unavailable.";
-    }
-  };
-  const acceptCredential = async (credential: string): Promise<void> => {
-    try {
-      // Claims here label the UI only. Every API request verifies the signed
-      // token server-side and derives its own storage key from Google's subject.
-      const encoded = credential
-        .split(".")[1]
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-      const payload = JSON.parse(
-        new TextDecoder().decode(
-          Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
-        ),
-      );
-      if (typeof payload.sub !== "string" || typeof payload.email !== "string")
-        throw new Error("Invalid Google identity.");
-      const identity: PlayerIdentity = {
-        provider: "google",
-        accountId: payload.sub,
-        email: payload.email,
-        idToken: credential,
-      };
-      const verified = await repository.listActiveHunts(identity);
-      if (!verified.ok) throw new Error(verified.message);
-      sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(identity));
-      const name = storedDisplayName(identity.accountId);
-      if (name) await loadHunts(identity, name);
-      else requestDisplayName(identity);
-    } catch (error) {
-      providerStatus.hidden = false;
-      providerStatus.textContent =
-        error instanceof Error ? error.message : "Google sign-in failed.";
+        "Could not return to sign-in. Check your connection and try again.";
+      setGoogleSignInEnabled(true);
     }
   };
   let pendingIdentity: PlayerIdentity | null = null;

@@ -106,9 +106,11 @@ export function mountDisplayTasks(
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
   );
-  const signOut = root.querySelector<HTMLButtonElement>(
-    '[data-testid="player-sign-out"]',
-  );
+  const signOut =
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="player-sign-out"]',
+    ) ??
+    root.querySelector<HTMLButtonElement>('[data-testid="player-sign-out"]');
   const findAccountElement = <T extends Element>(selector: string): T | null =>
     document.querySelector<T>(selector) ?? root.querySelector<T>(selector);
   const account = findAccountElement<HTMLDetailsElement>(

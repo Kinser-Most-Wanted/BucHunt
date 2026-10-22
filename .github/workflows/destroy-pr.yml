@@ -10,10 +10,13 @@ permissions:
   contents: read
   issues: write
   pull-requests: read
+  actions: write
 
 jobs:
   release:
     if: github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      assigned_prs: ${{ steps.cleanup.outputs.assigned_prs }}
     concurrency:
       group: deploy-preview
       cancel-in-progress: false
@@ -32,6 +35,7 @@ jobs:
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
 
       - name: Clear preview data and release assigned slot
+        id: cleanup
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -62,3 +66,36 @@ jobs:
           gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$SLOT_LABEL" >/dev/null || true
           echo "Released $SLOT_LABEL."
           bash ./deploy/deploy.sh allocate-preview-slots
+
+  requeue:
+    needs: release
+    if: needs.release.outputs.assigned_prs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Rerun checks and deployment for newly assigned PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNED_PRS: ${{ needs.release.outputs.assigned_prs }}
+        run: |
+          IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
+          for TARGET_PR in "${PRS[@]}"; do
+            [[ -n "$TARGET_PR" ]] || continue
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+            RUN_ID=$(gh api --paginate --jq --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; (.number | tostring) == $pr)) | .id' "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100" | head -n 1)
+            if [[ -z "$RUN_ID" ]]; then
+              echo "No prior PR workflow exists for PR #$TARGET_PR; its next push will deploy."
+              continue
+            fi
+            STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            if [[ "$STATUS" != completed ]]; then
+              echo "PR #$TARGET_PR already has workflow run $RUN_ID in progress; its deployment can use the assigned slot."
+              continue
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null
+            echo "Reran PR #$TARGET_PR checks and deployment with its assigned slot."
+          done

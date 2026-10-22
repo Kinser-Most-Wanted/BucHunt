@@ -50,7 +50,7 @@ if [[ "$1" == allocate-preview-slots ]]; then
     if [[ "$TARGET_PR" != "${CURRENT_PR_NUMBER:-}" ]]; then
       TARGET_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
       WORKFLOW_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&status=completed&per_page=100")
-      SUCCESSFUL_RUN=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$TARGET_HEAD" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr)) | .id' | head -n 1)
+      SUCCESSFUL_RUN=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$TARGET_HEAD" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
       if [[ -z "$SUCCESSFUL_RUN" ]]; then
         echo "PR #$TARGET_PR is waiting for its current checks to pass before receiving a preview slot."
         continue

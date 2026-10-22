@@ -2,6 +2,63 @@
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name> [preview-pr-number] | reset-preview <stack-name> <preview-pr-number>"; exit 1; fi
+if [[ "$1" == allocate-preview-slots ]]; then
+  if [[ -z "${GH_TOKEN:-}" || -z "${GITHUB_REPOSITORY:-}" ]]; then
+    echo "GH_TOKEN and GITHUB_REPOSITORY are required to allocate preview slots." >&2
+    exit 1
+  fi
+  export GH_TOKEN
+  for SLOT_LABEL in preview-slot-1 preview-slot-2 preview-slot-3; do
+    COLOR=0969DA
+    case "$SLOT_LABEL" in
+      preview-slot-1) COLOR=1F6FEB ;;
+      preview-slot-2) COLOR=8250DF ;;
+      preview-slot-3) COLOR=BF3989 ;;
+    esac
+    gh api --method POST "repos/$GITHUB_REPOSITORY/labels" -f "name=$SLOT_LABEL" -f "color=$COLOR" -f "description=Automatically assigned stable preview deployment slot" >/dev/null 2>&1 || true
+  done
+
+  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=open&sort=created&direction=asc&per_page=100")
+  USED_1=false
+  USED_2=false
+  USED_3=false
+  while IFS= read -r PR_JSON; do
+    [[ -n "$PR_JSON" ]] || continue
+    for SLOT in 1 2 3; do
+      if echo "$PR_JSON" | jq -e --arg label "preview-slot-$SLOT" '.labels | index($label) != null' >/dev/null; then
+        case "$SLOT" in
+          1) USED_1=true ;;
+          2) USED_2=true ;;
+          3) USED_3=true ;;
+        esac
+      fi
+    done
+  done <<< "$OPEN_PRS"
+
+  while IFS= read -r PR_JSON; do
+    [[ -n "$PR_JSON" ]] || continue
+    SLOT_COUNT=$(echo "$PR_JSON" | jq '[.labels[] | select(test("^preview-slot-[123]$"))] | length')
+    if [[ "$SLOT_COUNT" -ne 0 ]]; then
+      if [[ "$SLOT_COUNT" -gt 1 ]]; then
+        echo "PR #$(echo "$PR_JSON" | jq -r .number) has multiple preview slot labels; leaving it unchanged." >&2
+      fi
+      continue
+    fi
+    SLOT=""
+    if [[ "$USED_1" != true ]]; then SLOT=1; USED_1=true
+    elif [[ "$USED_2" != true ]]; then SLOT=2; USED_2=true
+    elif [[ "$USED_3" != true ]]; then SLOT=3; USED_3=true
+    else
+      echo "Preview slots are full; PR #$(echo "$PR_JSON" | jq -r .number) remains queued."
+      continue
+    fi
+    PR_NUMBER_TO_ASSIGN=$(echo "$PR_JSON" | jq -r .number)
+    SLOT_LABEL="preview-slot-$SLOT"
+    gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER_TO_ASSIGN/labels" -f "labels[]=$SLOT_LABEL" >/dev/null
+    echo "Assigned $SLOT_LABEL to PR #$PR_NUMBER_TO_ASSIGN."
+  done <<< "$OPEN_PRS"
+  exit 0
+fi
 if [[ "$1" == reset-preview ]]; then
   if [[ "$#" -ne 3 || ! "$3" =~ ^[0-9]+$ || ! "$2" =~ ^bucstop-preview-[123]$ ]]; then
     echo "Usage: $0 reset-preview <bucstop-preview-1|2|3> <preview-pr-number>" >&2

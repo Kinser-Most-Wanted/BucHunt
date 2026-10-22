@@ -85,7 +85,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await page.getByRole("button", { name: "Save name and continue" }).click();
 
   await expect(page.getByTestId("player-account")).toHaveText(
-    "Signed in as Baja",
+    "Signed in as Baja (Player)",
   );
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
@@ -319,7 +319,9 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
 
   await page.goto("/admin.html");
   await expect(page.getByTestId("admin-account-menu")).toBeVisible();
-  await expect(page.getByTestId("admin-display-name")).toHaveText("Baja");
+  await expect(page.getByTestId("admin-display-name")).toHaveText(
+    "Baja (Player)",
+  );
   await expect(page.locator("#admin-denied")).toBeVisible();
   await expect
     .poll(() =>

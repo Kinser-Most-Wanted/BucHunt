@@ -360,7 +360,7 @@ if [[ -n "{preview_pr_number}" ]]; then
   CURRENT_OWNER=$(cat "$OWNER_FILE" 2>/dev/null || true)
   if [[ "$CURRENT_OWNER" != "{preview_pr_number}" ]]; then
     systemctl stop buchunt || true
-    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.preview-pr-owner' -exec rm -rf -- {} +
+    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.preview-pr-owner' -exec rm -rf -- {{}} +
     echo "Reset preview data for PR #{preview_pr_number}."
   fi
   printf '%s\\n' "{preview_pr_number}" > "$OWNER_FILE"

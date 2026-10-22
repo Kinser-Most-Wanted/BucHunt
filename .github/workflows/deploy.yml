@@ -48,6 +48,7 @@ jobs:
       - name: Determine stack name
         id: stack
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REF_NAME: ${{ github.ref_name }}
         run: |

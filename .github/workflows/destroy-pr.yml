@@ -93,8 +93,13 @@ jobs:
               continue
             fi
             STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            for attempt in $(seq 1 120); do
+              [[ "$STATUS" == completed ]] && break
+              sleep 10
+              STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            done
             if [[ "$STATUS" != completed ]]; then
-              echo "PR #$TARGET_PR already has workflow run $RUN_ID in progress; its deployment can use the assigned slot."
+              echo "PR #$TARGET_PR workflow run $RUN_ID is still active; leaving the assigned slot in place."
               continue
             fi
             gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null

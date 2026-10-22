@@ -44,6 +44,14 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     );
     expect(route.request().headers().cookie).toBeUndefined();
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/join")) {
+      expect(route.request().method()).toBe("POST");
+      expect(route.request().postDataJSON()).toEqual({
+        accessCode: "ABCD1234",
+      });
+      await route.fulfill({ json: { ok: true, value: { huntId: hunt.id } } });
+      return;
+    }
     if (path.endsWith("/hunts")) {
       await route.fulfill({ json: { ok: true, value: [hunt] } });
       return;
@@ -70,7 +78,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     });
   });
 
-  await page.goto("/player.html");
+  await page.goto("/player.html?accessCode=ABCD1234");
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
   await expect(page.getByTestId("player-name-form")).toBeVisible();
   await page.getByTestId("player-display-name-input").fill("Baja");
@@ -117,7 +125,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "inert",
     "",
   );
-  await page.getByLabel("Hunt ID").fill("hunt-1");
+  await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("Campus Hunt");
   await expect(page.getByTestId("player-task-status")).toContainText(

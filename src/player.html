@@ -161,8 +161,14 @@
         >
           <h2 id="hunt-lookup-heading">Join a Hunt</h2>
           <form data-testid="player-hunt-form">
-            <label for="player-hunt-id">Hunt ID</label>
-            <input id="player-hunt-id" name="huntId" required />
+            <label for="player-hunt-id">Access code</label>
+            <input
+              id="player-hunt-id"
+              name="accessCode"
+              maxlength="8"
+              autocomplete="off"
+              required
+            />
             <button type="submit">Join Hunt</button>
           </form>
           <p role="status" data-testid="player-hunt-lookup-status"></p>

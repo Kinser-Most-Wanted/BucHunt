@@ -245,7 +245,7 @@ export function mountDisplayTasks(
     renderHunts(list, result.value);
     status.textContent = result.value.length
       ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
-      : "You have no saved hunts yet. Open one with its hunt ID below.";
+      : "You have no saved hunts yet. Join one with its access code below.";
   };
 
   const preparePlayerSignIn = async (): Promise<void> => {
@@ -413,7 +413,7 @@ export function mountDisplayTasks(
   const huntForm = root.querySelector<HTMLFormElement>(
     '[data-testid="player-hunt-form"]',
   );
-  const huntInput = root.querySelector<HTMLInputElement>('[name="huntId"]');
+  const huntInput = root.querySelector<HTMLInputElement>('[name="accessCode"]');
   const huntName = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-name"]',
   );
@@ -506,9 +506,34 @@ export function mountDisplayTasks(
         huntTasks.append(item);
       }
     };
-    huntForm.addEventListener("submit", (event) => {
+    huntForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      void loadHunt(huntInput.value.trim());
+      const identity = storedIdentity();
+      if (!identity) {
+        huntStatus.textContent = "Sign in with Google first.";
+        return;
+      }
+      const button = huntForm.querySelector<HTMLButtonElement>(
+        'button[type="submit"], button',
+      );
+      if (button) button.disabled = true;
+      const requestId = ++huntRequest;
+      huntStatus.textContent = "Joining hunt...";
+      try {
+        const result = await repository.joinHunt(
+          huntInput.value.trim(),
+          identity,
+        );
+        if (requestId !== huntRequest) return;
+        if (!result.ok) {
+          huntStatus.textContent = result.message;
+          if (result.code === "unauthorized") void preparePlayerSignIn();
+          return;
+        }
+        await loadHunt(result.value.huntId);
+      } finally {
+        if (button) button.disabled = false;
+      }
     });
     list.addEventListener("click", (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
@@ -516,6 +541,8 @@ export function mountDisplayTasks(
       );
       if (button) void loadHunt(button.dataset.huntId ?? "");
     });
+    const sharedCode = new URLSearchParams(location.search).get("accessCode");
+    if (sharedCode) huntInput.value = sharedCode;
     const selectedHunt = new URLSearchParams(location.search).get("huntId");
     if (selectedHunt && previousIdentity) void loadHunt(selectedHunt);
   }

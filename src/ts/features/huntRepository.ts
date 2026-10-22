@@ -57,6 +57,8 @@ export function createHuntRepository(): HuntRepository {
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
+    joinHunt: (accessCode, identity) =>
+      accountRequest("/api/player/account/join", identity, { accessCode }),
     getAccountHunt: (id, identity) =>
       accountRequest(
         `/api/player/account/hunts/${encodeURIComponent(id)}`,

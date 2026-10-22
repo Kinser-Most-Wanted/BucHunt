@@ -244,6 +244,11 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
   await page.getByTestId("hunt-id-toggle").click();
   await expect(page.getByTestId("hunt-detail-id")).toHaveText(id);
+  await expect(page.getByTestId("hunt-facts")).toContainText("Access code");
+  await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(
+    "href",
+    /accessCode=[A-F0-9]{8}$/,
+  );
   await expect(page.getByTestId("hunt-detail-tasks")).toContainText(
     "Find the fountain",
   );

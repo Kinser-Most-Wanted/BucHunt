@@ -28,8 +28,8 @@ export interface HuntDefinition extends HuntInput {
   status: HuntStatus;
   createdAt: string;
   updatedAt: string;
-  // Reserved until access code functionality is implemented.
-  accessCode: null;
+  // Null remains supported for hunts saved before access-code joining.
+  accessCode: string | null;
   tasks: TaskDefinition[];
 }
 export interface TaskDefinition extends TaskInput {
@@ -77,6 +77,7 @@ export type OperationResult<T> =
         | "not-implemented"
         | "validation"
         | "unauthorized"
+        | "forbidden"
         | "not-found"
         | "storage"
         | "network";

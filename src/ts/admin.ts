@@ -116,7 +116,7 @@ function setAccountMenu(user: { subject?: unknown; email?: unknown; role?: unkno
     // Use the Google account name if browser storage is unavailable.
   }
   if (accountDisplayName) {
-    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : ""}`;
+    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
   }
   if (accountEmail) accountEmail.textContent = email;
   if (accountId) accountId.textContent = subject;

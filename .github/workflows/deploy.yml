@@ -2,8 +2,6 @@ name: Deploy
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  pull_request_target:
-    types: [opened, synchronize, reopened]
   push:
     branches: [main, stage]
 permissions:
@@ -12,17 +10,14 @@ permissions:
   pull-requests: read
 jobs:
   lint:
-    if: github.event_name != 'pull_request_target'
     uses: ./.github/workflows/lint.yml
     permissions:
       contents: read
   e2e:
-    if: github.event_name != 'pull_request_target'
     uses: ./.github/workflows/playwright.yml
     permissions:
       contents: read
   verify:
-    if: github.event_name != 'pull_request_target'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -40,7 +35,13 @@ jobs:
       - run: pnpm check:admin
       - run: pnpm test:admin
   allocate-preview:
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [lint, e2e, verify]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success'
     outputs:
       assigned_prs: ${{ steps.allocate.outputs.assigned_prs }}
     concurrency:
@@ -51,37 +52,15 @@ jobs:
       actions: write
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-      - name: Wait for this PR's checks to finish successfully
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          READY=false
-          for attempt in $(seq 1 80); do
-            STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
-            [[ "$STATE" == open ]] || exit 0
-            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
-            RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&status=completed&per_page=100")
-            if echo "$RUNS" | jq -e --arg sha "$HEAD_SHA" --arg pr "$PR_NUMBER" '[.workflow_runs[]? | select(.conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha))] | length > 0' >/dev/null; then
-              READY=true
-              break
-            fi
-            sleep 15
-          done
-          if [[ "$READY" != true ]]; then
-            echo "PR checks have not completed successfully; leaving this PR queued without a slot."
-            exit 0
-          fi
       - name: Allocate free preview slots in PR creation order
         id: allocate
         env:
           GH_TOKEN: ${{ github.token }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash ./deploy/deploy.sh allocate-preview-slots
   requeue-preview:
     needs: allocate-preview
@@ -97,10 +76,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ASSIGNED_PRS: ${{ needs.allocate-preview.outputs.assigned_prs }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
           for TARGET_PR in "${PRS[@]}"; do
             [[ -n "$TARGET_PR" ]] || continue
+            if [[ "$TARGET_PR" == "$CURRENT_PR_NUMBER" ]]; then
+              echo "PR #$TARGET_PR will deploy in its current workflow run."
+              continue
+            fi
             HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
             RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
             RUN_ID=$(echo "$RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[]? | select(any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)

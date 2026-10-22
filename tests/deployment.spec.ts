@@ -123,6 +123,38 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await expect(page.locator("#home-sign-in-link")).toBeVisible();
 });
 
+test("admin sign-in prompt stays hidden while session is loading", async ({ page }) => {
+  let finishSessionCheck!: () => void;
+  const sessionCheck = new Promise<void>((resolve) => {
+    finishSessionCheck = resolve;
+  });
+  const administrator = {
+    subject: "google-subject-admin",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+
+  await page.route("**/api/auth/session", async (route) => {
+    await sessionCheck;
+    await route.fulfill({ json: { user: administrator } });
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: { administrator, capabilities: ["administrative.access"] },
+    }),
+  );
+
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-login")).toBeHidden();
+  await expect(page.locator("#admin-status")).toHaveText(
+    "Checking administrator session...",
+  );
+
+  finishSessionCheck();
+  await expect(page.locator("#admin-workspace")).toBeVisible();
+});
+
 test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   page,
 }) => {

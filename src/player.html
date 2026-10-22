@@ -94,6 +94,14 @@
                 </svg>
               </button>
             </div>
+            <button
+              type="button"
+              data-testid="player-sign-out"
+              class="player-account-sign-out"
+              hidden
+            >
+              Sign out
+            </button>
           </div>
         </details>
         <a href="./admin.html">Administration</a>
@@ -109,9 +117,6 @@
           clue to the next discovery.
         </p>
       </div>
-      <p class="notice player-notice">
-        Your hunt progress is saved to your BucHunt account.
-      </p>
       <section id="display-tasks" data-testid="display-tasks">
         <h2 data-testid="player-heading">Sign in to see active Hunts</h2>
         <form data-testid="player-name-form" class="player-name-form" hidden>
@@ -144,9 +149,6 @@
             </button>
           </div>
         </div>
-        <button type="button" data-testid="player-sign-out" hidden>
-          Sign out
-        </button>
         <p
           class="field-help"
           data-testid="player-provider-status"
@@ -185,7 +187,8 @@
         </section>
       </section>
     </main>
-    <footer>� 2026 Kinser-Most-Wanted � BucHunt</footer>
+    <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>
+

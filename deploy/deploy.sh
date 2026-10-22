@@ -18,7 +18,7 @@ if [[ "$1" == allocate-preview-slots ]]; then
     gh api --method POST "repos/$GITHUB_REPOSITORY/labels" -f "name=$SLOT_LABEL" -f "color=$COLOR" -f "description=Automatically assigned stable preview deployment slot" >/dev/null 2>&1 || true
   done
 
-  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=open&sort=created&direction=asc&per_page=100")
+  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
   USED_1=false
   USED_2=false
   USED_3=false
@@ -35,8 +35,10 @@ if [[ "$1" == allocate-preview-slots ]]; then
     done
   done <<< "$OPEN_PRS"
 
+  ASSIGNED_PRS=()
   while IFS= read -r PR_JSON; do
     [[ -n "$PR_JSON" ]] || continue
+    [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
     SLOT_COUNT=$(echo "$PR_JSON" | jq '[.labels[] | select(test("^preview-slot-[123]$"))] | length')
     if [[ "$SLOT_COUNT" -ne 0 ]]; then
       if [[ "$SLOT_COUNT" -gt 1 ]]; then
@@ -56,7 +58,12 @@ if [[ "$1" == allocate-preview-slots ]]; then
     SLOT_LABEL="preview-slot-$SLOT"
     gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER_TO_ASSIGN/labels" -f "labels[]=$SLOT_LABEL" >/dev/null
     echo "Assigned $SLOT_LABEL to PR #$PR_NUMBER_TO_ASSIGN."
+    ASSIGNED_PRS+=("$PR_NUMBER_TO_ASSIGN")
   done <<< "$OPEN_PRS"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    ASSIGNED_LIST=$(IFS=,; echo "${ASSIGNED_PRS[*]}")
+    printf 'assigned_prs=%s\\n' "$ASSIGNED_LIST" >> "$GITHUB_OUTPUT"
+  fi
   exit 0
 fi
 if [[ "$1" == reset-preview ]]; then

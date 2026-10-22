@@ -2,6 +2,18 @@ import { expect, test } from "@playwright/test";
 import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
+function parseAwsJson(output: string): Record<string, unknown> {
+  const trimmed = output.trim();
+  return trimmed ? JSON.parse(trimmed) : {};
+}
+
+test("AWS JSON parsing accepts empty success responses and rejects malformed output", () => {
+  expect(parseAwsJson("")).toEqual({});
+  expect(parseAwsJson("  \n")).toEqual({});
+  expect(parseAwsJson('{"Item":{"id":{"S":"nonce"}}}')).toHaveProperty("Item");
+  expect(() => parseAwsJson("not JSON")).toThrow();
+});
+
 // The deployment workflow supplies its HTTPS output as BASE_URL.
 test.use({ baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000" });
 
@@ -180,24 +192,25 @@ test("live authentication routes persist nonces and reject invalid credentials",
   const key = {
     id: { S: `login:${createHash("sha256").update(nonce).digest("hex")}` },
   };
-  const readNonce = () =>
-    JSON.parse(
-      execFileSync(
-        "aws",
-        [
-          "dynamodb",
-          "get-item",
-          "--table-name",
-          table!,
-          "--key",
-          JSON.stringify(key),
-          "--consistent-read",
-          "--output",
-          "json",
-        ],
-        { encoding: "utf8" },
-      ),
-    );
+  const readNonce = () => {
+    const output = execFileSync(
+      "aws",
+      [
+        "dynamodb",
+        "get-item",
+        "--table-name",
+        table!,
+        "--key",
+        JSON.stringify(key),
+        "--consistent-read",
+        "--output",
+        "json",
+      ],
+      { encoding: "utf8" },
+    ).trim();
+    // A successful GetItem can have no body after the nonce is consumed.
+    return parseAwsJson(output);
+  };
   try {
     expect(readNonce().Item).toBeTruthy();
     const rejectedOrigin = await request.post("/api/auth/login", {

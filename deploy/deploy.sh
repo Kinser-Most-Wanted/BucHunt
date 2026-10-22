@@ -172,7 +172,17 @@ tar -xzf /tmp/buchunt-release.tar.gz -C /opt/buchunt/releases/{release}
 cd /opt/buchunt/releases/{release}
 mkdir src
 mv index.html admin.html player.html css js assets src/
-PREVIOUS=$(readlink -f /opt/buchunt/current || true)
+# readlink -f can return the nonexistent current path on a first deployment.
+# Only remember an existing, concrete release with a valid server entry point.
+PREVIOUS=""
+RESOLVED=$(readlink -e /opt/buchunt/current || true)
+case "$RESOLVED" in
+  /opt/buchunt/releases/*)
+    if [[ "$RESOLVED" != /opt/buchunt/releases/{release} && -f "$RESOLVED/src/js/server/server.js" ]]; then
+      PREVIOUS="$RESOLVED"
+    fi
+    ;;
+esac
 printf '%s\\n' "$PREVIOUS" > /opt/buchunt/releases/{release}/previous
 if [[ -f /etc/buchunt.env ]]; then
   cp -p /etc/buchunt.env /opt/buchunt/releases/{release}/previous.env
@@ -182,16 +192,50 @@ cat > /opt/buchunt/releases/{release}/rollback.sh <<'ROLLBACK'
 set -euo pipefail
 DIRECTORY=/opt/buchunt/releases/{release}
 [[ ! -f "$DIRECTORY/rolled-back" ]] || exit 0
+diagnostics() {{
+  systemctl status buchunt --no-pager --full || true
+  journalctl -u buchunt -n 60 --no-pager || true
+}}
 previous=$(cat "$DIRECTORY/previous")
-if [[ -n "$previous" && -d "$previous" ]]; then
-  if [[ -f "$DIRECTORY/previous.env" ]]; then cp -p "$DIRECTORY/previous.env" /etc/buchunt.env; fi
-  ln -sfn "$previous" /opt/buchunt/next
-  mv -Tf /opt/buchunt/next /opt/buchunt/current
-  systemctl restart buchunt
-  systemctl is-active --quiet buchunt
-else
-  systemctl stop buchunt
+if [[ -z "$previous" ]]; then
+  echo "::warning::No previous application release exists; skipping rollback and leaving the current release unchanged."
+  touch "$DIRECTORY/rolled-back"
+  exit 0
 fi
+case "$previous" in
+  /opt/buchunt/releases/*) ;;
+  *) echo "Invalid saved rollback target: $previous" >&2; diagnostics; exit 1 ;;
+esac
+resolved=$(readlink -e "$previous" || true)
+case "$resolved" in
+  /opt/buchunt/releases/*) ;;
+  *) echo "Rollback target is missing or resolves outside the release directory." >&2; diagnostics; exit 1 ;;
+esac
+if [[ "$resolved" == "$DIRECTORY" || ! -f "$resolved/src/js/server/server.js" ]]; then
+  echo "Rollback target is the failed release or lacks the server entry point." >&2
+  diagnostics
+  exit 1
+fi
+if [[ -f "$DIRECTORY/previous.env" ]]; then cp -p "$DIRECTORY/previous.env" /etc/buchunt.env; fi
+ln -sfn "$resolved" /opt/buchunt/next
+mv -Tf /opt/buchunt/next /opt/buchunt/current
+systemctl reset-failed buchunt
+if ! systemctl restart buchunt; then diagnostics; exit 1; fi
+TOKEN=$(sed -n 's/^ORIGIN_TOKEN=//p' /etc/buchunt.env)
+READY=false
+for attempt in $(seq 1 30); do
+  if systemctl is-active --quiet buchunt && curl --fail --silent -H "X-Origin-Token: $TOKEN" http://127.0.0.1:3000/api/health >/dev/null; then
+    READY=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$READY" != true ]]; then
+  echo "Previous application release did not become healthy." >&2
+  diagnostics
+  exit 1
+fi
+echo "Restored healthy application release: $resolved"
 touch "$DIRECTORY/rolled-back"
 ROLLBACK
 chmod 700 /opt/buchunt/releases/{release}/rollback.sh
@@ -201,6 +245,7 @@ umask 077
 printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\nGOOGLE_CLIENT_ID={google_client_id}\\n' "$TOKEN" > /etc/buchunt.env
 ln -sfn /opt/buchunt/releases/{release} /opt/buchunt/next
 mv -Tf /opt/buchunt/next /opt/buchunt/current
+systemctl reset-failed buchunt
 systemctl restart buchunt
 curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 2 -H "X-Origin-Token: $TOKEN" http://127.0.0.1:3000/api/health
 systemctl is-active --quiet buchunt
@@ -213,7 +258,10 @@ for attempt in $(seq 1 120); do
   STATUS="$(aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE" --query Status --output text 2>/dev/null || true)"
   case "$STATUS" in
     Success) break ;;
-    Failed|Cancelled|TimedOut|Cancelling) echo "Deployment command failed: $COMMAND ($STATUS). Inspect SSM output."; exit 1 ;;
+    Failed|Cancelled|TimedOut|Cancelling)
+      echo "Deployment command failed: $COMMAND ($STATUS)." >&2
+      aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE" --query '{Status:Status,ResponseCode:ResponseCode,Output:StandardOutputContent,Error:StandardErrorContent}' --output json >&2 || true
+      exit 1 ;;
   esac
   if [[ "$attempt" == 120 ]]; then echo "Deployment command timed out: $COMMAND"; exit 1; fi
   sleep 5

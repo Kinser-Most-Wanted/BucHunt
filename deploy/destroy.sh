@@ -104,8 +104,10 @@ if [[ "$STATUS" != DELETE_IN_PROGRESS ]]; then
           --bucket "$BUCKET_NAME" \
           --region "$AWS_REGION" \
           --delete "$OBJECTS_TO_DELETE" --output json)
-        if ! echo "$DELETE_RESULT" | jq -e '(.Errors // []) | length == 0' >/dev/null; then
-          echo "$DELETE_RESULT" >&2
+        # Quiet-mode success can produce no CLI output. A nonzero AWS exit
+        # still fails above; nonempty responses must be valid and error-free.
+        if [[ -n "${DELETE_RESULT//[[:space:]]/}" ]] && ! echo "$DELETE_RESULT" | jq -e 'type == "object" and ((.Errors // []) | type == "array" and length == 0)' >/dev/null; then
+          echo "S3 object deletion returned an invalid response or object errors: $DELETE_RESULT" >&2
           exit 1
         fi
       fi

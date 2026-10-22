@@ -71,7 +71,7 @@ if [[ "$1" == allocate-preview-slots ]]; then
   done <<< "$OPEN_PRS"
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     ASSIGNED_LIST=$(IFS=,; echo "${ASSIGNED_PRS[*]}")
-    printf 'assigned_prs=%s\\n' "$ASSIGNED_LIST" >> "$GITHUB_OUTPUT"
+    printf 'assigned_prs=%s\n' "$ASSIGNED_LIST" >> "$GITHUB_OUTPUT"
   fi
   exit 0
 fi

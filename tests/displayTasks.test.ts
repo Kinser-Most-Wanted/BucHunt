@@ -194,9 +194,7 @@ test("player sign-in uses the shared BucHunt home page", async ({ page }) => {
     .getByRole("button", { name: "Sign in from BucHunt home" })
     .click();
   await expect(page).toHaveURL(/\/index\.html$/);
-  await expect(
-    page.getByRole("heading", { name: "One sign-in. Your whole BucHunt." }),
-  ).toBeVisible();
+  await expect(page.locator("#welcome-heading")).toContainText("Find your next");
   await expect(
     page.getByRole("button", { name: "Sign in with Google" }),
   ).toBeVisible();

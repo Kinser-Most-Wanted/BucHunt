@@ -1,13 +1,14 @@
 name: Deploy
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, stage]
 permissions:
   id-token: write
   contents: read
   pull-requests: read
+  issues: write
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
@@ -51,7 +52,23 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
-            echo 'stack_name=bucstop-preview' >> "$GITHUB_OUTPUT"
+            PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+            SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
+            SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
+            if [[ "$SLOT_COUNT" != 1 ]]; then
+              echo "This PR needs exactly one preview-slot-1, preview-slot-2, or preview-slot-3 label; skipping deployment."
+              echo 'stack_name=' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
+            for OTHER_PR in $(echo "$OPEN_PRS" | jq -r '.[].number'); do
+              if [[ "$OTHER_PR" != "$PR_NUMBER" ]] && gh api "repos/$GITHUB_REPOSITORY/issues/$OTHER_PR" --jq '.labels[].name' | grep -Fxq "$SLOT_LABEL"; then
+                echo "$SLOT_LABEL is already assigned to open PR #$OTHER_PR." >&2
+                exit 1
+              fi
+            done
+            SLOT=${SLOT_LABEL##*-}
+            echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == main ]]; then
             echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == stage ]]; then
@@ -82,6 +99,10 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          if [[ -n "$PR_NUMBER" && -z "${{ steps.stack.outputs.stack_name }}" ]]; then
+            echo "No preview slot is assigned; skipping deployment."
+            exit 0
+          fi
           if [[ -n "$PR_NUMBER" ]]; then
             STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
             if [[ "$STATE" != open ]]; then
@@ -97,7 +118,11 @@ jobs:
             echo "A newer commit exists; skipping this obsolete deployment."
             exit 0
           fi
-          bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          if [[ -n "$PR_NUMBER" ]]; then
+            PREVIEW_PR_NUMBER="$PR_NUMBER" bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          else
+            bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          fi
       - if: steps.release.outputs.site_url != ''
         run: pnpm exec playwright install chromium
       - name: Verify deployed hunt creation, persistence, and player workflow

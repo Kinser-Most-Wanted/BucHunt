@@ -72,6 +72,10 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     };
   });
 
+  await page.route("**/api/player/account/hunts", (route) =>
+    route.fulfill({ json: { ok: true, value: [] } }),
+  );
+
   await page.route("**/api/auth/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/auth/config") {
@@ -112,9 +116,7 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await expect(page).toHaveURL(/player\.html$/);
   await expect(page.getByTestId("player-name-form")).toBeVisible();
   await page.getByTestId("player-display-name-input").fill("Baja");
-  await page
-    .getByRole("button", { name: "Save name and continue" })
-    .click();
+  await page.getByRole("button", { name: "Save name and continue" }).click();
   await expect(page.getByTestId("player-account-menu")).toBeVisible();
   await expect(page.getByTestId("player-display-name")).toHaveText(
     "Baja (Admin)",

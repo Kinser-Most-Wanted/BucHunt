@@ -45,11 +45,27 @@ function clearPlayerSession(): void {
 function rememberPlayerSession(user: { subject?: unknown; email?: unknown }, credential?: string): void {
   if (typeof user.subject !== "string" || typeof user.email !== "string") return;
   try {
+    if (!credential) {
+      const saved = JSON.parse(sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null") as {
+        provider?: unknown;
+        accountId?: unknown;
+        email?: unknown;
+        idToken?: unknown;
+      } | null;
+      if (
+        saved?.provider === "google" &&
+        saved.accountId === user.subject &&
+        saved.email === user.email &&
+        typeof saved.idToken === "string" &&
+        saved.idToken !== "verified-server-session"
+      ) return;
+      return;
+    }
     sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify({
       provider: "google",
       accountId: user.subject,
       email: user.email,
-      idToken: credential ?? "verified-server-session",
+      idToken: credential,
     }));
   } catch { /* The server session remains authoritative if browser storage is unavailable. */ }
 }

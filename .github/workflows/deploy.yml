@@ -36,7 +36,13 @@ jobs:
       - run: pnpm check:admin
       - run: pnpm test:admin
   allocate-preview:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [lint, e2e, verify]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success'
     concurrency:
       group: deploy-preview
       cancel-in-progress: false
@@ -47,6 +53,7 @@ jobs:
       - name: Allocate free preview slots in PR creation order
         env:
           GH_TOKEN: ${{ github.token }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash ./deploy/deploy.sh allocate-preview-slots
   deploy:
     concurrency:

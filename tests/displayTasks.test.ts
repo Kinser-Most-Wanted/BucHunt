@@ -271,3 +271,73 @@ test("expired progress tokens return to the shared home sign-in", async ({
     expect.objectContaining({ name: "legacy", value: "unchanged" }),
   );
 });
+
+
+test("player sign-in survives visiting Hunt Studio and returning", async ({
+  page,
+}) => {
+  const identity = {
+    provider: "google",
+    email: "player@example.com",
+    accountId: "google-account-123",
+    idToken: "verified-test-token",
+  };
+  await page.addInitScript((savedIdentity) => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify(savedIdentity),
+    );
+    localStorage.setItem(
+      "buchunt.player-profile.google-account-123",
+      "Baja",
+    );
+  }, identity);
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      json: {
+        user: {
+          subject: identity.accountId,
+          email: identity.email,
+          role: "user",
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        },
+      },
+    }),
+  );
+  await page.route("**/api/admin/session", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: {
+          id: "browser:test",
+          identityType: "temporary-browser",
+        },
+      },
+    }),
+  );
+  await page.route("**/api/player/account/hunts", async (route) => {
+    expect(route.request().headers().authorization).toBe(
+      "Bearer verified-test-token",
+    );
+    await route.fulfill({ json: { ok: true, value: [] } });
+  });
+
+  await page.goto("/admin.html");
+  await expect(page.locator("#signed-in")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const value = sessionStorage.getItem("buchunt.player-session");
+        return value ? JSON.parse(value).idToken : null;
+      }),
+    )
+    .toBe("verified-test-token");
+
+  await page.goto("/player.html");
+  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.getByTestId("player-account")).toContainText("Baja");
+  await expect(page.getByTestId("player-task-status")).toContainText(
+    "no saved hunts yet",
+  );
+  await expect(page).toHaveURL(/\/player\.html$/);
+});

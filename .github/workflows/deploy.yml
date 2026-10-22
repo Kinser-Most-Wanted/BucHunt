@@ -1,7 +1,7 @@
 name: Deploy
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, stage]
 permissions:
@@ -34,23 +34,122 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm check:admin
       - run: pnpm test:admin
+  allocate-preview:
+    needs: [lint, e2e, verify]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success'
+    outputs:
+      assigned_prs: ${{ steps.allocate.outputs.assigned_prs }}
+    concurrency:
+      group: deploy-preview
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allocate free preview slots in PR creation order
+        id: allocate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash ./deploy/deploy.sh allocate-preview-slots
+  requeue-preview:
+    needs: allocate-preview
+    if: needs.allocate-preview.outputs.assigned_prs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Rerun successful PR checks and deployment for newly assigned slots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNED_PRS: ${{ needs.allocate-preview.outputs.assigned_prs }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
+          for TARGET_PR in "${PRS[@]}"; do
+            [[ -n "$TARGET_PR" ]] || continue
+            if [[ "$TARGET_PR" == "$CURRENT_PR_NUMBER" ]]; then
+              echo "PR #$TARGET_PR will deploy in its current workflow run."
+              continue
+            fi
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+            RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
+            RUN_ID=$(echo "$RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[]? | select(any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
+            if [[ -z "$RUN_ID" ]]; then
+              echo "No previous PR workflow exists for PR #$TARGET_PR."
+              continue
+            fi
+            STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            for attempt in $(seq 1 120); do
+              [[ "$STATUS" == completed ]] && break
+              sleep 10
+              STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            done
+            if [[ "$STATUS" != completed ]]; then
+              echo "PR #$TARGET_PR workflow run $RUN_ID is still active; leaving the assigned slot in place."
+              continue
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null
+            echo "Reran PR #$TARGET_PR checks and deployment with its assigned slot."
+          done
   deploy:
     concurrency:
-      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
+      group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
       cancel-in-progress: false
-    needs: [lint, e2e, verify]
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      queue: max
+    needs: [lint, e2e, verify, allocate-preview]
+    if: >-
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success' &&
+      (needs.allocate-preview.result == 'success' || needs.allocate-preview.result == 'skipped') &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Determine stack name
         id: stack
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
-            echo "stack_name=bucstop-pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+            SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
+            SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
+            if [[ "$SLOT_COUNT" == 0 ]]; then
+              echo "All preview slots are occupied or this PR is waiting its turn; skipping deployment for now."
+              echo 'stack_name=' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ "$SLOT_COUNT" != 1 ]]; then
+              echo "This PR has multiple preview slot labels; refusing deployment."
+              exit 1
+            fi
+            OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
+            CONFLICTING_PR=$(echo "$OPEN_PRS" | jq -r --arg pr "$PR_NUMBER" --arg label "$SLOT_LABEL" '.[] | select((.number | tostring) != $pr) | select(any(.labels[].name; . == $label)) | .number' | head -n 1)
+            if [[ -n "$CONFLICTING_PR" ]]; then
+              echo "$SLOT_LABEL is already assigned to open PR #$CONFLICTING_PR." >&2
+              exit 1
+            fi
+            SLOT=${SLOT_LABEL##*-}
+            echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == main ]]; then
             echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == stage ]]; then
@@ -59,14 +158,18 @@ jobs:
             exit 1
           fi
       - uses: pnpm/action-setup@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           version: 10.33.0
       - uses: actions/setup-node@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+        if: steps.stack.outputs.stack_name != ''
       - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           aws-region: us-east-1
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
@@ -81,13 +184,15 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          if [[ -n "$PR_NUMBER" && -z "${{ steps.stack.outputs.stack_name }}" ]]; then
+            echo "No preview slot is assigned; skipping deployment."
+            exit 0
+          fi
           if [[ -n "$PR_NUMBER" ]]; then
             STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
             if [[ "$STATE" != open ]]; then
-              # GitHub may replace a pending cleanup job with this deployment.
-              # Reconcile the closed PR here as well so cleanup is never lost.
-              echo "PR #$PR_NUMBER is closed; deleting its environment."
-              bash ./deploy/destroy.sh "${{ steps.stack.outputs.stack_name }}"
+              # The shared preview stack must survive individual PR closures.
+              echo "PR #$PR_NUMBER is closed; skipping its preview deployment."
               exit 0
             fi
             CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
@@ -98,7 +203,11 @@ jobs:
             echo "A newer commit exists; skipping this obsolete deployment."
             exit 0
           fi
-          bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          if [[ -n "$PR_NUMBER" ]]; then
+            PREVIEW_PR_NUMBER="$PR_NUMBER" bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          else
+            bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          fi
       - if: steps.release.outputs.site_url != ''
         run: pnpm exec playwright install chromium
       - name: Verify deployed hunt creation, persistence, and player workflow

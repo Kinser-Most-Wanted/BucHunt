@@ -1,4 +1,4 @@
-name: Destroy PR Environment
+name: Release PR Preview Slot
 
 on:
   pull_request:
@@ -8,16 +8,21 @@ on:
 permissions:
   id-token: write
   contents: read
-  pull-requests: read
+  issues: write
+  pull-requests: write
+  actions: write
 
 jobs:
-  destroy:
+  release:
     if: github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      assigned_prs: ${{ steps.cleanup.outputs.assigned_prs }}
     concurrency:
-      group: deploy-${{ github.event.pull_request.number }}
+      group: deploy-preview
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -29,14 +34,74 @@ jobs:
           aws-region: us-east-1
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
 
-      - name: Destroy PR environment
+      - name: Clear preview data and release assigned slot
+        id: cleanup
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
           if [[ "$STATE" != closed ]]; then
-            echo "PR #$PR_NUMBER was reopened; skipping destruction."
+            echo "PR #$PR_NUMBER was reopened; keeping its preview slot."
             exit 0
           fi
-          bash ./deploy/destroy.sh "bucstop-pr-$PR_NUMBER"
+
+          PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER")
+          SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
+          SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
+          if [[ "$SLOT_COUNT" == 0 ]]; then
+            echo "PR #$PR_NUMBER had no preview slot; checking the queue for any available slot."
+            bash ./deploy/deploy.sh allocate-preview-slots
+            exit 0
+          fi
+          if [[ "$SLOT_COUNT" != 1 ]]; then
+            echo "PR #$PR_NUMBER has multiple preview slot labels; refusing to clear a slot." >&2
+            exit 1
+          fi
+
+          SLOT=${SLOT_LABEL##*-}
+          STACK_NAME="bucstop-preview-$SLOT"
+          bash ./deploy/deploy.sh reset-preview "$STACK_NAME" "$PR_NUMBER"
+
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$SLOT_LABEL" >/dev/null || true
+          echo "Released $SLOT_LABEL."
+          bash ./deploy/deploy.sh allocate-preview-slots
+
+  requeue:
+    needs: release
+    if: needs.release.outputs.assigned_prs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Rerun checks and deployment for newly assigned PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNED_PRS: ${{ needs.release.outputs.assigned_prs }}
+        run: |
+          IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
+          for TARGET_PR in "${PRS[@]}"; do
+            [[ -n "$TARGET_PR" ]] || continue
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+            WORKFLOW_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
+            RUN_ID=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[] | select(any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
+            if [[ -z "$RUN_ID" ]]; then
+              echo "No prior PR workflow exists for PR #$TARGET_PR; its next push will deploy."
+              continue
+            fi
+            STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            for attempt in $(seq 1 120); do
+              [[ "$STATUS" == completed ]] && break
+              sleep 10
+              STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            done
+            if [[ "$STATUS" != completed ]]; then
+              echo "PR #$TARGET_PR workflow run $RUN_ID is still active; leaving the assigned slot in place."
+              continue
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null
+            echo "Reran PR #$TARGET_PR checks and deployment with its assigned slot."
+          done

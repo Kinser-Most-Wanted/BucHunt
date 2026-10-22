@@ -1,8 +1,115 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name>"; exit 1; fi
+if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name> [preview-pr-number] | reset-preview <stack-name> <preview-pr-number>"; exit 1; fi
+if [[ "$1" == allocate-preview-slots ]]; then
+  if [[ -z "${GH_TOKEN:-}" || -z "${GITHUB_REPOSITORY:-}" ]]; then
+    echo "GH_TOKEN and GITHUB_REPOSITORY are required to allocate preview slots." >&2
+    exit 1
+  fi
+  export GH_TOKEN
+  for SLOT_LABEL in preview-slot-1 preview-slot-2 preview-slot-3; do
+    COLOR=0969DA
+    case "$SLOT_LABEL" in
+      preview-slot-1) COLOR=1F6FEB ;;
+      preview-slot-2) COLOR=8250DF ;;
+      preview-slot-3) COLOR=BF3989 ;;
+    esac
+    gh api --method POST "repos/$GITHUB_REPOSITORY/labels" -f "name=$SLOT_LABEL" -f "color=$COLOR" -f "description=Automatically assigned stable preview deployment slot" >/dev/null 2>&1 || true
+  done
+
+  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
+  USED_1=false
+  USED_2=false
+  USED_3=false
+  while IFS= read -r PR_JSON; do
+    [[ -n "$PR_JSON" ]] || continue
+    for SLOT in 1 2 3; do
+      if echo "$PR_JSON" | jq -e --arg label "preview-slot-$SLOT" '.labels | index($label) != null' >/dev/null; then
+        case "$SLOT" in
+          1) USED_1=true ;;
+          2) USED_2=true ;;
+          3) USED_3=true ;;
+        esac
+      fi
+    done
+  done <<< "$OPEN_PRS"
+
+  ASSIGNED_PRS=()
+  while IFS= read -r PR_JSON; do
+    [[ -n "$PR_JSON" ]] || continue
+    [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
+    SLOT_COUNT=$(echo "$PR_JSON" | jq '[.labels[] | select(test("^preview-slot-[123]$"))] | length')
+    if [[ "$SLOT_COUNT" -ne 0 ]]; then
+      if [[ "$SLOT_COUNT" -gt 1 ]]; then
+        echo "PR #$(echo "$PR_JSON" | jq -r .number) has multiple preview slot labels; leaving it unchanged." >&2
+      fi
+      continue
+    fi
+    TARGET_PR=$(echo "$PR_JSON" | jq -r .number)
+    if [[ "$TARGET_PR" != "${CURRENT_PR_NUMBER:-}" ]]; then
+      TARGET_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+      WORKFLOW_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&status=completed&per_page=100")
+      SUCCESSFUL_RUN=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$TARGET_HEAD" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
+      if [[ -z "$SUCCESSFUL_RUN" ]]; then
+        echo "PR #$TARGET_PR is waiting for its current checks to pass before receiving a preview slot."
+        continue
+      fi
+    fi
+    SLOT=""
+    if [[ "$USED_1" != true ]]; then SLOT=1; USED_1=true
+    elif [[ "$USED_2" != true ]]; then SLOT=2; USED_2=true
+    elif [[ "$USED_3" != true ]]; then SLOT=3; USED_3=true
+    else
+      echo "Preview slots are full; PR #$(echo "$PR_JSON" | jq -r .number) remains queued."
+      continue
+    fi
+    PR_NUMBER_TO_ASSIGN=$(echo "$PR_JSON" | jq -r .number)
+    SLOT_LABEL="preview-slot-$SLOT"
+    gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER_TO_ASSIGN/labels" -f "labels[]=$SLOT_LABEL" >/dev/null
+    echo "Assigned $SLOT_LABEL to PR #$PR_NUMBER_TO_ASSIGN."
+    ASSIGNED_PRS+=("$PR_NUMBER_TO_ASSIGN")
+  done <<< "$OPEN_PRS"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    ASSIGNED_LIST=$(IFS=,; echo "${ASSIGNED_PRS[*]}")
+    printf 'assigned_prs=%s\n' "$ASSIGNED_LIST" >> "$GITHUB_OUTPUT"
+  fi
+  exit 0
+fi
+if [[ "$1" == reset-preview ]]; then
+  if [[ "$#" -ne 3 || ! "$3" =~ ^[0-9]+$ || ! "$2" =~ ^bucstop-preview-[123]$ ]]; then
+    echo "Usage: $0 reset-preview <bucstop-preview-1|2|3> <preview-pr-number>" >&2
+    exit 1
+  fi
+  RESET_STACK="$2"
+  RESET_PR="$3"
+  RESET_INSTANCE=$(aws cloudformation describe-stacks --stack-name "$RESET_STACK" --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
+  if [[ -z "$RESET_INSTANCE" || "$RESET_INSTANCE" == None ]]; then echo "Preview stack has no instance" >&2; exit 1; fi
+  RESET_PARAMETERS=$(python3 - "$RESET_PR" <<'PY'
+import json, sys
+pr = sys.argv[1]
+script = f"""set -euo pipefail
+DATA=/var/lib/buchunt
+OWNER="$DATA/.preview-pr-owner"
+if [[ -f "$OWNER" && "$(cat "$OWNER")" == "{pr}" ]]; then
+  systemctl stop buchunt || true
+  find "$DATA" -mindepth 1 -maxdepth 1 -exec rm -rf -- {{}} +
+  systemctl start buchunt
+  echo "Cleared preview data for closed PR #{pr}."
+else
+  echo "Preview is not owned by PR #{pr}; no data was removed."
+fi
+"""
+print(json.dumps({"commands": [script]}))
+PY
+)
+  RESET_COMMAND=$(aws ssm send-command --instance-ids "$RESET_INSTANCE" --document-name AWS-RunShellScript --parameters "$RESET_PARAMETERS" --query Command.CommandId --output text)
+  aws ssm wait command-executed --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE"
+  aws ssm get-command-invocation --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE" --query StandardOutputContent --output text
+  exit 0
+fi
 STACK_NAME="$1"
+PREVIEW_PR_NUMBER="${PREVIEW_PR_NUMBER:-}"
 DELETE_ROOT_VOLUME=false
 if [[ "$STACK_NAME" =~ ^bucstop-pr-[0-9]+$ ]]; then
   DELETE_ROOT_VOLUME=true
@@ -153,12 +260,15 @@ for attempt in $(seq 1 60); do
   if [[ "$attempt" == 60 ]]; then echo "Instance did not register with SSM"; exit 1; fi
   sleep 5
 done
-export BUCKET INSTANCE SECRET RELEASE GOOGLE_CLIENT_ID
+export BUCKET INSTANCE SECRET RELEASE GOOGLE_CLIENT_ID PREVIEW_PR_NUMBER
 python3 - "$PARAMETERS" <<'PY'
 import json, os, sys
 bucket, secret, release = (os.environ[k] for k in ('BUCKET','SECRET','RELEASE'))
 region = os.environ['AWS_DEFAULT_REGION']
 google_client_id = os.environ['GOOGLE_CLIENT_ID']
+preview_pr_number = os.environ.get('PREVIEW_PR_NUMBER', '')
+if preview_pr_number and not preview_pr_number.isdigit():
+    raise SystemExit('Invalid PREVIEW_PR_NUMBER')
 import re
 if not re.fullmatch(r'[A-Za-z0-9._-]*', google_client_id):
     raise SystemExit('Invalid GOOGLE_CLIENT_ID')
@@ -243,6 +353,18 @@ trap 'bash /opt/buchunt/releases/{release}/rollback.sh' ERR
 TOKEN=$(aws secretsmanager get-secret-value --secret-id {secret} --query SecretString --output text)
 umask 077
 printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\nGOOGLE_CLIENT_ID={google_client_id}\\n' "$TOKEN" > /etc/buchunt.env
+if [[ -n "{preview_pr_number}" ]]; then
+  DATA_DIR=/var/lib/buchunt
+  install -d -m 700 "$DATA_DIR"
+  OWNER_FILE="$DATA_DIR/.preview-pr-owner"
+  CURRENT_OWNER=$(cat "$OWNER_FILE" 2>/dev/null || true)
+  if [[ "$CURRENT_OWNER" != "{preview_pr_number}" ]]; then
+    systemctl stop buchunt || true
+    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.preview-pr-owner' -exec rm -rf -- {} +
+    echo "Reset preview data for PR #{preview_pr_number}."
+  fi
+  printf '%s\\n' "{preview_pr_number}" > "$OWNER_FILE"
+fi
 ln -sfn /opt/buchunt/releases/{release} /opt/buchunt/next
 mv -Tf /opt/buchunt/next /opt/buchunt/current
 systemctl reset-failed buchunt

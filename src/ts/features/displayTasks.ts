@@ -518,4 +518,3 @@ export function mountDisplayTasks(
       .finally(() => window.location.assign("./index.html"));
   });
 }
-

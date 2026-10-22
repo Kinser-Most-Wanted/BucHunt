@@ -38,6 +38,28 @@ const PLAYER_SESSION_KEY = "buchunt.player-session";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let google: GoogleIdentity | undefined;
 let verifiedCredential: string | undefined;
+function warmGoogleSignIn() {
+  return Promise.allSettled([
+    loadGoogle(),
+    request("/api/auth/config"),
+  ]);
+}
+let homeGoogleWarmup = isHomePage ? warmGoogleSignIn() : undefined;
+async function getGoogleConfig() {
+  if (homeGoogleWarmup) {
+    const warmup = homeGoogleWarmup;
+    homeGoogleWarmup = undefined;
+    const [scriptResult, configResult] = await warmup;
+    if (scriptResult.status === "rejected") throw scriptResult.reason;
+    if (configResult.status === "rejected") throw configResult.reason;
+    return configResult.value;
+  }
+  const [, config] = await Promise.all([
+    loadGoogle(),
+    request("/api/auth/config"),
+  ]);
+  return config;
+}
 
 function clearPlayerSession(): void {
   try { sessionStorage.removeItem(PLAYER_SESSION_KEY); } catch { /* Storage may be unavailable. */ }
@@ -130,8 +152,7 @@ function showError(error: unknown): void {
 }
 async function prepareGoogle(): Promise<void> {
   if (!isHomePage || !googleButton) return;
-  await loadGoogle();
-  const config = await request("/api/auth/config");
+  const config = await getGoogleConfig();
   google?.accounts.id.initialize({
     client_id: config.clientId,
     nonce: config.nonce,

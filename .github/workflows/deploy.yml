@@ -10,7 +10,6 @@ permissions:
   id-token: write
   contents: read
   pull-requests: read
-  actions: read
 jobs:
   lint:
     if: github.event_name != 'pull_request_target'
@@ -160,12 +159,11 @@ jobs:
               exit 1
             fi
             OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
-            for OTHER_PR in $(echo "$OPEN_PRS" | jq -r '.[].number'); do
-              if [[ "$OTHER_PR" != "$PR_NUMBER" ]] && gh api "repos/$GITHUB_REPOSITORY/issues/$OTHER_PR" --jq '.labels[].name' | grep -Fxq "$SLOT_LABEL"; then
-                echo "$SLOT_LABEL is already assigned to open PR #$OTHER_PR." >&2
-                exit 1
-              fi
-            done
+            CONFLICTING_PR=$(echo "$OPEN_PRS" | jq -r --arg pr "$PR_NUMBER" --arg label "$SLOT_LABEL" '.[] | select((.number | tostring) != $pr) | select(any(.labels[].name; . == $label)) | .number' | head -n 1)
+            if [[ -n "$CONFLICTING_PR" ]]; then
+              echo "$SLOT_LABEL is already assigned to open PR #$CONFLICTING_PR." >&2
+              exit 1
+            fi
             SLOT=${SLOT_LABEL##*-}
             echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == main ]]; then

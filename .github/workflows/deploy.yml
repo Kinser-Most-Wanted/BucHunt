@@ -2,6 +2,8 @@ name: Deploy
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
   push:
     branches: [main, stage]
 permissions:
@@ -9,17 +11,19 @@ permissions:
   contents: read
   pull-requests: read
   actions: read
-  issues: write
 jobs:
   lint:
+    if: github.event_name != 'pull_request_target'
     uses: ./.github/workflows/lint.yml
     permissions:
       contents: read
   e2e:
+    if: github.event_name != 'pull_request_target'
     uses: ./.github/workflows/playwright.yml
     permissions:
       contents: read
   verify:
+    if: github.event_name != 'pull_request_target'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -37,25 +41,82 @@ jobs:
       - run: pnpm check:admin
       - run: pnpm test:admin
   allocate-preview:
-    needs: [lint, e2e, verify]
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      needs.lint.result == 'success' &&
-      needs.e2e.result == 'success' &&
-      needs.verify.result == 'success'
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      assigned_prs: ${{ steps.allocate.outputs.assigned_prs }}
     concurrency:
       group: deploy-preview
       cancel-in-progress: false
       queue: max
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Allocate free preview slots in PR creation order
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Wait for this PR's checks to finish successfully
         env:
           GH_TOKEN: ${{ github.token }}
-          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          READY=false
+          for attempt in $(seq 1 80); do
+            STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
+            [[ "$STATE" == open ]] || exit 0
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+            RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&status=completed&per_page=100")
+            if echo "$RUNS" | jq -e --arg sha "$HEAD_SHA" --arg pr "$PR_NUMBER" '[.workflow_runs[]? | select(.conclusion == "success" and any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha))] | length > 0' >/dev/null; then
+              READY=true
+              break
+            fi
+            sleep 15
+          done
+          if [[ "$READY" != true ]]; then
+            echo "PR checks have not completed successfully; leaving this PR queued without a slot."
+            exit 0
+          fi
+      - name: Allocate free preview slots in PR creation order
+        id: allocate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash ./deploy/deploy.sh allocate-preview-slots
+  requeue-preview:
+    needs: allocate-preview
+    if: needs.allocate-preview.outputs.assigned_prs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Rerun successful PR checks and deployment for newly assigned slots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNED_PRS: ${{ needs.allocate-preview.outputs.assigned_prs }}
+        run: |
+          IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
+          for TARGET_PR in "${PRS[@]}"; do
+            [[ -n "$TARGET_PR" ]] || continue
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+            RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
+            RUN_ID=$(echo "$RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[]? | select(any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
+            if [[ -z "$RUN_ID" ]]; then
+              echo "No previous PR workflow exists for PR #$TARGET_PR."
+              continue
+            fi
+            STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            if [[ "$STATUS" != completed ]]; then
+              echo "PR #$TARGET_PR already has workflow run $RUN_ID in progress; it will deploy with its assigned slot."
+              continue
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null
+            echo "Reran PR #$TARGET_PR checks and deployment with its assigned slot."
+          done
   deploy:
     concurrency:
       group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}

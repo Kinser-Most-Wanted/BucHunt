@@ -24,6 +24,7 @@ if [[ "$1" == allocate-preview-slots ]]; then
   USED_3=false
   while IFS= read -r PR_JSON; do
     [[ -n "$PR_JSON" ]] || continue
+    [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
     for SLOT in 1 2 3; do
       if echo "$PR_JSON" | jq -e --arg label "preview-slot-$SLOT" '.labels | index($label) != null' >/dev/null; then
         case "$SLOT" in

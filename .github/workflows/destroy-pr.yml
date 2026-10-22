@@ -8,10 +8,16 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: read
 
 jobs:
   destroy:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: deploy-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -24,4 +30,13 @@ jobs:
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
 
       - name: Destroy PR environment
-        run: ./deploy/destroy.sh "bucstop-pr-${{ github.event.pull_request.number }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
+          if [[ "$STATE" != closed ]]; then
+            echo "PR #$PR_NUMBER was reopened; skipping destruction."
+            exit 0
+          fi
+          bash ./deploy/destroy.sh "bucstop-pr-$PR_NUMBER"

@@ -94,8 +94,13 @@ export function mountCreateHunt(
       '[data-testid="hunt-player-link"]',
     );
     if (link) {
-      link.href = `./player.html?huntId=${encodeURIComponent(hunt.id)}`;
-      link.hidden = false;
+      link.hidden = true;
+      void repository.getAdminHunt(hunt.id).then((result) => {
+        if (selected?.id !== hunt.id || !result.ok || !result.value.accessCode)
+          return;
+        link.href = `./player.html?accessCode=${encodeURIComponent(result.value.accessCode)}`;
+        link.hidden = false;
+      });
     }
     if (loadTasks)
       document

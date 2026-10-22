@@ -30,6 +30,10 @@ export interface HuntRepository {
   ): Promise<OperationResult<TaskDefinition>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
+  joinHunt(
+    accessCode: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ huntId: string }>>;
   getAccountHunt(
     huntId: string,
     identity: PlayerIdentity,

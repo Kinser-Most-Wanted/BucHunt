@@ -25,9 +25,16 @@ Parameters:
     Type: String
     Default: https://localhost
     Description: Exact HTTPS origin allowed to submit authentication requests
+  DeleteRootVolumeOnTermination:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Delete disposable PR data; retain main and stage data for recovery
   ImageId:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Type: AWS::EC2::Image::Id
+    Description: Explicit AMI; deployments preserve the current image and reject persistent instance replacement
+Conditions:
+  DeleteRootVolume: !Equals [!Ref DeleteRootVolumeOnTermination, 'true']
 Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -106,7 +113,7 @@ Resources:
             VolumeSize: 12
             VolumeType: gp3
             Encrypted: true
-            DeleteOnTermination: false
+            DeleteOnTermination: !If [DeleteRootVolume, true, false]
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-json-server"
@@ -304,6 +311,8 @@ Resources:
 Outputs:
   BucketName:
     Value: !Ref WebsiteBucket
+  AuthSessionTable:
+    Value: !Ref AdminSessions
   InstanceId:
     Value: !Ref ApplicationInstance
   OriginSecretArn:
@@ -313,4 +322,7 @@ Outputs:
   SiteUrl:
     Value: !Sub "https://${CloudFrontDistribution.DomainName}"
   DataRecovery:
-    Value: Root EBS volume is retained on termination; snapshot and restore it before replacing the instance.
+    Value: !If
+      - DeleteRootVolume
+      - Disposable PR data is deleted on instance termination.
+      - Root EBS volume is retained on termination; snapshot and restore it before replacing the instance.

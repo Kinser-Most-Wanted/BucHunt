@@ -173,9 +173,10 @@
           "pattern": "Z$"
         },
         "accessCode": {
-          "type": "null",
+          "type": ["string", "null"],
+          "pattern": "^[A-F0-9]{8}$",
           "default": null,
-          "description": "Reserved placeholder. Access code generation and lookup are not implemented."
+          "description": "Shared hunt admission code; null is supported for legacy hunts."
         },
         "taskOrderMode": {
           "type": "string",

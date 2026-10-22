@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { validateHunt } from "../validation/huntValidation.js";
@@ -91,10 +91,15 @@ function configuration(value: unknown): HuntConfigurationFile {
   )
     throw new Error("Unsupported configuration");
   const ids = new Set<string>();
+  const codes = new Set<string>();
   for (const hunt of data.hunts) {
     if (!validateHunt(hunt).ok || ids.has(hunt.id))
       throw new Error("Invalid stored hunt");
     ids.add(hunt.id);
+    if (hunt.accessCode) {
+      if (codes.has(hunt.accessCode)) throw new Error("Duplicate access code");
+      codes.add(hunt.accessCode);
+    }
   }
   return data;
 }
@@ -116,6 +121,24 @@ function inputFields(input: Record<string, unknown>, allowed: string[]): void {
       "Unknown input fields.",
       unexpected.map((field) => ({ field, message: "Unknown input field." })),
     );
+}
+function newAccessCode(hunts: HuntDefinition[]): string {
+  let code: string;
+  do {
+    code = randomBytes(4).toString("hex").toUpperCase();
+  } while (hunts.some((hunt) => hunt.accessCode === code));
+  return code;
+}
+export function isHuntAvailable(
+  hunt: HuntDefinition,
+  now = Date.now(),
+): boolean {
+  return (
+    hunt.status !== "archived" &&
+    hunt.tasks.length > 0 &&
+    Date.parse(hunt.beginsAt) <= now &&
+    (hunt.endsAt === null || now < Date.parse(hunt.endsAt))
+  );
 }
 export class HuntStore {
   private file: JsonFile<HuntConfigurationFile>;
@@ -150,6 +173,7 @@ export class HuntStore {
       }),
     );
     return this.file.update((data) => {
+      hunt.accessCode = newAccessCode(data.hunts);
       data.hunts.push(hunt);
       return hunt;
     });
@@ -161,6 +185,19 @@ export class HuntStore {
     const hunt = (await this.file.get()).hunts.find((item) => item.id === id);
     if (!hunt) throw new StoreError("not-found", "Hunt not found.");
     return hunt;
+  }
+  async getWithAccessCode(id: string): Promise<HuntDefinition> {
+    const hunt = await this.get(id);
+    if (hunt.accessCode) return hunt;
+    return this.file.update((data) => {
+      const saved = data.hunts.find((item) => item.id === id);
+      if (!saved) throw new StoreError("not-found", "Hunt not found.");
+      saved.accessCode ??= newAccessCode(data.hunts);
+      return saved;
+    });
+  }
+  async findByAccessCode(code: string): Promise<HuntDefinition | undefined> {
+    return (await this.list()).find((hunt) => hunt.accessCode === code);
   }
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);

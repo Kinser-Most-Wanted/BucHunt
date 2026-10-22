@@ -1,4 +1,3 @@
-import { loadGoogleIdentity } from "./adminAccess.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
@@ -245,77 +244,31 @@ export function mountDisplayTasks(
     renderHunts(list, result.value);
     status.textContent = result.value.length
       ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
-      : "You have no saved hunts yet. Open one with its hunt ID below.";
+      : "You have no saved hunts yet. Join one with its access code below.";
   };
 
   const preparePlayerSignIn = async (): Promise<void> => {
-    setGoogleSignInEnabled(true);
-    if (!googleButtonHost) return;
+    setGoogleSignInEnabled(false);
+    providerStatus.hidden = false;
+    providerStatus.textContent = "Returning to BucHunt sign-in...";
     try {
-      const response = await fetch("/api/player/account/config", {
-        credentials: "omit",
+      // Clear any cookie-backed login so the shared home page presents its
+      // single Google sign-in flow instead of redirecting back to this page.
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
         cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: "{}",
       });
-      const config = await response.json();
-      if (!response.ok || !config.ok)
-        throw new Error(config.message ?? "Player sign-in is unavailable.");
-      const google = await loadGoogleIdentity();
-      google.accounts.id.initialize({
-        client_id: config.value.clientId,
-        nonce: crypto.randomUUID(),
-        auto_select: false,
-        callback: ({ credential }) => {
-          void acceptCredential(credential);
-        },
-      });
-      googleButtonHost.replaceChildren();
-      google.accounts.id.renderButton(googleButtonHost, {
-        type: "standard",
-        theme: "outline",
-        size: "large",
-        shape: "pill",
-        text: "signin_with",
-        width: 280,
-      });
-    } catch (error) {
-      providerStatus.hidden = false;
+      if (!response.ok && response.status !== 401)
+        throw new Error("The current sign-in could not be refreshed.");
+      sessionStorage.removeItem(PLAYER_SESSION_KEY);
+      window.location.assign("./index.html");
+    } catch {
       providerStatus.textContent =
-        error instanceof Error
-          ? error.message
-          : "Player sign-in is unavailable.";
-    }
-  };
-  const acceptCredential = async (credential: string): Promise<void> => {
-    try {
-      // Claims here label the UI only. Every API request verifies the signed
-      // token server-side and derives its own storage key from Google's subject.
-      const encoded = credential
-        .split(".")[1]
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-      const payload = JSON.parse(
-        new TextDecoder().decode(
-          Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
-        ),
-      );
-      if (typeof payload.sub !== "string" || typeof payload.email !== "string")
-        throw new Error("Invalid Google identity.");
-      const identity: PlayerIdentity = {
-        provider: "google",
-        accountId: payload.sub,
-        email: payload.email,
-        idToken: credential,
-      };
-      const verified = await repository.listActiveHunts(identity);
-      if (!verified.ok) throw new Error(verified.message);
-      sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(identity));
-      const name = storedDisplayName(identity.accountId);
-      if (name) await loadHunts(identity, name);
-      else requestDisplayName(identity);
-    } catch (error) {
-      providerStatus.hidden = false;
-      providerStatus.textContent =
-        error instanceof Error ? error.message : "Google sign-in failed.";
+        "Could not return to sign-in. Check your connection and try again.";
+      setGoogleSignInEnabled(true);
     }
   };
   let pendingIdentity: PlayerIdentity | null = null;
@@ -413,7 +366,7 @@ export function mountDisplayTasks(
   const huntForm = root.querySelector<HTMLFormElement>(
     '[data-testid="player-hunt-form"]',
   );
-  const huntInput = root.querySelector<HTMLInputElement>('[name="huntId"]');
+  const huntInput = root.querySelector<HTMLInputElement>('[name="accessCode"]');
   const huntName = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-name"]',
   );
@@ -506,9 +459,34 @@ export function mountDisplayTasks(
         huntTasks.append(item);
       }
     };
-    huntForm.addEventListener("submit", (event) => {
+    huntForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      void loadHunt(huntInput.value.trim());
+      const identity = storedIdentity();
+      if (!identity) {
+        huntStatus.textContent = "Sign in with Google first.";
+        return;
+      }
+      const button = huntForm.querySelector<HTMLButtonElement>(
+        'button[type="submit"], button',
+      );
+      if (button) button.disabled = true;
+      const requestId = ++huntRequest;
+      huntStatus.textContent = "Joining hunt...";
+      try {
+        const result = await repository.joinHunt(
+          huntInput.value.trim(),
+          identity,
+        );
+        if (requestId !== huntRequest) return;
+        if (!result.ok) {
+          huntStatus.textContent = result.message;
+          if (result.code === "unauthorized") void preparePlayerSignIn();
+          return;
+        }
+        await loadHunt(result.value.huntId);
+      } finally {
+        if (button) button.disabled = false;
+      }
     });
     list.addEventListener("click", (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
@@ -516,6 +494,8 @@ export function mountDisplayTasks(
       );
       if (button) void loadHunt(button.dataset.huntId ?? "");
     });
+    const sharedCode = new URLSearchParams(location.search).get("accessCode");
+    if (sharedCode) huntInput.value = sharedCode;
     const selectedHunt = new URLSearchParams(location.search).get("huntId");
     if (selectedHunt && previousIdentity) void loadHunt(selectedHunt);
   }

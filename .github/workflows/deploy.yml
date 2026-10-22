@@ -7,11 +7,19 @@ on:
 permissions:
   id-token: write
   contents: read
-concurrency:
-  group: deploy-${{ github.event.pull_request.number || github.ref_name }}
-  cancel-in-progress: false
+  pull-requests: read
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    permissions:
+      contents: read
+  e2e:
+    uses: ./.github/workflows/playwright.yml
+    permissions:
+      contents: read
   verify:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,21 +30,15 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm lint
+      - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+      - run: pnpm exec tsc --noEmit
       - run: pnpm check:admin
       - run: pnpm test:admin
-      - run: pnpm format:check
-      - run: pnpm exec playwright install chromium
-      - run: pnpm test
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: pre-deployment-test-results
-          path: test-results/
   deploy:
-    needs: verify
+    concurrency:
+      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
+      cancel-in-progress: false
+    needs: [lint, e2e, verify]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -63,7 +65,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-1
@@ -72,14 +74,62 @@ jobs:
         id: release
         env:
           ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
-          GOOGLE_CLIENT_ID: "436661871708-p5g867dkf2lk0vlon4dialct09j1m70c.apps.googleusercontent.com"
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
-        run: bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
-      - run: pnpm exec playwright install chromium
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ -n "$PR_NUMBER" ]]; then
+            STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
+            if [[ "$STATE" != open ]]; then
+              # GitHub may replace a pending cleanup job with this deployment.
+              # Reconcile the closed PR here as well so cleanup is never lost.
+              echo "PR #$PR_NUMBER is closed; deleting its environment."
+              bash ./deploy/destroy.sh "${{ steps.stack.outputs.stack_name }}"
+              exit 0
+            fi
+            CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+          else
+            CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$REF_NAME" --jq .object.sha)
+          fi
+          if [[ "$CURRENT_HEAD" != "$EXPECTED_HEAD" ]]; then
+            echo "A newer commit exists; skipping this obsolete deployment."
+            exit 0
+          fi
+          bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+      - if: steps.release.outputs.site_url != ''
+        run: pnpm exec playwright install chromium
       - name: Verify deployed hunt creation, persistence, and player workflow
+        if: steps.release.outputs.site_url != ''
         env:
           BASE_URL: ${{ steps.release.outputs.site_url }}
+          AUTH_SESSION_TABLE: ${{ steps.release.outputs.auth_session_table }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: pnpm exec playwright test tests/deployment.spec.ts tests/huntConfiguration.spec.ts
+      - name: Restore previous application release after failed deployment checks
+        if: failure() && steps.release.outputs.instance_id != '' && steps.release.outputs.release != ''
+        env:
+          INSTANCE_ID: ${{ steps.release.outputs.instance_id }}
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          PARAMETERS=$(jq -nc --arg command "if test -f /opt/buchunt/releases/$RELEASE/rollback.sh; then bash /opt/buchunt/releases/$RELEASE/rollback.sh; fi" '{commands: [$command]}')
+          COMMAND=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --parameters "$PARAMETERS" --query Command.CommandId --output text)
+          if ! aws ssm wait command-executed --command-id "$COMMAND" --instance-id "$INSTANCE_ID"; then
+            aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE_ID" --query '{Status:Status,ResponseCode:ResponseCode,Output:StandardOutputContent,Error:StandardErrorContent}' --output json >&2 || true
+            exit 1
+          fi
+          aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
+      - name: Restore previous authentication artifact and configuration
+        if: failure() && steps.release.outputs.previous_parameters != ''
+        env:
+          ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+          RESTORE_PARAMETERS_JSON: ${{ steps.release.outputs.previous_parameters }}
+          STACK_NAME: ${{ steps.stack.outputs.stack_name }}
+        run: bash ./deploy/deploy.sh "$STACK_NAME"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

@@ -9,7 +9,12 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HuntStore, StoreError, ContributorStore } from "./huntStore.js";
+import {
+  HuntStore,
+  StoreError,
+  ContributorStore,
+  isHuntAvailable,
+} from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 
 interface ServerOptions {
@@ -164,6 +169,26 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        if (path === "/api/player/account/join" && method === "POST") {
+          const input = await body(request);
+          const code =
+            input && typeof input === "object"
+              ? (input as Record<string, unknown>).accessCode
+              : undefined;
+          const normalized =
+            typeof code === "string" ? code.trim().toUpperCase() : "";
+          const hunt = /^[A-F0-9]{8}$/.test(normalized)
+            ? await hunts.findByAccessCode(normalized)
+            : undefined;
+          if (!hunt || !isHuntAvailable(hunt))
+            throw new StoreError(
+              "validation",
+              "Invalid access code. The hunt may be unavailable.",
+            );
+          await accountProgress.join(player, hunt.id);
+          json(response, 200, { ok: true, value: { huntId: hunt.id } });
+          return;
+        }
         if (path === "/api/player/account/hunts" && method === "GET") {
           const savedHunts = await accountProgress.huntsWithProgress(player);
           const definitions = await hunts.list();
@@ -191,6 +216,16 @@ export function createApplication(options: ServerOptions = {}) {
           );
         if (accountMatch) {
           const hunt = await hunts.get(accountMatch[1]);
+          if (
+            !(await accountProgress.huntsWithProgress(player)).includes(hunt.id)
+          ) {
+            json(response, 403, {
+              ok: false,
+              code: "forbidden",
+              message: "Join this hunt using its access code first.",
+            });
+            return;
+          }
           if (method === "GET" && !accountMatch[2]) {
             json(response, 200, {
               ok: true,
@@ -317,7 +352,10 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (!match[2] && method === "GET") {
-            json(response, 200, { ok: true, value: hunt });
+            json(response, 200, {
+              ok: true,
+              value: await hunts.getWithAccessCode(hunt.id),
+            });
             return;
           }
           if (match[2] === "tasks" && !match[3] && method === "POST") {
@@ -372,6 +410,15 @@ export function createApplication(options: ServerOptions = {}) {
           path,
         );
       if (match) {
+        if ((await hunts.get(match[1])).accessCode !== null) {
+          json(response, 403, {
+            ok: false,
+            code: "forbidden",
+            message:
+              "Sign in with Google and join this hunt using its access code.",
+          });
+          return;
+        }
         const cookies = request.headers.cookie ?? "";
         let player = /(?:^|;\s*)buchunt-player=([a-f0-9-]{36})(?:;|$)/.exec(
           cookies,

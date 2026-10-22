@@ -86,7 +86,8 @@ jobs:
           for TARGET_PR in "${PRS[@]}"; do
             [[ -n "$TARGET_PR" ]] || continue
             HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
-            RUN_ID=$(gh api --paginate --jq --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; (.number | tostring) == $pr)) | .id' "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100" | head -n 1)
+            WORKFLOW_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
+            RUN_ID=$(echo "$WORKFLOW_RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; (.number | tostring) == $pr)) | .id' | head -n 1)
             if [[ -z "$RUN_ID" ]]; then
               echo "No prior PR workflow exists for PR #$TARGET_PR; its next push will deploy."
               continue

@@ -35,13 +35,35 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm check:admin
       - run: pnpm test:admin
+  allocate-preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: deploy-preview
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allocate free preview slots in PR creation order
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ./deploy/deploy.sh allocate-preview-slots
   deploy:
     concurrency:
       group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
       cancel-in-progress: false
       queue: max
-    needs: [lint, e2e, verify]
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: [lint, e2e, verify, allocate-preview]
+    if: >-
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success' &&
+      (needs.allocate-preview.result == 'success' || needs.allocate-preview.result == 'skipped') &&
+      (github.event_name != 'pull_request' ||
+        (github.event.pull_request.head.repo.full_name == github.repository &&
+         github.event.action != 'opened' &&
+         github.event.action != 'reopened'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,10 +78,14 @@ jobs:
             PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
             SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
             SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
-            if [[ "$SLOT_COUNT" != 1 ]]; then
-              echo "This PR needs exactly one preview-slot-1, preview-slot-2, or preview-slot-3 label; skipping deployment."
+            if [[ "$SLOT_COUNT" == 0 ]]; then
+              echo "All preview slots are occupied or this PR is waiting its turn; skipping deployment for now."
               echo 'stack_name=' >> "$GITHUB_OUTPUT"
               exit 0
+            fi
+            if [[ "$SLOT_COUNT" != 1 ]]; then
+              echo "This PR has multiple preview slot labels; refusing deployment."
+              exit 1
             fi
             OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
             for OTHER_PR in $(echo "$OPEN_PRS" | jq -r '.[].number'); do

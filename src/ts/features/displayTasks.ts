@@ -33,6 +33,22 @@ function storedIdentity(): PlayerIdentity | null {
   return null;
 }
 
+async function currentAccountRole(): Promise<"administrator" | "user"> {
+  try {
+    const response = await fetch("/api/auth/session", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) return "user";
+    const payload = (await response.json()) as {
+      user?: { role?: unknown };
+    };
+    return payload.user?.role === "administrator" ? "administrator" : "user";
+  } catch {
+    return "user";
+  }
+}
+
 function taskLocationElement(
   location: PlayerHunt["tasks"][number]["location"],
 ): HTMLParagraphElement | null {
@@ -222,7 +238,12 @@ export function mountDisplayTasks(
     heading.textContent = "Your Hunts";
     signOut.hidden = false;
     account.hidden = false;
-    displayName.textContent = name;
+    displayName.textContent = `${name} (Player)`;
+    void currentAccountRole().then((role) => {
+      if (account.hidden || storedIdentity()?.accountId !== signedIn.accountId)
+        return;
+      displayName.textContent = `${name} (${role === "administrator" ? "Admin" : "Player"})`;
+    });
     email.textContent = signedIn.email;
     emailDetails.hidden = false;
     email.hidden = true;

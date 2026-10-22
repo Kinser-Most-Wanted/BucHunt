@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name>"; exit 1; fi
+if [ "$#" -lt 1 ]; then echo "Usage: $0 <stack-name> [preview-pr-number] | reset-preview <stack-name> <preview-pr-number>"; exit 1; fi
+if [[ "$1" == reset-preview ]]; then
+  if [[ "$#" -ne 3 || ! "$3" =~ ^[0-9]+$ || ! "$2" =~ ^bucstop-preview-[123]$ ]]; then
+    echo "Usage: $0 reset-preview <bucstop-preview-1|2|3> <preview-pr-number>" >&2
+    exit 1
+  fi
+  RESET_STACK="$2"
+  RESET_PR="$3"
+  RESET_INSTANCE=$(aws cloudformation describe-stacks --stack-name "$RESET_STACK" --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
+  if [[ -z "$RESET_INSTANCE" || "$RESET_INSTANCE" == None ]]; then echo "Preview stack has no instance" >&2; exit 1; fi
+  RESET_SCRIPT="set -euo pipefail; DATA=/var/lib/buchunt; OWNER=\\$DATA/.preview-pr-owner; if [[ -f \\\"\\$OWNER\\\" ]] && [[ \\\"\\$(cat \\\"\\$OWNER\\\")\\\" == \\\"$RESET_PR\\\" ]]; then systemctl stop buchunt || true; find \\\"\\$DATA\\\" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; systemctl start buchunt; echo 'Cleared preview data for PR #$RESET_PR.'; else echo 'Preview is not owned by PR #$RESET_PR; no data was removed.'; fi"
+  RESET_PARAMETERS=$(jq -nc --arg command "$RESET_SCRIPT" '{commands: [$command]}')
+  RESET_COMMAND=$(aws ssm send-command --instance-ids "$RESET_INSTANCE" --document-name AWS-RunShellScript --parameters "$RESET_PARAMETERS" --query Command.CommandId --output text)
+  aws ssm wait command-executed --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE"
+  aws ssm get-command-invocation --command-id "$RESET_COMMAND" --instance-id "$RESET_INSTANCE" --query StandardOutputContent --output text
+  exit 0
+fi
 STACK_NAME="$1"
+PREVIEW_PR_NUMBER="${PREVIEW_PR_NUMBER:-}"
 DELETE_ROOT_VOLUME=false
 if [[ "$STACK_NAME" =~ ^bucstop-pr-[0-9]+$ ]]; then
   DELETE_ROOT_VOLUME=true
@@ -153,12 +170,15 @@ for attempt in $(seq 1 60); do
   if [[ "$attempt" == 60 ]]; then echo "Instance did not register with SSM"; exit 1; fi
   sleep 5
 done
-export BUCKET INSTANCE SECRET RELEASE GOOGLE_CLIENT_ID
+export BUCKET INSTANCE SECRET RELEASE GOOGLE_CLIENT_ID PREVIEW_PR_NUMBER
 python3 - "$PARAMETERS" <<'PY'
 import json, os, sys
 bucket, secret, release = (os.environ[k] for k in ('BUCKET','SECRET','RELEASE'))
 region = os.environ['AWS_DEFAULT_REGION']
 google_client_id = os.environ['GOOGLE_CLIENT_ID']
+preview_pr_number = os.environ.get('PREVIEW_PR_NUMBER', '')
+if preview_pr_number and not preview_pr_number.isdigit():
+    raise SystemExit('Invalid PREVIEW_PR_NUMBER')
 import re
 if not re.fullmatch(r'[A-Za-z0-9._-]*', google_client_id):
     raise SystemExit('Invalid GOOGLE_CLIENT_ID')
@@ -243,6 +263,18 @@ trap 'bash /opt/buchunt/releases/{release}/rollback.sh' ERR
 TOKEN=$(aws secretsmanager get-secret-value --secret-id {secret} --query SecretString --output text)
 umask 077
 printf 'HOST=0.0.0.0\\nPORT=3000\\nDATA_DIRECTORY=/var/lib/buchunt\\nORIGIN_TOKEN=%s\\nGOOGLE_CLIENT_ID={google_client_id}\\n' "$TOKEN" > /etc/buchunt.env
+if [[ -n "{preview_pr_number}" ]]; then
+  DATA_DIR=/var/lib/buchunt
+  install -d -m 700 "$DATA_DIR"
+  OWNER_FILE="$DATA_DIR/.preview-pr-owner"
+  CURRENT_OWNER=$(cat "$OWNER_FILE" 2>/dev/null || true)
+  if [[ "$CURRENT_OWNER" != "{preview_pr_number}" ]]; then
+    systemctl stop buchunt || true
+    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.preview-pr-owner' -exec rm -rf -- {} +
+    echo "Reset preview data for PR #{preview_pr_number}."
+  fi
+  printf '%s\\n' "{preview_pr_number}" > "$OWNER_FILE"
+fi
 ln -sfn /opt/buchunt/releases/{release} /opt/buchunt/next
 mv -Tf /opt/buchunt/next /opt/buchunt/current
 systemctl reset-failed buchunt

@@ -61,9 +61,7 @@ jobs:
       needs.verify.result == 'success' &&
       (needs.allocate-preview.result == 'success' || needs.allocate-preview.result == 'skipped') &&
       (github.event_name != 'pull_request' ||
-        (github.event.pull_request.head.repo.full_name == github.repository &&
-         github.event.action != 'opened' &&
-         github.event.action != 'reopened'))
+        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

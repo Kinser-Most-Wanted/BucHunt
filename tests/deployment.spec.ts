@@ -36,6 +36,7 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   };
 
   await page.addInitScript(() => {
+    localStorage.setItem("buchunt.player-profile.google-subject-123", "Baja");
     type Callback = (response: { credential: string }) => void;
     const testWindow = window as typeof window & {
       google?: {
@@ -111,7 +112,10 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in with Google" }).click();
   await expect(page).toHaveURL(/player\.html$/);
   await expect(page.getByTestId("player-task-status")).toBeVisible();
-  await page.getByRole("link", { name: "Administration", exact: true }).click();
+  await expect(page.getByTestId("player-display-name")).toHaveText(
+    "Baja (Admin)",
+  );
+  await page.getByRole("link", { name: "Hunt Studio", exact: true }).click();
   await expect(page.locator("#admin-status")).toHaveText(
     "Administrator access verified.",
   );

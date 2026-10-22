@@ -123,7 +123,9 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await expect(page.locator("#home-sign-in-link")).toBeVisible();
 });
 
-test("admin sign-in prompt stays hidden while session is loading", async ({ page }) => {
+test("admin sign-in prompt stays hidden while session is loading", async ({
+  page,
+}) => {
   let finishSessionCheck!: () => void;
   const sessionCheck = new Promise<void>((resolve) => {
     finishSessionCheck = resolve;

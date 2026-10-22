@@ -56,7 +56,6 @@ jobs:
 
           SLOT=${SLOT_LABEL##*-}
           STACK_NAME="bucstop-preview-$SLOT"
-          STACK_NAME="bucstop-preview-$SLOT"
           bash ./deploy/deploy.sh reset-preview "$STACK_NAME" "$PR_NUMBER"
 
           gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$SLOT_LABEL" >/dev/null || true

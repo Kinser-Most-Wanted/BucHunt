@@ -42,7 +42,7 @@ function taskLocationElement(
   const details = document.createElement("p");
   details.className = "task-location";
   details.append(
-    document.createTextNode(`Location: ${latitude}, ${longitude} � `),
+    document.createTextNode(`Location: ${latitude}, ${longitude} \u00b7 `),
   );
   const mapLink = document.createElement("a");
   mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
@@ -518,3 +518,4 @@ export function mountDisplayTasks(
       .finally(() => window.location.assign("./index.html"));
   });
 }
+

@@ -36,8 +36,9 @@ jobs:
       - run: pnpm test:admin
   deploy:
     concurrency:
-      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
+      group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
       cancel-in-progress: false
+      queue: max
     needs: [lint, e2e, verify]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -50,7 +51,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
-            echo "stack_name=bucstop-pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo 'stack_name=bucstop-preview' >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == main ]]; then
             echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == stage ]]; then
@@ -84,10 +85,8 @@ jobs:
           if [[ -n "$PR_NUMBER" ]]; then
             STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
             if [[ "$STATE" != open ]]; then
-              # GitHub may replace a pending cleanup job with this deployment.
-              # Reconcile the closed PR here as well so cleanup is never lost.
-              echo "PR #$PR_NUMBER is closed; deleting its environment."
-              bash ./deploy/destroy.sh "${{ steps.stack.outputs.stack_name }}"
+              # The shared preview stack must survive individual PR closures.
+              echo "PR #$PR_NUMBER is closed; skipping its preview deployment."
               exit 0
             fi
             CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)

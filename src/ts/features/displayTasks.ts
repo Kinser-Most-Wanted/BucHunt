@@ -109,34 +109,36 @@ export function mountDisplayTasks(
   const signOut = root.querySelector<HTMLButtonElement>(
     '[data-testid="player-sign-out"]',
   );
-  const account = root.querySelector<HTMLElement>(
-    '[data-testid="player-account"]',
+  const findAccountElement = <T extends Element>(selector: string): T | null =>
+    document.querySelector<T>(selector) ?? root.querySelector<T>(selector);
+  const account = findAccountElement<HTMLDetailsElement>(
+    '[data-testid="player-account-menu"]',
   );
-  const displayName = root.querySelector<HTMLElement>(
+  const displayName = findAccountElement<HTMLElement>(
     '[data-testid="player-display-name"]',
   );
-  const emailDetails = root.querySelector<HTMLElement>(
+  const emailDetails = findAccountElement<HTMLElement>(
     '[data-testid="player-google-email"]',
   );
-  const email = root.querySelector<HTMLOutputElement>(
+  const email = findAccountElement<HTMLOutputElement>(
     '[data-testid="player-email"]',
   );
-  const emailToggle = root.querySelector<HTMLButtonElement>(
+  const emailToggle = findAccountElement<HTMLButtonElement>(
     '[data-testid="email-toggle"]',
   );
-  const copyEmail = root.querySelector<HTMLButtonElement>(
+  const copyEmail = findAccountElement<HTMLButtonElement>(
     '[data-testid="copy-email"]',
   );
-  const accountIdDetails = root.querySelector<HTMLElement>(
+  const accountIdDetails = findAccountElement<HTMLElement>(
     '[data-testid="player-google-account-id"]',
   );
-  const accountIdToggle = root.querySelector<HTMLButtonElement>(
+  const accountIdToggle = findAccountElement<HTMLButtonElement>(
     '[data-testid="account-id-toggle"]',
   );
-  const accountIdValue = root.querySelector<HTMLOutputElement>(
+  const accountIdValue = findAccountElement<HTMLOutputElement>(
     '[data-testid="account-id-value"]',
   );
-  const copyAccountId = root.querySelector<HTMLButtonElement>(
+  const copyAccountId = findAccountElement<HTMLButtonElement>(
     '[data-testid="copy-account-id"]',
   );
   const nameForm = root.querySelector<HTMLFormElement>(
@@ -187,6 +189,7 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(true);
     signOut.hidden = true;
     account.hidden = true;
+    account.open = false;
     emailDetails.hidden = true;
     email.hidden = true;
     emailToggle.hidden = false;

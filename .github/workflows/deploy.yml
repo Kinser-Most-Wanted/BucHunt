@@ -174,14 +174,18 @@ jobs:
             exit 1
           fi
       - uses: pnpm/action-setup@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           version: 10.33.0
       - uses: actions/setup-node@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+        if: steps.stack.outputs.stack_name != ''
       - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           aws-region: us-east-1
           role-to-assume: ${{ vars.DEPLOY_ROLE }}

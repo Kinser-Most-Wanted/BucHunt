@@ -25,14 +25,14 @@ if [[ "$1" == allocate-preview-slots ]]; then
     gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$1/labels/Queued" >/dev/null 2>&1 || true
   }
 
-  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, base_ref: .base.ref, head_ref: .head.ref, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
+  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, title: .title, base_ref: .base.ref, head_ref: .head.ref, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
   USED_1=false
   USED_2=false
   USED_3=false
   while IFS= read -r PR_JSON; do
     [[ -n "$PR_JSON" ]] || continue
     [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
-    if [[ "$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage ]]; then
+    if [[ ("$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage) || "$(echo "$PR_JSON" | jq -r .title)" == Stage ]]; then
       continue
     fi
     for SLOT in 1 2 3; do
@@ -51,7 +51,7 @@ if [[ "$1" == allocate-preview-slots ]]; then
     [[ -n "$PR_JSON" ]] || continue
     [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
     TARGET_PR=$(echo "$PR_JSON" | jq -r .number)
-    if [[ "$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage ]]; then
+    if [[ ("$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage) || "$(echo "$PR_JSON" | jq -r .title)" == Stage ]]; then
       STALE_SLOT_LABELS=$(echo "$PR_JSON" | jq -r '.labels[] | select(test("^preview-slot-[123]$"))')
       while IFS= read -r SLOT_LABEL; do
         [[ -n "$SLOT_LABEL" ]] || continue

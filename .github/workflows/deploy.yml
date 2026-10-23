@@ -65,6 +65,9 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.title != 'Stage' &&
+      !(github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.head.ref == 'stage') &&
       needs.lint.result == 'success' &&
       needs.e2e.result == 'success' &&
       needs.verify.result == 'success'

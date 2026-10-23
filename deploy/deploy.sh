@@ -25,13 +25,16 @@ if [[ "$1" == allocate-preview-slots ]]; then
     gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$1/labels/Queued" >/dev/null 2>&1 || true
   }
 
-  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
+  OPEN_PRS=$(gh api --paginate --jq '.[] | {number, state, base_ref: .base.ref, head_ref: .head.ref, labels: [.labels[].name]}' "repos/$GITHUB_REPOSITORY/pulls?state=all&sort=created&direction=asc&per_page=100")
   USED_1=false
   USED_2=false
   USED_3=false
   while IFS= read -r PR_JSON; do
     [[ -n "$PR_JSON" ]] || continue
     [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
+    if [[ "$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage ]]; then
+      continue
+    fi
     for SLOT in 1 2 3; do
       if echo "$PR_JSON" | jq -e --arg label "preview-slot-$SLOT" '.labels | index($label) != null' >/dev/null; then
         case "$SLOT" in
@@ -48,6 +51,16 @@ if [[ "$1" == allocate-preview-slots ]]; then
     [[ -n "$PR_JSON" ]] || continue
     [[ "$(echo "$PR_JSON" | jq -r .state)" == open ]] || continue
     TARGET_PR=$(echo "$PR_JSON" | jq -r .number)
+    if [[ "$(echo "$PR_JSON" | jq -r .base_ref)" == main && "$(echo "$PR_JSON" | jq -r .head_ref)" == stage ]]; then
+      STALE_SLOT_LABELS=$(echo "$PR_JSON" | jq -r '.labels[] | select(test("^preview-slot-[123]$"))')
+      while IFS= read -r SLOT_LABEL; do
+        [[ -n "$SLOT_LABEL" ]] || continue
+        gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$TARGET_PR/labels/$SLOT_LABEL" >/dev/null 2>&1 || true
+      done <<< "$STALE_SLOT_LABELS"
+      unqueue_pr "$TARGET_PR"
+      echo "PR #$TARGET_PR targets main from stage; using the dedicated Stage deployment."
+      continue
+    fi
     SLOT_COUNT=$(echo "$PR_JSON" | jq '[.labels[] | select(test("^preview-slot-[123]$"))] | length')
     if [[ "$SLOT_COUNT" -ne 0 ]]; then
       unqueue_pr "$TARGET_PR"

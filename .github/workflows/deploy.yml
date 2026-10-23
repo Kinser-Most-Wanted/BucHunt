@@ -1,69 +1,246 @@
 name: Deploy
-
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
-    branches:
-      - main
-      - stage
-
+    branches: [main, stage]
 permissions:
   id-token: write
   contents: read
-
+  pull-requests: read
 jobs:
-  deploy:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    permissions:
+      contents: read
+  e2e:
+    uses: ./.github/workflows/playwright.yml
+    permissions:
+      contents: read
+  verify:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-
-    concurrency:
-      group: deploy-${{ github.event.pull_request.number || github.ref_name }}
-      cancel-in-progress: false
-
     steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm check:admin
+      - run: pnpm test:admin
+  allocate-preview:
+    needs: [lint, e2e, verify]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success'
+    outputs:
+      assigned_prs: ${{ steps.allocate.outputs.assigned_prs }}
+    concurrency:
+      group: deploy-preview
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allocate free preview slots in PR creation order
+        id: allocate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash ./deploy/deploy.sh allocate-preview-slots
+  requeue-preview:
+    needs: allocate-preview
+    if: needs.allocate-preview.outputs.assigned_prs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Rerun successful PR checks and deployment for newly assigned slots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNED_PRS: ${{ needs.allocate-preview.outputs.assigned_prs }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          IFS=',' read -ra PRS <<< "$ASSIGNED_PRS"
+          for TARGET_PR in "${PRS[@]}"; do
+            [[ -n "$TARGET_PR" ]] || continue
+            if [[ "$TARGET_PR" == "$CURRENT_PR_NUMBER" ]]; then
+              echo "PR #$TARGET_PR will deploy in its current workflow run."
+              continue
+            fi
+            HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$TARGET_PR" --jq .head.sha)
+            RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?event=pull_request&per_page=100")
+            RUN_ID=$(echo "$RUNS" | jq -r --arg sha "$HEAD_SHA" --arg pr "$TARGET_PR" '.workflow_runs[]? | select(any(.pull_requests[]?; (.number | tostring) == $pr and .head.sha == $sha)) | .id' | head -n 1)
+            if [[ -z "$RUN_ID" ]]; then
+              echo "No previous PR workflow exists for PR #$TARGET_PR."
+              continue
+            fi
+            STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            for attempt in $(seq 1 120); do
+              [[ "$STATUS" == completed ]] && break
+              sleep 10
+              STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .status)
+            done
+            if [[ "$STATUS" != completed ]]; then
+              echo "PR #$TARGET_PR workflow run $RUN_ID is still active; leaving the assigned slot in place."
+              continue
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/rerun" >/dev/null
+            echo "Reran PR #$TARGET_PR checks and deployment with its assigned slot."
+          done
+  deploy:
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
+      cancel-in-progress: false
+      queue: max
+    needs: [lint, e2e, verify, allocate-preview]
+    if: >-
+      always() &&
+      needs.lint.result == 'success' &&
+      needs.e2e.result == 'success' &&
+      needs.verify.result == 'success' &&
+      (needs.allocate-preview.result == 'success' || needs.allocate-preview.result == 'skipped') &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Determine stack name
         id: stack
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "stack_name=bucstop-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
-            echo "stack_name=bucstop" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref_name }}" == "stage" ]]; then
-            echo "stack_name=bucstop-stage" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PR_NUMBER" ]]; then
+            PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+            SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
+            SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
+            if [[ "$SLOT_COUNT" == 0 ]]; then
+              echo "All preview slots are occupied or this PR is waiting its turn; skipping deployment for now."
+              echo 'stack_name=' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ "$SLOT_COUNT" != 1 ]]; then
+              echo "This PR has multiple preview slot labels; refusing deployment."
+              exit 1
+            fi
+            OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
+            CONFLICTING_PR=$(echo "$OPEN_PRS" | jq -r --arg pr "$PR_NUMBER" --arg label "$SLOT_LABEL" '.[] | select((.number | tostring) != $pr) | select(any(.labels[].name; . == $label)) | .number' | head -n 1)
+            if [[ -n "$CONFLICTING_PR" ]]; then
+              echo "$SLOT_LABEL is already assigned to open PR #$CONFLICTING_PR." >&2
+              exit 1
+            fi
+            SLOT=${SLOT_LABEL##*-}
+            echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
+          elif [[ "$REF_NAME" == main ]]; then
+            echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
+          elif [[ "$REF_NAME" == stage ]]; then
+            echo 'stack_name=bucstop-stage' >> "$GITHUB_OUTPUT"
           else
-            echo "Unsupported ref/event"
             exit 1
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: pnpm/action-setup@v4
+        if: steps.stack.outputs.stack_name != ''
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        if: steps.stack.outputs.stack_name != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+        if: steps.stack.outputs.stack_name != ''
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.stack.outputs.stack_name != ''
         with:
           aws-region: us-east-1
           role-to-assume: ${{ vars.DEPLOY_ROLE }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Deploy
+      - name: Deploy application and durable storage
+        id: release
+        env:
+          ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          chmod +x ./deploy/deploy.sh
-          ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          if [[ -n "$PR_NUMBER" && -z "${{ steps.stack.outputs.stack_name }}" ]]; then
+            echo "No preview slot is assigned; skipping deployment."
+            exit 0
+          fi
+          if [[ -n "$PR_NUMBER" ]]; then
+            STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)
+            if [[ "$STATE" != open ]]; then
+              # The shared preview stack must survive individual PR closures.
+              echo "PR #$PR_NUMBER is closed; skipping its preview deployment."
+              exit 0
+            fi
+            CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+          else
+            CURRENT_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$REF_NAME" --jq .object.sha)
+          fi
+          if [[ "$CURRENT_HEAD" != "$EXPECTED_HEAD" ]]; then
+            echo "A newer commit exists; skipping this obsolete deployment."
+            exit 0
+          fi
+          if [[ -n "$PR_NUMBER" ]]; then
+            PREVIEW_PR_NUMBER="$PR_NUMBER" bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          else
+            bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          fi
+      - if: steps.release.outputs.site_url != ''
+        run: pnpm exec playwright install chromium
+      - name: Verify deployed hunt creation, persistence, and player workflow
+        if: steps.release.outputs.site_url != ''
+        env:
+          BASE_URL: ${{ steps.release.outputs.site_url }}
+          AUTH_SESSION_TABLE: ${{ steps.release.outputs.auth_session_table }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+        run: pnpm exec playwright test tests/deployment.spec.ts tests/huntConfiguration.spec.ts
+      - name: Restore previous application release after failed deployment checks
+        if: failure() && steps.release.outputs.instance_id != '' && steps.release.outputs.release != ''
+        env:
+          INSTANCE_ID: ${{ steps.release.outputs.instance_id }}
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          PARAMETERS=$(jq -nc --arg command "if test -f /opt/buchunt/releases/$RELEASE/rollback.sh; then bash /opt/buchunt/releases/$RELEASE/rollback.sh; fi" '{commands: [$command]}')
+          COMMAND=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --parameters "$PARAMETERS" --query Command.CommandId --output text)
+          if ! aws ssm wait command-executed --command-id "$COMMAND" --instance-id "$INSTANCE_ID"; then
+            aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE_ID" --query '{Status:Status,ResponseCode:ResponseCode,Output:StandardOutputContent,Error:StandardErrorContent}' --output json >&2 || true
+            exit 1
+          fi
+          aws ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
+      - name: Restore previous authentication artifact and configuration
+        if: failure() && steps.release.outputs.previous_parameters != ''
+        env:
+          ADMIN_ARTIFACT_BUCKET: ${{ vars.ADMIN_ARTIFACT_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+          RESTORE_PARAMETERS_JSON: ${{ steps.release.outputs.previous_parameters }}
+          STACK_NAME: ${{ steps.stack.outputs.stack_name }}
+        run: bash ./deploy/deploy.sh "$STACK_NAME"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: deployed-test-results
+          path: test-results/

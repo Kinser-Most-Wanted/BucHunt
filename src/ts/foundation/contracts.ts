@@ -1,17 +1,20 @@
 import type {
-  AdminCredentials,
   AdminSession,
+  GoogleAuthConfig,
   HuntDefinition,
   HuntInput,
   OperationResult,
+  PlayerIdentity,
   PlayerHunt,
   TaskDefinition,
   TaskInput,
 } from "./types.js";
 
 export interface AuthenticationService {
-  signIn(credentials: AdminCredentials): Promise<OperationResult<AdminSession>>;
+  getGoogleConfig(): Promise<OperationResult<GoogleAuthConfig>>;
+  signIn(credential: string): Promise<OperationResult<AdminSession>>;
   getSession(): Promise<OperationResult<AdminSession>>;
+  getCapabilities(): Promise<OperationResult<void>>;
   signOut(): Promise<OperationResult<void>>;
 }
 export interface DefinitionValidator {
@@ -27,6 +30,23 @@ export interface HuntRepository {
   ): Promise<OperationResult<TaskDefinition>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
+  joinHunt(
+    accessCode: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ huntId: string }>>;
+  getAccountHunt(
+    huntId: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerHunt>>;
+  answerAccountTask(
+    huntId: string,
+    taskId: string,
+    answer: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ completed: boolean }>>;
+  listActiveHunts(
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerHunt[]>>;
 }
 export interface FoundationServices {
   authentication: AuthenticationService;

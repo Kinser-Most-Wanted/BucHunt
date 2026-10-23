@@ -1,25 +1,25 @@
 name: Playwright
-
 on:
-  push:
-  pull_request:
-
+  workflow_call:
+permissions:
+  contents: read
 jobs:
   e2e:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run test:e2e
+      - run: pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/

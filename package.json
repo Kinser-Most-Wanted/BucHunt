@@ -9,15 +9,27 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "serve": "serve src -l 3000"
+    "serve": "node src/js/server/server.js",
+    "test": "playwright test",
+    "format:check": "prettier --check src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts",
+    "build:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --outDir",
+    "check:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --noEmit",
+    "test:admin": "node --experimental-strip-types --test src/server/admin.test.ts",
+    "format": "prettier --write src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts"
   },
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.0",
     "eslint": "^9.39.4",
     "serve": "^14.2.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.0"
+    "typescript-eslint": "^8.58.0",
+    "@types/node": "^22.0.0",
+    "prettier": "^3.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1152.0",
+    "google-auth-library": "10.9.1"
   }
 }

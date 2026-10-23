@@ -1,17 +1,43 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: BucHunt static website infrastructure
-
+AWSTemplateFormatVersion: "2010-09-09"
+Description: BucHunt HTTPS application with a single durable JSON writer
 Parameters:
-  EnvironmentName:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  CloudFrontPrefixListId:
     Type: String
-    Default: production
-
+  AdminCodeBucket:
+    Type: String
+    Description: Private S3 bucket in this region containing the authentication Lambda ZIP
+  AdminCodeKey:
+    Type: String
+    Description: Immutable S3 object key for the authentication Lambda ZIP
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: Google Identity Services Web application client ID
+  AdminEmails:
+    Type: String
+    Default: ''
+    Description: Comma-separated verified Google email addresses allowed administrator access
+  AdminOrigin:
+    Type: String
+    Default: https://localhost
+    Description: Exact HTTPS origin allowed to submit authentication requests
+  DeleteRootVolumeOnTermination:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Delete disposable PR data; retain main and stage data for recovery
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: Explicit AMI; deployments preserve the current image and reject persistent instance replacement
+Conditions:
+  DeleteRootVolume: !Equals [!Ref DeleteRootVolumeOnTermination, 'true']
 Resources:
-
   WebsiteBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
     Properties:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -24,86 +50,279 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
-
-  CloudFrontOriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
     Properties:
-      OriginAccessControlConfig:
-        Name: !Sub '${AWS::StackName}-OAC'
-        Description: Access control for BucHunt S3 bucket
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
+      Description: Private CloudFront origin token; never a hunt creator credential
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
+  ApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ReadApplicationArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${WebsiteBucket.Arn}/releases/*"
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref AdminSecret
+  ApplicationProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref ApplicationRole]
+  ApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Only CloudFront can connect to the application origin
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+  ApplicationInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref ApplicationProfile
+      MetadataOptions:
+        HttpTokens: required
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref ApplicationSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 12
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: !If [DeleteRootVolume, true, false]
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-json-server"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -euo pipefail
+          dnf install -y nodejs22
+          useradd --system --home-dir /opt/buchunt buchunt
+          install -d -o buchunt -g buchunt -m 700 /var/lib/buchunt
+          install -d -o root -g root -m 755 /opt/buchunt/releases
+          cat > /etc/systemd/system/buchunt.service <<'SERVICE'
+          [Unit]
+          Description=BucHunt JSON application
+          After=network-online.target
+          Wants=network-online.target
+          [Service]
+          User=buchunt
+          Group=buchunt
+          WorkingDirectory=/opt/buchunt/current
+          EnvironmentFile=/etc/buchunt.env
+          ExecStart=/usr/bin/node-22 src/js/server/server.js
+          Restart=on-failure
+          NoNewPrivileges=true
+          ProtectSystem=strict
+          ProtectHome=true
+          PrivateTmp=true
+          ReadWritePaths=/var/lib/buchunt
+          UMask=0077
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+          systemctl daemon-reload
+          systemctl enable buchunt
+  AdminSessions:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+  AdminApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-admin'
+      ProtocolType: HTTP
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: AdminSessions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt AdminSessions.Arn
+  AdminFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: admin.handler
+      Role: !GetAtt AdminRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Code:
+        S3Bucket: !Ref AdminCodeBucket
+        S3Key: !Ref AdminCodeKey
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          ADMIN_EMAILS: !Ref AdminEmails
+          ADMIN_SESSION_TABLE: !Ref AdminSessions
+          ADMIN_ORIGIN: !Ref AdminOrigin
+  AdminIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref AdminApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt AdminFunction.Arn
+      PayloadFormatVersion: '2.0'
+  AdminCapabilityRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/admin/capabilities
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AuthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth/{proxy+}
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AuthRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AdminApi
+      RouteKey: ANY /api/auth
+      Target: !Join ['/', [integrations, !Ref AdminIntegration]]
+  AdminStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref AdminApi
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+  AdminInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/admin/capabilities'
+  AuthInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminApi}/*/*/api/auth*'
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
-
         Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
-            S3OriginConfig:
-              OriginAccessIdentity: ''
-            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
-
+          - Id: AdminApiOrigin
+            DomainName: !Sub '${AdminApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+          - Id: ApplicationOrigin
+            DomainName: !GetAtt ApplicationInstance.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 3000
+              OriginProtocolPolicy: http-only
+            OriginCustomHeaders:
+              - HeaderName: X-Forwarded-Proto
+                HeaderValue: https
+              - HeaderName: X-Origin-Token
+                HeaderValue: !Sub "{{resolve:secretsmanager:${AdminSecret}:SecretString}}"
         DefaultCacheBehavior:
-          TargetOriginId: S3Origin
+          TargetOriginId: ApplicationOrigin
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
-
-          AllowedMethods:
-            - GET
-            - HEAD
-
-          CachedMethods:
-            - GET
-            - HEAD
-
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          MinTTL: 0
+          DefaultTTL: 0
+          MaxTTL: 0
           ForwardedValues:
             QueryString: true
-
+            Headers: ["*"]
+            Cookies:
+              Forward: all
+        CacheBehaviors:
+          - PathPattern: /api/auth*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          - PathPattern: /api/admin/capabilities*
+            TargetOriginId: AdminApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         PriceClass: PriceClass_100
-
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-
-  BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowCloudFrontRead
-            Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Action:
-              - s3:GetObject
-            Resource: !Sub '${WebsiteBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
-
 Outputs:
-
   BucketName:
-    Description: S3 bucket containing the BucHunt website
     Value: !Ref WebsiteBucket
-
+  AuthSessionTable:
+    Value: !Ref AdminSessions
+  InstanceId:
+    Value: !Ref ApplicationInstance
+  OriginSecretArn:
+    Value: !Ref AdminSecret
   DistributionId:
-    Description: CloudFront distribution ID
     Value: !Ref CloudFrontDistribution
-
   SiteUrl:
-    Description: CloudFront website URL
-    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+  DataRecovery:
+    Value: !If
+      - DeleteRootVolume
+      - Disposable PR data is deleted on instance termination.
+      - Root EBS volume is retained on termination; snapshot and restore it before replacing the instance.

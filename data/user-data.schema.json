@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BucHunt Per-User Data",
+  "description": "Private per-account profile and owned Hunt definitions. Store this file outside the public website directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profile", "hunts"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "createdAt", "updatedAt"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Stable account ID supplied by a trusted server identity layer."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      }
+    },
+    "hunts": {
+      "type": "array",
+      "items": {
+        "$ref": "./hunts.schema.json#/$defs/hunt"
+      }
+    }
+  }
+}
+

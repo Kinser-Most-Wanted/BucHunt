@@ -1,14 +1,16 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: "./tests",
   use: {
-    baseURL: 'http://127.0.0.1:3000',
-    ...devices['Desktop Chrome'],
+    baseURL: "http://127.0.0.1:3000",
+    ...devices["Desktop Chrome"],
   },
-  webServer: {
-    command: 'pnpm run serve',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: process.env.BASE_URL
+    ? undefined
+    : {
+        command: "pnpm run build && pnpm run serve",
+        url: "http://127.0.0.1:3000",
+        reuseExistingServer: !process.env.CI,
+      },
 });

@@ -28,14 +28,15 @@ export interface HuntDefinition extends HuntInput {
   status: HuntStatus;
   createdAt: string;
   updatedAt: string;
-  // Reserved until access code functionality is implemented.
-  accessCode: null;
+  // Null remains supported for hunts saved before access-code joining.
+  accessCode: string | null;
   tasks: TaskDefinition[];
 }
 export interface TaskDefinition extends TaskInput {
   id: string;
 }
 export interface PlayerTask {
+  description?: string;
   id: string;
   huntId: string;
   displayLabel: string;
@@ -48,12 +49,21 @@ export interface PlayerHunt {
   description: string;
   tasks: PlayerTask[];
 }
-export interface AdminCredentials {
-  username: string;
-  password: string;
+export interface PlayerIdentity {
+  email: string;
+  accountId: string;
+  provider: "google";
+  idToken: string;
+}
+export interface GoogleAuthConfig {
+  clientId: string;
+  nonce: string;
 }
 export interface AdminSession {
-  authenticated: boolean;
+  subject: string;
+  email: string;
+  expiresAt: number;
+  role: "administrator" | "user";
 }
 export interface ValidationIssue {
   field: string;
@@ -67,6 +77,7 @@ export type OperationResult<T> =
         | "not-implemented"
         | "validation"
         | "unauthorized"
+        | "forbidden"
         | "not-found"
         | "storage"
         | "network";
@@ -77,3 +88,4 @@ export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
 }
+

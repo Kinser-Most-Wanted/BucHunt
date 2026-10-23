@@ -1,7 +1,7 @@
 name: Deploy
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   push:
     branches: [main, stage]
 permissions:
@@ -34,6 +34,32 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm check:admin
       - run: pnpm test:admin
+  label-stage-pr:
+    if: >-
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'opened' ||
+        github.event.action == 'reopened' ||
+        github.event.action == 'edited') &&
+      (github.event.pull_request.title == 'Stage' ||
+        github.event.pull_request.head.ref == 'stage')
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure the Stage label exists and apply it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/labels/Stage" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+              -f name=Stage \
+              -f color=1A73E8 \
+              -f "description=Stage deployment pull request" >/dev/null
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f 'labels[]=Stage' >/dev/null
   allocate-preview:
     needs: [lint, e2e, verify]
     if: >-
@@ -107,7 +133,7 @@ jobs:
           done
   deploy:
     concurrency:
-      group: deploy-${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
+      group: deploy-${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'stage' && github.event.pull_request.base.ref == 'main' && 'stage' || (github.event_name == 'pull_request' && 'preview' || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     needs: [lint, e2e, verify, allocate-preview]
@@ -131,25 +157,31 @@ jobs:
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
             PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
-            SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
-            SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
-            if [[ "$SLOT_COUNT" == 0 ]]; then
-              echo "All preview slots are occupied or this PR is waiting its turn; skipping deployment for now."
-              echo 'stack_name=' >> "$GITHUB_OUTPUT"
-              exit 0
+            BASE_REF=$(echo "$PR_JSON" | jq -r '.base.ref')
+            HEAD_REF=$(echo "$PR_JSON" | jq -r '.head.ref')
+            if [[ "$BASE_REF" == main && "$HEAD_REF" == stage ]]; then
+              echo 'stack_name=bucstop-stage' >> "$GITHUB_OUTPUT"
+            else
+              SLOT_LABEL=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | if length == 1 then .[0] else "" end')
+              SLOT_COUNT=$(echo "$PR_JSON" | jq -r '[.labels[].name | select(test("^preview-slot-[123]$"))] | length')
+              if [[ "$SLOT_COUNT" == 0 ]]; then
+                echo "All preview slots are occupied or this PR is waiting its turn; skipping deployment for now."
+                echo 'stack_name=' >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              if [[ "$SLOT_COUNT" != 1 ]]; then
+                echo "This PR has multiple preview slot labels; refusing deployment."
+                exit 1
+              fi
+              OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
+              CONFLICTING_PR=$(echo "$OPEN_PRS" | jq -r --arg pr "$PR_NUMBER" --arg label "$SLOT_LABEL" '.[] | select((.number | tostring) != $pr) | select(any(.labels[].name; . == $label)) | .number' | head -n 1)
+              if [[ -n "$CONFLICTING_PR" ]]; then
+                echo "$SLOT_LABEL is already assigned to open PR #$CONFLICTING_PR." >&2
+                exit 1
+              fi
+              SLOT=${SLOT_LABEL##*-}
+              echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
             fi
-            if [[ "$SLOT_COUNT" != 1 ]]; then
-              echo "This PR has multiple preview slot labels; refusing deployment."
-              exit 1
-            fi
-            OPEN_PRS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100")
-            CONFLICTING_PR=$(echo "$OPEN_PRS" | jq -r --arg pr "$PR_NUMBER" --arg label "$SLOT_LABEL" '.[] | select((.number | tostring) != $pr) | select(any(.labels[].name; . == $label)) | .number' | head -n 1)
-            if [[ -n "$CONFLICTING_PR" ]]; then
-              echo "$SLOT_LABEL is already assigned to open PR #$CONFLICTING_PR." >&2
-              exit 1
-            fi
-            SLOT=${SLOT_LABEL##*-}
-            echo "stack_name=bucstop-preview-$SLOT" >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == main ]]; then
             echo 'stack_name=bucstop' >> "$GITHUB_OUTPUT"
           elif [[ "$REF_NAME" == stage ]]; then
@@ -203,10 +235,11 @@ jobs:
             echo "A newer commit exists; skipping this obsolete deployment."
             exit 0
           fi
-          if [[ -n "$PR_NUMBER" ]]; then
-            PREVIEW_PR_NUMBER="$PR_NUMBER" bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+          STACK_NAME="${{ steps.stack.outputs.stack_name }}"
+          if [[ -n "$PR_NUMBER" && "$STACK_NAME" =~ ^bucstop-preview-[123]$ ]]; then
+            PREVIEW_PR_NUMBER="$PR_NUMBER" bash ./deploy/deploy.sh "$STACK_NAME"
           else
-            bash ./deploy/deploy.sh "${{ steps.stack.outputs.stack_name }}"
+            bash ./deploy/deploy.sh "$STACK_NAME"
           fi
       - if: steps.release.outputs.site_url != ''
         run: pnpm exec playwright install chromium

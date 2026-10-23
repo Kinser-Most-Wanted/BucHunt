@@ -1,7 +1,7 @@
 name: Deploy
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   push:
     branches: [main, stage]
 permissions:
@@ -34,6 +34,32 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm check:admin
       - run: pnpm test:admin
+  label-stage-pr:
+    if: >-
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'opened' ||
+        github.event.action == 'reopened' ||
+        github.event.action == 'edited') &&
+      (github.event.pull_request.title == 'Stage' ||
+        github.event.pull_request.head.ref == 'stage')
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure the Stage label exists and apply it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/labels/Stage" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+              -f name=Stage \
+              -f color=1A73E8 \
+              -f "description=Stage deployment pull request" >/dev/null
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f 'labels[]=Stage' >/dev/null
   allocate-preview:
     needs: [lint, e2e, verify]
     if: >-

@@ -162,8 +162,19 @@ if EXISTING_STACK=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME
   if [[ -n "$EXISTING_INSTANCE" && "$EXISTING_INSTANCE" != None ]]; then
     IMAGE_ID=$(aws ec2 describe-instances --instance-ids "$EXISTING_INSTANCE" --query 'Reservations[0].Instances[0].ImageId' --output text)
   elif [[ "$DELETE_ROOT_VOLUME" == false ]]; then
-    echo "Existing persistent stack has no recoverable instance. Restore its data before redeploying." >&2
-    exit 1
+    EXISTING_RESOURCES=$(aws cloudformation list-stack-resources --stack-name "$STACK_NAME" --output json)
+    LEGACY_STATIC_STACK=$(echo "$EXISTING_RESOURCES" | jq -r '
+      [.StackResourceSummaries[]? | select(.ResourceStatus != "DELETE_COMPLETE")] as $resources |
+      (any($resources[]; .LogicalResourceId == "CloudFrontOriginAccessControl" and .ResourceType == "AWS::CloudFront::OriginAccessControl") and
+       any($resources[]; .LogicalResourceId == "WebsiteBucket" and .ResourceType == "AWS::S3::Bucket") and
+       any($resources[]; .LogicalResourceId == "CloudFrontDistribution" and .ResourceType == "AWS::CloudFront::Distribution"))
+    ')
+    if [[ "$LEGACY_STATIC_STACK" == true ]]; then
+      echo "Detected legacy static-site stack; upgrading it while preserving its website bucket and CloudFront distribution."
+    else
+      echo "Existing persistent stack has no recoverable application instance. Restore its data before redeploying." >&2
+      exit 1
+    fi
   fi
 elif [[ "$EXISTING_STACK" != *ValidationError* || "$EXISTING_STACK" != *"Stack with id $STACK_NAME does not exist"* ]]; then
   echo "$EXISTING_STACK" >&2
@@ -171,8 +182,8 @@ elif [[ "$EXISTING_STACK" != *ValidationError* || "$EXISTING_STACK" != *"Stack w
 fi
 IMAGE_ID="${IMAGE_ID:-$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query Parameter.Value --output text)}"
 if [[ ! "$IMAGE_ID" =~ ^ami-[a-f0-9]+$ ]]; then echo "Could not resolve a valid AMI" >&2; exit 1; fi
-# Inspect the actual change set before applying it. Root data cannot silently be
-# abandoned by an instance replacement, removal, or conditional replacement.
+# Inspect the actual change set before applying it. Persistent application data,
+# the production website bucket, and its stable CloudFront URL must be preserved.
 deploy_stack() {
   local change_type=UPDATE change_set parameters changes status reason replacement
   [[ "$STACK_EXISTS" == true ]] || change_type=CREATE
@@ -205,10 +216,10 @@ PARAMETERS
     return 1
   fi
   changes=$(aws cloudformation describe-change-set --stack-name "$STACK_NAME" --change-set-name "$change_set" --output json)
-  replacement=$(echo "$changes" | jq -r 'if (.Changes | type) != "array" then error("Invalid change set") else [.Changes[] | .ResourceChange | select(.LogicalResourceId == "ApplicationInstance" and (.Action == "Remove" or (.Action == "Modify" and .Replacement != "False")))] | length > 0 end')
+  replacement=$(echo "$changes" | jq -r 'if (.Changes | type) != "array" then error("Invalid change set") else [.Changes[] | .ResourceChange | select((.LogicalResourceId == "ApplicationInstance" or .LogicalResourceId == "WebsiteBucket" or .LogicalResourceId == "CloudFrontDistribution") and (.Action == "Remove" or (.Action == "Modify" and .Replacement != "False")))] | length > 0 end')
   if [[ "$DELETE_ROOT_VOLUME" == false && "$replacement" == true ]]; then
     aws cloudformation delete-change-set --stack-name "$STACK_NAME" --change-set-name "$change_set"
-    echo "Refusing persistent instance replacement/removal. Plan and verify data recovery before a maintenance deployment." >&2
+    echo "Refusing persistent data, website bucket, or stable URL replacement/removal." >&2
     return 1
   fi
   aws cloudformation execute-change-set --stack-name "$STACK_NAME" --change-set-name "$change_set"

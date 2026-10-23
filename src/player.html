@@ -17,8 +17,95 @@
         />
       </a>
       <nav aria-label="Main navigation">
-        <a href="./admin.html">Administration</a>
+        <a href="./admin.html">Hunt Studio</a>
         <a href="./player.html">Player tasks</a>
+        <details
+          data-testid="player-account-menu"
+          class="player-account-menu"
+          hidden
+        >
+          <summary data-testid="player-account" class="player-account">
+            Signed in as <strong data-testid="player-display-name"></strong>
+          </summary>
+          <div class="player-account-dropdown">
+            <div
+              data-testid="player-google-email"
+              class="player-sensitive-detail"
+              hidden
+            >
+              <button
+                type="button"
+                data-testid="email-toggle"
+                aria-expanded="false"
+                aria-controls="player-email-value"
+              >
+                Show Google account email
+              </button>
+              <output
+                id="player-email-value"
+                data-testid="player-email"
+                hidden
+              ></output>
+              <button
+                type="button"
+                class="copy-icon-button"
+                data-testid="copy-email"
+                aria-label="Copy Google account email"
+                title="Copy email"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                  <path
+                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <div
+              data-testid="player-google-account-id"
+              class="player-sensitive-detail"
+              hidden
+            >
+              <button
+                type="button"
+                data-testid="account-id-toggle"
+                aria-expanded="false"
+                aria-controls="player-account-id-value"
+              >
+                Show Google account ID
+              </button>
+              <output
+                id="player-account-id-value"
+                data-testid="account-id-value"
+                hidden
+              ></output>
+              <button
+                type="button"
+                class="copy-icon-button"
+                data-testid="copy-account-id"
+                aria-label="Copy Google account ID"
+                title="Copy account ID"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                  <path
+                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <button
+              type="button"
+              data-testid="player-sign-out"
+              class="player-account-sign-out"
+              hidden
+            >
+              Sign out
+            </button>
+          </div>
+        </details>
       </nav>
     </header>
     <main class="player-page">
@@ -30,82 +117,8 @@
           clue to the next discovery.
         </p>
       </div>
-      <p class="notice player-notice">
-        Your hunt progress is saved to your BucHunt account.
-      </p>
       <section id="display-tasks" data-testid="display-tasks">
         <h2 data-testid="player-heading">Sign in to see active Hunts</h2>
-        <p data-testid="player-account" class="player-account" hidden>
-          Signed in as <strong data-testid="player-display-name"></strong>
-        </p>
-        <div
-          data-testid="player-google-email"
-          class="player-sensitive-detail"
-          hidden
-        >
-          <button
-            type="button"
-            data-testid="email-toggle"
-            aria-expanded="false"
-            aria-controls="player-email-value"
-          >
-            Show Google account email
-          </button>
-          <output
-            id="player-email-value"
-            data-testid="player-email"
-            hidden
-          ></output>
-          <button
-            type="button"
-            class="copy-icon-button"
-            data-testid="copy-email"
-            aria-label="Copy Google account email"
-            title="Copy email"
-            hidden
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-              <path
-                d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-              ></path>
-            </svg>
-          </button>
-        </div>
-        <div
-          data-testid="player-google-account-id"
-          class="player-sensitive-detail"
-          hidden
-        >
-          <button
-            type="button"
-            data-testid="account-id-toggle"
-            aria-expanded="false"
-            aria-controls="player-account-id-value"
-          >
-            Show Google account ID
-          </button>
-          <output
-            id="player-account-id-value"
-            data-testid="account-id-value"
-            hidden
-          ></output>
-          <button
-            type="button"
-            class="copy-icon-button"
-            data-testid="copy-account-id"
-            aria-label="Copy Google account ID"
-            title="Copy account ID"
-            hidden
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-              <path
-                d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-              ></path>
-            </svg>
-          </button>
-        </div>
         <form data-testid="player-name-form" class="player-name-form" hidden>
           <label for="player-display-name-input"
             >Choose your display name</label
@@ -136,9 +149,6 @@
             </button>
           </div>
         </div>
-        <button type="button" data-testid="player-sign-out" hidden>
-          Sign out
-        </button>
         <p
           class="field-help"
           data-testid="player-provider-status"
@@ -177,7 +187,7 @@
         </section>
       </section>
     </main>
-    <footer>© 2026 Kinser-Most-Wanted · BucHunt</footer>
+    <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>
 </html>

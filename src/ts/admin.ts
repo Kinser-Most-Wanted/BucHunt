@@ -27,17 +27,50 @@ const loginPanel = document.getElementById("admin-login") as HTMLElement | null;
 const googleButton = document.getElementById("google-sign-in") as HTMLElement | null;
 const adminWorkspace = document.getElementById("admin-workspace") as HTMLElement | null;
 const adminDenied = document.getElementById("admin-denied") as HTMLElement | null;
-const signedInPanel = document.getElementById("signed-in") as HTMLElement | null;
+const adminAccessPanel = document.getElementById("admin-access") as HTMLElement | null;
+const accountMenu = document.getElementById("admin-account-menu") as HTMLDetailsElement | null;
+const accountDisplayName = document.querySelector<HTMLElement>('[data-testid="admin-display-name"]');
+const accountEmailDetails = document.querySelector<HTMLElement>('[data-testid="admin-google-email"]');
+const accountEmail = document.querySelector<HTMLOutputElement>('[data-testid="admin-email-value"]');
+const accountEmailToggle = document.querySelector<HTMLButtonElement>('[data-testid="admin-email-toggle"]');
+const accountEmailCopy = document.querySelector<HTMLButtonElement>('[data-testid="admin-copy-email"]');
+const accountIdDetails = document.querySelector<HTMLElement>('[data-testid="admin-google-account-id"]');
+const accountId = document.querySelector<HTMLOutputElement>('[data-testid="admin-id-value"]');
+const accountIdToggle = document.querySelector<HTMLButtonElement>('[data-testid="admin-id-toggle"]');
+const accountIdCopy = document.querySelector<HTMLButtonElement>('[data-testid="admin-copy-id"]');
+const accountStatus = document.querySelector<HTMLElement>('[data-testid="admin-account-status"]');
 const isHomePage = document.body.dataset.page === "home";
 const isAdminPage = document.body.dataset.page === "admin";
 const statusText = document.getElementById("admin-status") as HTMLElement;
-const identity = document.getElementById("admin-identity") as HTMLElement | null;
 const signOut = document.getElementById("sign-out") as HTMLButtonElement | null;
 const homeSignInLink = document.getElementById("home-sign-in-link") as HTMLElement | null;
 const PLAYER_SESSION_KEY = "buchunt.player-session";
+const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let google: GoogleIdentity | undefined;
 let verifiedCredential: string | undefined;
+function warmGoogleSignIn() {
+  return Promise.allSettled([
+    loadGoogle(),
+    request("/api/auth/config"),
+  ]);
+}
+let homeGoogleWarmup = isHomePage ? warmGoogleSignIn() : undefined;
+async function getGoogleConfig() {
+  if (homeGoogleWarmup) {
+    const warmup = homeGoogleWarmup;
+    homeGoogleWarmup = undefined;
+    const [scriptResult, configResult] = await warmup;
+    if (scriptResult.status === "rejected") throw scriptResult.reason;
+    if (configResult.status === "rejected") throw configResult.reason;
+    return configResult.value;
+  }
+  const [, config] = await Promise.all([
+    loadGoogle(),
+    request("/api/auth/config"),
+  ]);
+  return config;
+}
 
 function clearPlayerSession(): void {
   try { sessionStorage.removeItem(PLAYER_SESSION_KEY); } catch { /* Storage may be unavailable. */ }
@@ -69,6 +102,83 @@ function rememberPlayerSession(user: { subject?: unknown; email?: unknown }, cre
     }));
   } catch { /* The server session remains authoritative if browser storage is unavailable. */ }
 }
+function setAccountMenu(user: { subject?: unknown; email?: unknown; role?: unknown }): void {
+  if (!accountMenu) return;
+  const subject = typeof user.subject === "string" ? user.subject : "";
+  const email = typeof user.email === "string" ? user.email : "";
+  let nickname = email.split("@")[0] || "Google account";
+  try {
+    const savedName = localStorage
+      .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${subject}`)
+      ?.trim();
+    if (savedName) nickname = savedName;
+  } catch {
+    // Use the Google account name if browser storage is unavailable.
+  }
+  if (accountDisplayName) {
+    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
+  }
+  if (accountEmail) accountEmail.textContent = email;
+  if (accountId) accountId.textContent = subject;
+  if (accountMenu) {
+    accountMenu.hidden = false;
+    accountMenu.open = false;
+  }
+  if (accountEmailDetails) accountEmailDetails.hidden = false;
+  if (accountEmail) accountEmail.hidden = true;
+  if (accountEmailToggle) {
+    accountEmailToggle.hidden = false;
+    accountEmailToggle.textContent = "Show Google account email";
+    accountEmailToggle.setAttribute("aria-expanded", "false");
+  }
+  if (accountEmailCopy) accountEmailCopy.hidden = true;
+  if (accountIdDetails) accountIdDetails.hidden = false;
+  if (accountId) accountId.hidden = true;
+  if (accountIdToggle) {
+    accountIdToggle.hidden = false;
+    accountIdToggle.textContent = "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", "false");
+  }
+  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountStatus) {
+    accountStatus.hidden = true;
+    accountStatus.textContent = "";
+  }
+}
+function toggleAccountDetail(
+  value: HTMLOutputElement | null,
+  toggle: HTMLButtonElement | null,
+  copy: HTMLButtonElement | null,
+  label: string,
+): void {
+  if (!value || !toggle || !copy) return;
+  value.hidden = !value.hidden;
+  const revealed = !value.hidden;
+  copy.hidden = !revealed;
+  toggle.textContent = `${revealed ? "Hide" : "Show"} Google account ${label}`;
+  toggle.setAttribute("aria-expanded", String(revealed));
+}
+function copyAccountDetail(
+  value: HTMLOutputElement | null,
+  label: string,
+): void {
+  if (!value || !accountStatus) return;
+  void navigator.clipboard.writeText(value.textContent ?? "").then(() => {
+    accountStatus.textContent = `Google account ${label} copied.`;
+    accountStatus.hidden = false;
+  }).catch(() => {
+    accountStatus.textContent = `Could not copy the Google account ${label}.`;
+    accountStatus.hidden = false;
+  });
+}
+accountEmailToggle?.addEventListener("click", () =>
+  toggleAccountDetail(accountEmail, accountEmailToggle, accountEmailCopy, "email"),
+);
+accountIdToggle?.addEventListener("click", () =>
+  toggleAccountDetail(accountId, accountIdToggle, accountIdCopy, "ID"),
+);
+accountEmailCopy?.addEventListener("click", () => copyAccountDetail(accountEmail, "email"));
+accountIdCopy?.addEventListener("click", () => copyAccountDetail(accountId, "ID"));
 function signedOut(message: string): void {
   clearTimeout(expiryTimer);
   clearPlayerSession();
@@ -76,9 +186,32 @@ function signedOut(message: string): void {
   if (googleButton) googleButton.hidden = !isHomePage;
   if (adminWorkspace) adminWorkspace.hidden = true;
   if (adminDenied) adminDenied.hidden = true;
-  if (signedInPanel) signedInPanel.hidden = true;
+  if (adminAccessPanel) adminAccessPanel.hidden = false;
+  if (accountMenu) {
+    accountMenu.hidden = true;
+    accountMenu.open = false;
+  }
+  if (accountEmailDetails) accountEmailDetails.hidden = true;
+  if (accountEmail) accountEmail.hidden = true;
+  if (accountEmailToggle) {
+    accountEmailToggle.hidden = false;
+    accountEmailToggle.textContent = "Show Google account email";
+    accountEmailToggle.setAttribute("aria-expanded", "false");
+  }
+  if (accountEmailCopy) accountEmailCopy.hidden = true;
+  if (accountIdDetails) accountIdDetails.hidden = true;
+  if (accountId) accountId.hidden = true;
+  if (accountIdToggle) {
+    accountIdToggle.hidden = false;
+    accountIdToggle.textContent = "Show Google account ID";
+    accountIdToggle.setAttribute("aria-expanded", "false");
+  }
+  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountStatus) {
+    accountStatus.hidden = true;
+    accountStatus.textContent = "";
+  }
   if (homeSignInLink) homeSignInLink.hidden = false;
-  if (identity) identity.textContent = "";
   statusText.textContent = message;
 }
 async function request(path: string, body?: unknown) {
@@ -109,11 +242,11 @@ async function showSession(): Promise<void> {
   if (isAdministrator && isAdminPage) await request("/api/admin/capabilities");
   if (loginPanel) loginPanel.hidden = true;
   if (googleButton) googleButton.hidden = true;
-  if (signedInPanel) signedInPanel.hidden = false;
+  if (adminAccessPanel) adminAccessPanel.hidden = isAdministrator;
+  if (accountMenu) setAccountMenu(user);
   if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
   if (adminDenied) adminDenied.hidden = isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;
-  if (identity) identity.textContent = `Signed in as ${typeof user.email === "string" ? user.email : "your Google account"}.`;
   statusText.textContent = isAdministrator
     ? "Administrator access verified."
     : "";
@@ -130,8 +263,7 @@ function showError(error: unknown): void {
 }
 async function prepareGoogle(): Promise<void> {
   if (!isHomePage || !googleButton) return;
-  await loadGoogle();
-  const config = await request("/api/auth/config");
+  const config = await getGoogleConfig();
   google?.accounts.id.initialize({
     client_id: config.clientId,
     nonce: config.nonce,

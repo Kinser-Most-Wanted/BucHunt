@@ -72,6 +72,10 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     };
   });
 
+  await page.route("**/api/player/account/hunts", (route) =>
+    route.fulfill({ json: { ok: true, value: [] } }),
+  );
+
   await page.route("**/api/auth/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/auth/config") {
@@ -110,17 +114,62 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign in with Google" }).click();
   await expect(page).toHaveURL(/player\.html$/);
-  await expect(page.getByTestId("player-task-status")).toBeVisible();
-  await page.getByRole("link", { name: "Administration", exact: true }).click();
+  await expect(page.getByTestId("player-name-form")).toBeVisible();
+  await page.getByTestId("player-display-name-input").fill("Baja");
+  await page.getByRole("button", { name: "Save name and continue" }).click();
+  await expect(page.getByTestId("player-account-menu")).toBeVisible();
+  await expect(page.getByTestId("player-display-name")).toHaveText(
+    "Baja (Admin)",
+  );
+  await page.getByRole("link", { name: "Hunt Studio", exact: true }).click();
   await expect(page.locator("#admin-status")).toHaveText(
     "Administrator access verified.",
   );
+  await expect(page.locator("#admin-access")).toBeHidden();
   await expect(page.locator("#admin-workspace")).toBeVisible();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
-  await page.locator("#sign-out").click();
+  await expect(page.getByTestId("admin-account-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-display-name")).toContainText("(Admin)");
+  await page.getByTestId("admin-account").click();
+  await expect(page.getByTestId("admin-sign-out")).toBeVisible();
+  await page.getByTestId("admin-sign-out").click();
   await expect(page.locator("#admin-workspace")).toBeHidden();
   await expect(page.locator("#admin-login")).toBeVisible();
   await expect(page.locator("#home-sign-in-link")).toBeVisible();
+});
+
+test("admin sign-in prompt stays hidden while session is loading", async ({
+  page,
+}) => {
+  let finishSessionCheck!: () => void;
+  const sessionCheck = new Promise<void>((resolve) => {
+    finishSessionCheck = resolve;
+  });
+  const administrator = {
+    subject: "google-subject-admin",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+
+  await page.route("**/api/auth/session", async (route) => {
+    await sessionCheck;
+    await route.fulfill({ json: { user: administrator } });
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: { administrator, capabilities: ["administrative.access"] },
+    }),
+  );
+
+  await page.goto("/admin.html");
+  await expect(page.locator("#admin-login")).toBeHidden();
+  await expect(page.locator("#admin-status")).toHaveText(
+    "Checking administrator session...",
+  );
+
+  finishSessionCheck();
+  await expect(page.locator("#admin-workspace")).toBeVisible();
 });
 
 test("non-admin Google accounts cannot view Hunt Studio tools", async ({
@@ -140,7 +189,12 @@ test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   await expect(page.locator("#admin-denied")).toBeVisible();
   await expect(page.getByTestId("admin-workspace")).toBeHidden();
   await expect(page.getByTestId("hunt-form")).toBeHidden();
-  await expect(page.locator("#sign-out")).toBeVisible();
+  await expect(page.getByTestId("admin-account-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-display-name")).not.toContainText(
+    "(Admin)",
+  );
+  await page.getByTestId("admin-account").click();
+  await expect(page.getByTestId("admin-sign-out")).toBeVisible();
 });
 
 test("player account endpoints require bearer identity and never issue cookies", async ({

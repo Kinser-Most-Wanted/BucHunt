@@ -33,6 +33,22 @@ function storedIdentity(): PlayerIdentity | null {
   return null;
 }
 
+async function currentAccountRole(): Promise<"administrator" | "user"> {
+  try {
+    const response = await fetch("/api/auth/session", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) return "user";
+    const payload = (await response.json()) as {
+      user?: { role?: unknown };
+    };
+    return payload.user?.role === "administrator" ? "administrator" : "user";
+  } catch {
+    return "user";
+  }
+}
+
 function taskLocationElement(
   location: PlayerHunt["tasks"][number]["location"],
 ): HTMLParagraphElement | null {
@@ -42,7 +58,7 @@ function taskLocationElement(
   const details = document.createElement("p");
   details.className = "task-location";
   details.append(
-    document.createTextNode(`Location: ${latitude}, ${longitude} � `),
+    document.createTextNode(`Location: ${latitude}, ${longitude} \u00b7 `),
   );
   const mapLink = document.createElement("a");
   mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
@@ -106,37 +122,41 @@ export function mountDisplayTasks(
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
   );
-  const signOut = root.querySelector<HTMLButtonElement>(
-    '[data-testid="player-sign-out"]',
+  const signOut =
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="player-sign-out"]',
+    ) ??
+    root.querySelector<HTMLButtonElement>('[data-testid="player-sign-out"]');
+  const findAccountElement = <T extends Element>(selector: string): T | null =>
+    document.querySelector<T>(selector) ?? root.querySelector<T>(selector);
+  const account = findAccountElement<HTMLDetailsElement>(
+    '[data-testid="player-account-menu"]',
   );
-  const account = root.querySelector<HTMLElement>(
-    '[data-testid="player-account"]',
-  );
-  const displayName = root.querySelector<HTMLElement>(
+  const displayName = findAccountElement<HTMLElement>(
     '[data-testid="player-display-name"]',
   );
-  const emailDetails = root.querySelector<HTMLElement>(
+  const emailDetails = findAccountElement<HTMLElement>(
     '[data-testid="player-google-email"]',
   );
-  const email = root.querySelector<HTMLOutputElement>(
+  const email = findAccountElement<HTMLOutputElement>(
     '[data-testid="player-email"]',
   );
-  const emailToggle = root.querySelector<HTMLButtonElement>(
+  const emailToggle = findAccountElement<HTMLButtonElement>(
     '[data-testid="email-toggle"]',
   );
-  const copyEmail = root.querySelector<HTMLButtonElement>(
+  const copyEmail = findAccountElement<HTMLButtonElement>(
     '[data-testid="copy-email"]',
   );
-  const accountIdDetails = root.querySelector<HTMLElement>(
+  const accountIdDetails = findAccountElement<HTMLElement>(
     '[data-testid="player-google-account-id"]',
   );
-  const accountIdToggle = root.querySelector<HTMLButtonElement>(
+  const accountIdToggle = findAccountElement<HTMLButtonElement>(
     '[data-testid="account-id-toggle"]',
   );
-  const accountIdValue = root.querySelector<HTMLOutputElement>(
+  const accountIdValue = findAccountElement<HTMLOutputElement>(
     '[data-testid="account-id-value"]',
   );
-  const copyAccountId = root.querySelector<HTMLButtonElement>(
+  const copyAccountId = findAccountElement<HTMLButtonElement>(
     '[data-testid="copy-account-id"]',
   );
   const nameForm = root.querySelector<HTMLFormElement>(
@@ -187,6 +207,7 @@ export function mountDisplayTasks(
     setGoogleSignInEnabled(true);
     signOut.hidden = true;
     account.hidden = true;
+    account.open = false;
     emailDetails.hidden = true;
     email.hidden = true;
     emailToggle.hidden = false;
@@ -217,7 +238,12 @@ export function mountDisplayTasks(
     heading.textContent = "Your Hunts";
     signOut.hidden = false;
     account.hidden = false;
-    displayName.textContent = name;
+    displayName.textContent = `${name} (Player)`;
+    void currentAccountRole().then((role) => {
+      if (account.hidden || storedIdentity()?.accountId !== signedIn.accountId)
+        return;
+      displayName.textContent = `${name} (${role === "administrator" ? "Admin" : "Player"})`;
+    });
     email.textContent = signedIn.email;
     emailDetails.hidden = false;
     email.hidden = true;

@@ -28,6 +28,15 @@ export interface HuntRepository {
     huntId: string,
     input: TaskInput,
   ): Promise<OperationResult<TaskDefinition>>;
+  updateTask(
+    huntId: string,
+    taskId: string,
+    input: TaskInput,
+  ): Promise<OperationResult<TaskDefinition>>;
+  deleteTask(
+    huntId: string,
+    taskId: string,
+  ): Promise<OperationResult<{ deleted: true }>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
   joinHunt(

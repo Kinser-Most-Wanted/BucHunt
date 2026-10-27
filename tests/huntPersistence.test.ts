@@ -43,12 +43,35 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
     );
     const restarted = new HuntStore(path);
     expect((await restarted.get(hunt.id)).tasks).toHaveLength(12);
+    const original = (await restarted.get(hunt.id)).tasks[0];
+    const updated = await store.updateTask(hunt.id, original.id, {
+      ...task,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
+    expect(updated.id).toBe(original.id);
+    expect(updated.displayLabel).toBe("Updated fountain");
+    expect(updated.requiredAnswer).toBe("New answer");
     const before = await readFile(path, "utf8");
+    await expect(
+      store.updateTask(hunt.id, original.id, {
+        ...task,
+        displayLabel: "Corrupted task",
+        requiredAnswer: "",
+      }),
+    ).rejects.toThrow("invalid");
     await expect(store.addTask(hunt.id, task)).rejects.toThrow("invalid");
     await expect(
       store.addTask(hunt.id, { ...task, requiredAnswer: "", order: 20 }),
     ).rejects.toThrow("invalid");
     expect(await readFile(path, "utf8")).toBe(before);
+    expect(await store.deleteTask(hunt.id, original.id)).toEqual({
+      deleted: true,
+    });
+    expect((await restarted.get(hunt.id)).tasks).toHaveLength(11);
+    await expect(store.deleteTask(hunt.id, original.id)).rejects.toThrow(
+      "Task not found.",
+    );
     const progressPath = join(directory, "player-progress.json");
     await new PlayerProgressStore(progressPath).complete(
       "player-a",
@@ -189,6 +212,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
       })
     ).json();
     expect(saved.ok).toBe(true);
+    const taskRoute = route + "/tasks/" + saved.value.id;
     for (const cookie of [
       stranger.cookie,
       collaborator.cookie,
@@ -203,6 +227,26 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
             method: "POST",
             headers: headers(cookie),
             body: JSON.stringify({ ...task, order: 2 }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await fetch(base + taskRoute, {
+            method: "PATCH",
+            headers: headers(cookie),
+            body: JSON.stringify({
+              ...task,
+              displayLabel: "Unauthorized edit",
+            }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await fetch(base + taskRoute, {
+            method: "DELETE",
+            headers: { ...headers(cookie), "Content-Type": "application/json" },
           })
         ).status,
       ).toBe(403);
@@ -246,15 +290,63 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         ).json()
       ).value,
     ).toEqual([{ id, name: input.name, role: "contributor" }]);
+    const contributedTask = await (
+      await fetch(base + route + "/tasks", {
+        method: "POST",
+        headers: headers(collaborator.cookie),
+        body: JSON.stringify({ ...task, order: 2 }),
+      })
+    ).json();
+    expect(contributedTask.ok).toBe(true);
+    const contributedTaskRoute = route + "/tasks/" + contributedTask.value.id;
+
+    const changedAnswer = await fetch(base + taskRoute, {
+      method: "PATCH",
+      headers: admin,
+      body: JSON.stringify({
+        ...task,
+        displayLabel: "Updated fountain",
+        requiredAnswer: "New answer",
+      }),
+    });
+    expect(changedAnswer.status).toBe(200);
+    expect((await changedAnswer.json()).value).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
+    const savedConfig = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    const rejectedEdit = await fetch(base + taskRoute, {
+      method: "PATCH",
+      headers: admin,
+      body: JSON.stringify({
+        ...task,
+        displayLabel: "Corrupted task",
+        requiredAnswer: "",
+      }),
+    });
+    expect(rejectedEdit.status).toBe(400);
     expect(
-      (
-        await fetch(base + route + "/tasks", {
-          method: "POST",
-          headers: headers(collaborator.cookie),
-          body: JSON.stringify({ ...task, order: 2 }),
-        })
-      ).status,
-    ).toBe(201);
+      (await (await fetch(base + route, { headers: admin })).json()).value,
+    ).toEqual(savedConfig.value);
+
+    const removed = await fetch(base + contributedTaskRoute, {
+      method: "DELETE",
+      headers: headers(collaborator.cookie),
+    });
+    expect(removed.status).toBe(200);
+    expect((await removed.json()).value).toEqual({ deleted: true });
+    const afterDelete = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    expect(afterDelete.value.tasks).toHaveLength(1);
+    expect(afterDelete.value.tasks[0]).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+    });
+
     expect(
       (
         await fetch(base + route + "/contributors", {
@@ -281,7 +373,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         await fetch(base + answerPath, {
           method: "POST",
           headers: headers(playerCookie),
-          body: '{"answer":"wrong"}',
+          body: '{"answer":"bucky"}',
         })
       ).status,
     ).toBe(400);
@@ -290,7 +382,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         await fetch(base + answerPath, {
           method: "POST",
           headers: headers(playerCookie),
-          body: '{"answer":"bucky"}',
+          body: '{"answer":"new answer"}',
         })
       ).status,
     ).toBe(200);
@@ -303,15 +395,21 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
     await stop();
     app = createApplication({ dataDirectory: directory });
     base = await start();
-    expect(
-      (
-        await (
-          await fetch(base + `/api/player/hunts/${id}`, {
-            headers: headers(playerCookie),
-          })
-        ).json()
-      ).value.tasks[0].completed,
-    ).toBe(true);
+    const restoredHunt = await (
+      await fetch(base + `/api/player/hunts/${id}`, {
+        headers: headers(playerCookie),
+      })
+    ).json();
+    expect(restoredHunt.value.tasks[0].completed).toBe(true);
+    const restoredConfig = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    expect(restoredConfig.value.tasks).toHaveLength(1);
+    expect(restoredConfig.value.tasks[0]).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
     expect(
       (await fetch(base + route, { headers: headers(collaborator.cookie) }))
         .status,

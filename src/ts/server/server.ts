@@ -332,12 +332,16 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const taskMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/tasks\/([a-zA-Z0-9-]+)$/.exec(
+            path,
+          );
         const match =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/(browser:[a-f0-9]{64}))?)?$/.exec(
             path,
           );
-        if (match) {
-          const hunt = await hunts.get(match[1]);
+        if (match || taskMatch) {
+          const hunt = await hunts.get(match?.[1] ?? taskMatch![1]);
           const owner = hunt.ownerId === creatorId;
           if (
             !owner &&
@@ -351,21 +355,39 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
-          if (!match[2] && method === "GET") {
+          if (taskMatch && method === "PATCH") {
+            json(response, 200, {
+              ok: true,
+              value: await hunts.updateTask(
+                hunt.id,
+                taskMatch[2],
+                await body(request),
+              ),
+            });
+            return;
+          }
+          if (taskMatch && method === "DELETE") {
+            json(response, 200, {
+              ok: true,
+              value: await hunts.deleteTask(hunt.id, taskMatch[2]),
+            });
+            return;
+          }
+          if (match && !match[2] && method === "GET") {
             json(response, 200, {
               ok: true,
               value: await hunts.getWithAccessCode(hunt.id),
             });
             return;
           }
-          if (match[2] === "tasks" && !match[3] && method === "POST") {
+          if (match && match[2] === "tasks" && !match[3] && method === "POST") {
             json(response, 201, {
               ok: true,
               value: await hunts.addTask(hunt.id, await body(request)),
             });
             return;
           }
-          if (match[2] === "contributors") {
+          if (match && match[2] === "contributors") {
             if (!owner) {
               json(response, 403, {
                 ok: false,

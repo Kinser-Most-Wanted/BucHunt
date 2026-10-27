@@ -64,7 +64,10 @@ function showIssues(root: HTMLElement, messages: string[]): void {
   }
 }
 
-function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
+function mountLocationPicker(
+  root: HTMLElement,
+  form: HTMLFormElement,
+): ((point: MapPoint, label?: string) => void) | undefined {
   const mapElement = root.querySelector<HTMLDivElement>(
     '[data-testid="task-location-map"]',
   );
@@ -213,6 +216,10 @@ function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
   status.textContent =
     "Search for a place or click the map to choose a location.";
   window.requestAnimationFrame(() => map.invalidateSize());
+  return (point, label) => {
+    map.setView([point.lat, point.lng], 18);
+    setLocation(point, label);
+  };
 }
 
 function renderTasks(root: HTMLElement, tasks: TaskDefinition[]): void {
@@ -236,7 +243,24 @@ function renderTasks(root: HTMLElement, tasks: TaskDefinition[]): void {
     const description = document.createElement("span");
     description.textContent = task.description;
     content.append(label, description);
-    item.append(order, content);
+
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.dataset.testid = "edit-task";
+    edit.dataset.taskAction = "edit";
+    edit.dataset.taskId = task.id;
+    edit.setAttribute("aria-label", `Edit task: ${task.displayLabel}`);
+    edit.textContent = "Edit";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.testid = "delete-task";
+    remove.dataset.taskAction = "delete";
+    remove.dataset.taskId = task.id;
+    remove.setAttribute("aria-label", `Delete task: ${task.displayLabel}`);
+    remove.textContent = "Delete";
+
+    item.append(order, content, edit, remove);
     list.append(item);
   }
 }
@@ -249,12 +273,88 @@ export function mountDefineTask(
   const form = root.querySelector<HTMLFormElement>('[data-testid="task-form"]');
   const status = root.querySelector<HTMLElement>('[data-testid="task-status"]');
   if (!form || !status) return;
-  mountLocationPicker(root, form);
-  root.addEventListener("hunt-selected", () => {
-    renderTasks(root, []);
-    showIssues(root, []);
+  const setTaskLocation = mountLocationPicker(root, form);
+  const taskList = root.querySelector<HTMLOListElement>(
+    '[data-testid="defined-task-list"]',
+  );
+  const submitButton = form.querySelector<HTMLButtonElement>(
+    'button[type="submit"]',
+  );
+  if (!taskList || !submitButton) return;
+  const addTaskLabel = submitButton.textContent ?? "Add task to hunt";
+  const cancelEdit = document.createElement("button");
+  cancelEdit.type = "button";
+  cancelEdit.dataset.testid = "cancel-task-edit";
+  cancelEdit.textContent = "Cancel edit";
+  cancelEdit.hidden = true;
+  submitButton.after(cancelEdit);
+
+  let displayedTasks: TaskDefinition[] = [];
+  let editingTaskId: string | null = null;
+  const huntInput = field<HTMLInputElement>(form, "huntId");
+  const orderInput = field<HTMLInputElement>(form, "order");
+  const resetEditor = (huntId = huntInput?.value.trim() ?? ""): void => {
+    editingTaskId = null;
+    submitButton.textContent = addTaskLabel;
+    cancelEdit.hidden = true;
+    form.reset();
+    if (huntInput) huntInput.value = huntId;
+    const points = field<HTMLInputElement>(form, "points");
+    if (points) points.value = "0";
+    if (orderInput)
+      orderInput.value = String(
+        Math.max(0, ...displayedTasks.map((task) => task.order)) + 1,
+      );
+  };
+  const showTasks = (tasks: TaskDefinition[]): void => {
+    displayedTasks = tasks;
+    renderTasks(root, tasks);
+  };
+  const editTask = (task: TaskDefinition): void => {
+    editingTaskId = task.id;
+    submitButton.textContent = "Save task changes";
+    cancelEdit.hidden = false;
+    const displayLabel = field<HTMLInputElement>(form, "displayLabel");
+    const description = field<HTMLTextAreaElement>(form, "description");
+    const requiredAnswer = field<HTMLInputElement>(form, "requiredAnswer");
+    const latitude = field<HTMLInputElement>(form, "latitude");
+    const longitude = field<HTMLInputElement>(form, "longitude");
     const order = field<HTMLInputElement>(form, "order");
-    if (order) order.value = "1";
+    const points = field<HTMLInputElement>(form, "points");
+    const hint = field<HTMLInputElement>(form, "hint");
+    const answerCaseSensitive = field<HTMLInputElement>(
+      form,
+      "answerCaseSensitive",
+    );
+    if (displayLabel) displayLabel.value = task.displayLabel;
+    if (description) description.value = task.description;
+    if (requiredAnswer) requiredAnswer.value = task.requiredAnswer;
+    if (latitude) latitude.value = String(task.location.latitude);
+    if (longitude) longitude.value = String(task.location.longitude);
+    if (order) order.value = String(task.order);
+    if (points) points.value = String(task.points);
+    if (hint) hint.value = task.hint ?? "";
+    if (answerCaseSensitive)
+      answerCaseSensitive.checked = task.answerCaseSensitive;
+    setTaskLocation?.({
+      lat: task.location.latitude,
+      lng: task.location.longitude,
+    });
+    showIssues(root, []);
+    status.textContent = `Editing “${task.displayLabel}”. Save your changes or cancel the edit.`;
+    displayLabel?.focus();
+  };
+
+  cancelEdit.addEventListener("click", () => {
+    resetEditor();
+    status.textContent = "Task edit cancelled.";
+  });
+
+  root.addEventListener("hunt-selected", () => {
+    showTasks([]);
+    if (editingTaskId) resetEditor();
+    showIssues(root, []);
+    if (orderInput) orderInput.value = "1";
     status.textContent =
       "Hunt selection updated. Add a task or load its saved tasks.";
   });
@@ -262,7 +362,7 @@ export function mountDefineTask(
   root
     .querySelector('[data-testid="load-admin-hunt"]')
     ?.addEventListener("click", async () => {
-      const id = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
+      const id = huntInput?.value.trim() ?? "";
       if (!id) {
         status.textContent = "Choose a hunt from My hunts first.";
         return;
@@ -273,10 +373,10 @@ export function mountDefineTask(
           showIssues(root, [result.message]);
           return;
         }
-        renderTasks(root, result.value.tasks);
-        const order = field<HTMLInputElement>(form, "order");
-        if (order)
-          order.value = String(
+        if (editingTaskId) resetEditor(id);
+        showTasks(result.value.tasks);
+        if (orderInput)
+          orderInput.value = String(
             Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
           );
         status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
@@ -285,22 +385,68 @@ export function mountDefineTask(
       }
     });
 
+  taskList.addEventListener("click", async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "button[data-task-action]",
+    );
+    if (!button) return;
+    const task = displayedTasks.find(
+      (item) => item.id === button.dataset.taskId,
+    );
+    if (!task) return;
+    if (button.dataset.taskAction === "edit") {
+      editTask(task);
+      return;
+    }
+    if (button.dataset.taskAction !== "delete") return;
+    if (!window.confirm(`Delete “${task.displayLabel}” from this hunt?`)) return;
+
+    const huntId = huntInput?.value.trim() ?? "";
+    if (!huntId) {
+      status.textContent = "Choose a hunt from My hunts first.";
+      return;
+    }
+    button.disabled = true;
+    status.textContent = `Deleting “${task.displayLabel}”…`;
+    try {
+      const deleted = await repository.deleteTask(huntId, task.id);
+      if (!deleted.ok) {
+        showIssues(
+          root,
+          deleted.issues?.map((issue) => issue.message) ?? [deleted.message],
+        );
+        status.textContent = "Task was not deleted.";
+        return;
+      }
+      showTasks(displayedTasks.filter((item) => item.id !== task.id));
+      if (editingTaskId === task.id) resetEditor(huntId);
+      const result = await repository.getAdminHunt(huntId);
+      if (result.ok) showTasks(result.value.tasks);
+      status.textContent = result.ok
+        ? `“${task.displayLabel}” was deleted from this hunt.`
+        : `“${task.displayLabel}” was deleted, but the task list could not be refreshed: ${result.message}`;
+    } catch {
+      status.textContent = "The task service could not be reached. Try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     showIssues(root, []);
 
-    const huntId = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
+    const huntId = huntInput?.value.trim() ?? "";
     const displayLabel =
       field<HTMLInputElement>(form, "displayLabel")?.value.trim() ?? "";
     const description =
       field<HTMLTextAreaElement>(form, "description")?.value.trim() ?? "";
     const requiredAnswer =
       field<HTMLInputElement>(form, "requiredAnswer")?.value.trim() ?? "";
-    const latitudeValue =
-      field<HTMLInputElement>(form, "latitude")?.value ?? "";
+    const latitudeValue = field<HTMLInputElement>(form, "latitude")?.value ?? "";
     const longitudeValue =
       field<HTMLInputElement>(form, "longitude")?.value ?? "";
-    const orderValue = field<HTMLInputElement>(form, "order")?.value ?? "";
+    const orderValue = orderInput?.value ?? "";
     const pointsValue = field<HTMLInputElement>(form, "points")?.value ?? "0";
     const hintValue = field<HTMLInputElement>(form, "hint")?.value.trim() ?? "";
     const answerCaseSensitive =
@@ -349,44 +495,44 @@ export function mountDefineTask(
       hint: hintValue || null,
       points,
     };
-    const button = form.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
-    if (button) button.disabled = true;
-    status.textContent = "Saving task…";
+    const taskIdBeingEdited = editingTaskId;
+    submitButton.disabled = true;
+    status.textContent = taskIdBeingEdited
+      ? "Saving task changes…"
+      : "Saving task…";
     try {
-      const saved = await repository.addTask(huntId, task);
+      const saved = taskIdBeingEdited
+        ? await repository.updateTask(huntId, taskIdBeingEdited, task)
+        : await repository.addTask(huntId, task);
       if (!saved.ok) {
         showIssues(
           root,
           saved.issues?.map((issue) => issue.message) ?? [saved.message],
         );
-        status.textContent = "Task was not saved.";
+        status.textContent = taskIdBeingEdited
+          ? "Task changes were not saved."
+          : "Task was not saved.";
         return;
       }
 
-      status.textContent = "Task saved. Refreshing the hunt task list…";
+      const verb = taskIdBeingEdited ? "updated" : "saved";
+      resetEditor(huntId);
+      status.textContent = `Task ${verb}. Refreshing the hunt task list…`;
       const result = await repository.getAdminHunt(huntId);
       if (result.ok) {
-        renderTasks(root, result.value.tasks);
-        status.textContent = `“${saved.value.displayLabel}” was saved and appears in this hunt’s task list.`;
-        form.reset();
-        const pointsInput = field<HTMLInputElement>(form, "points");
-        const orderInput = field<HTMLInputElement>(form, "order");
-        if (pointsInput) pointsInput.value = "0";
+        showTasks(result.value.tasks);
+        status.textContent = `“${saved.value.displayLabel}” was ${verb} and appears in this hunt’s task list.`;
         if (orderInput)
           orderInput.value = String(
-            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+            Math.max(0, ...result.value.tasks.map((item) => item.order)) + 1,
           );
-        const huntInput = field<HTMLInputElement>(form, "huntId");
-        if (huntInput) huntInput.value = huntId;
       } else {
-        status.textContent = `Task was saved, but the updated hunt list could not be loaded: ${result.message}`;
+        status.textContent = `Task was ${verb}, but the updated hunt list could not be loaded: ${result.message}`;
       }
     } catch {
       status.textContent = "The task service could not be reached. Try again.";
     } finally {
-      if (button) button.disabled = false;
+      submitButton.disabled = false;
     }
   });
 }

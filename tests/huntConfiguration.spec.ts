@@ -257,6 +257,32 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
+
+  await page.getByTestId("edit-task").click();
+  await expect(page.getByLabel("Display label", { exact: true })).toHaveValue(
+    "Find the fountain",
+  );
+  await expect(page.locator('[name="latitude"]')).toHaveValue("36.302");
+  await expect(page.locator('[name="longitude"]')).toHaveValue("-82.369");
+  await page.getByLabel("Display label", { exact: true }).fill("The Blue Fountain");
+  await page.getByLabel("Clue and instructions").fill("Read the new plaque");
+  await page.getByLabel("Required answer", { exact: true }).fill("Campus bell");
+  await page.getByRole("button", { name: "Save task changes" }).click();
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was updated and appears",
+  );
+  await expect(page.getByTestId("defined-task-list")).toContainText(
+    "The Blue Fountain",
+  );
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("delete-task").click();
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was deleted from this hunt",
+  );
+  await expect(page.getByTestId("defined-task-list")).not.toContainText(
+    "The Blue Fountain",
+  );
 });
 
 test("only owners and contributors can configure a hunt through the creator workspace", async ({

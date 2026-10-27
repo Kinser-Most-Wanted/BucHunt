@@ -648,9 +648,6 @@ export function mountDisplayTasks(
     const intro = document.createElement("div");
     intro.className = "player-hunt-intro";
     huntName.before(intro);
-    const closeButton = huntDetails.querySelector<HTMLButtonElement>(
-      '[data-testid="close-player-hunt-details"]',
-    );
     intro.append(huntName, huntDescription, huntStatus);
 
     let huntRequest = 0;

@@ -243,16 +243,20 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "36.304000, -82.368000",
   );
   const mapToggle = page.getByRole("button", {
-    name: "Show map for Old Fountain",
+    name: "Show Task Location",
   });
   await mapToggle.click();
-  const taskMap = page.getByTitle("Map for Old Fountain");
+  const taskMap = page.getByTitle("Task location map");
   await expect(taskMap).toBeVisible();
+  await expect(page.getByLabel("Answer for Library Steps")).toHaveCSS(
+    "min-height",
+    "56px",
+  );
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");
   expect(marker?.split(",").map(Number)).toEqual([36.304, -82.368]);
-  await page.getByRole("button", { name: "Hide map for Old Fountain" }).click();
+  await page.getByRole("button", { name: "Hide Task Location" }).click();
   await expect(taskMap).toBeHidden();
   await expect(page.getByTestId("player-task-list")).toContainText("Completed");
   await expect(page.getByTestId("player-task-list")).toContainText(

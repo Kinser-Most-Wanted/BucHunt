@@ -2241,15 +2241,40 @@ body[data-page="player"] .hunt-access-code {
   font-size: 1.5rem;
 }
 .player-hunt-details > h2 {
+  max-width: 30ch;
   margin: 0.25rem 0 0.4rem;
   color: #f7f7fa;
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  letter-spacing: -0.05em;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.player-hunt-details > h2[data-content-length="medium"] {
+  font-size: clamp(1.75rem, 3.5vw, 2.3rem);
+}
+.player-hunt-details > h2[data-content-length="long"] {
+  font-size: clamp(1.5rem, 3vw, 2rem);
 }
 .player-hunt-details .details-status,
 .player-hunt-details .details-description,
 .player-hunt-details .details-muted {
   color: #aab3c1;
+}
+.player-hunt-details .details-description {
+  max-width: 54ch;
+  margin: 0.75rem 0 1rem;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.player-hunt-details .details-description[data-content-length="medium"] {
+  max-width: 66ch;
+  font-size: 1.02rem;
+}
+.player-hunt-details .details-description[data-content-length="long"] {
+  max-width: 72ch;
+  font-size: 1rem;
 }
 .player-hunt-details > section {
   margin: 1rem 0 0;
@@ -2300,14 +2325,43 @@ body[data-page="player"] .hunt-access-code {
   font-weight: 700;
 }
 .player-hunt-details .task-location {
-  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.7rem;
+  background: rgb(255 255 255 / 3%);
 }
-.player-hunt-details .task-location > button {
+.player-hunt-details .task-location-caption {
   margin: 0;
-  border: 1px solid rgb(255 199 44 / 28%);
+  color: #99a7b9;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.player-hunt-details .task-location-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgb(255 199 44 / 30%);
   border-radius: 0.65rem;
-  background: rgb(255 199 44 / 10%);
-  color: #ffc72c;
+  background: #15345d;
+  color: #f8d66b;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.player-hunt-details .task-location-toggle:hover:not(:disabled) {
+  border-color: rgb(255 199 44 / 60%);
+  background: #1a416f;
 }
 .player-hunt-details .task-location-map {
   display: block;
@@ -2321,18 +2375,69 @@ body[data-page="player"] .hunt-access-code {
 .player-hunt-details .task-location-map[hidden] {
   display: none;
 }
-.player-hunt-details form {
+.player-hunt-details form.task-answer-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+.player-hunt-details .task-answer-label {
+  margin: 0;
+  color: #e4e9f1;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.player-hunt-details .task-answer-input {
+  width: 100%;
+  min-height: 3.5rem;
+  margin-top: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 0.7rem;
+  background: #f7f9fc;
+  color: #15253c;
+  font-size: 1.05rem;
+}
+.player-hunt-details .task-answer-input:focus-visible {
+  border-color: #ffc72c;
+  outline: 3px solid rgb(255 199 44 / 35%);
+  outline-offset: 2px;
+}
+.player-hunt-details .task-answer-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 0.65rem;
-  margin-top: 0.8rem;
+  align-items: center;
+  gap: 0.75rem;
 }
-.player-hunt-details form label {
-  flex: 1 1 15rem;
+.player-hunt-details .task-answer-submit {
+  min-height: 2.8rem;
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border: 1px solid #ffc72c;
+  border-radius: 0.65rem;
+  background: #ffc72c;
+  color: #10294a;
+  font-size: 0.9rem;
+  font-weight: 750;
+  box-shadow: 0 5px 16px rgb(0 0 0 / 16%);
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
-.player-hunt-details form input {
-  margin-top: 0.35rem;
+.player-hunt-details .task-answer-submit:hover:not(:disabled) {
+  background: #ffd95f;
+  box-shadow: 0 7px 20px rgb(0 0 0 / 22%);
+  transform: translateY(-1px);
+}
+.player-hunt-details .task-answer-message {
+  margin: 0;
+  color: #ffc8bd;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.player-hunt-details .task-answer-message:empty {
+  display: none;
 }
 @media (max-width: 38rem) {
   body[data-page="player"] > header {

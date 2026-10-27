@@ -49,20 +49,23 @@ async function currentAccountRole(): Promise<"administrator" | "user" | null> {
 
 function taskLocationElement(
   location: PlayerHunt["tasks"][number]["location"],
-  label: string,
 ): HTMLDivElement | null {
   if (!location) return null;
   const latitude = location.latitude;
   const longitude = location.longitude;
   const details = document.createElement("div");
   details.className = "task-location";
+  const caption = document.createElement("p");
+  caption.className = "task-location-caption";
+  caption.textContent = "Task location";
   const mapToggle = document.createElement("button");
   mapToggle.type = "button";
-  mapToggle.textContent = `Show map for ${label}`;
+  mapToggle.className = "task-location-toggle";
+  mapToggle.textContent = "Show Task Location";
   mapToggle.setAttribute("aria-expanded", "false");
   const map = document.createElement("iframe");
   map.className = "task-location-map";
-  map.title = `Map for ${label}`;
+  map.title = "Task location map";
   map.loading = "lazy";
   map.referrerPolicy = "no-referrer";
   map.hidden = true;
@@ -70,7 +73,7 @@ function taskLocationElement(
     const showing = map.hidden;
     map.hidden = !showing;
     mapToggle.setAttribute("aria-expanded", String(showing));
-    mapToggle.textContent = `${showing ? "Hide" : "Show"} map for ${label}`;
+    mapToggle.textContent = showing ? "Hide Task Location" : "Show Task Location";
     if (showing && !map.src) {
       const padding = 0.005;
       const bounds = [
@@ -84,7 +87,7 @@ function taskLocationElement(
       map.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bounds}&layer=mapnik&marker=${latitude}%2C${longitude}`;
     }
   });
-  details.append(mapToggle, map);
+  details.append(caption, mapToggle, map);
   return details;
 }
 
@@ -125,6 +128,15 @@ function formattedTime(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function contentLength(
+  value: string,
+  shortLimit: number,
+  mediumLimit: number,
+): "short" | "medium" | "long" {
+  const length = value.trim().length;
+  return length <= shortLimit ? "short" : length <= mediumLimit ? "medium" : "long";
 }
 
 function renderHunts(
@@ -617,7 +629,13 @@ export function mountDisplayTasks(
       const phase = huntPhase(hunt, now);
       const completed = hunt.tasks.filter((task) => task.completed).length;
       huntName.textContent = hunt.name;
+      huntName.dataset.contentLength = contentLength(hunt.name, 28, 56);
       huntDescription.textContent = hunt.description;
+      huntDescription.dataset.contentLength = contentLength(
+        hunt.description,
+        120,
+        280,
+      );
       huntStatus.textContent =
         phase === "past"
           ? "Hunt Ended. Your progress is still available to review."
@@ -674,21 +692,29 @@ export function mountDisplayTasks(
           description.textContent = task.description;
           item.append(description);
         }
-        const location = taskLocationElement(task.location, task.displayLabel);
+        const location = taskLocationElement(task.location);
         if (location) item.append(location);
         if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
+          answerForm.className = "task-answer-form";
           const answerLabel = document.createElement("label");
+          answerLabel.className = "task-answer-label";
           answerLabel.textContent = `Answer for ${task.displayLabel}`;
           const answer = document.createElement("input");
+          answer.className = "task-answer-input";
           answer.required = true;
           answerLabel.append(answer);
+          const actions = document.createElement("div");
+          actions.className = "task-answer-actions";
           const submit = document.createElement("button");
           submit.type = "submit";
+          submit.className = "task-answer-submit";
           submit.textContent = "Submit answer";
           const message = document.createElement("p");
+          message.className = "task-answer-message";
           message.setAttribute("role", "status");
-          answerForm.append(answerLabel, submit, message);
+          actions.append(submit, message);
+          answerForm.append(answerLabel, actions);
           answerForm.addEventListener("submit", async (event) => {
             event.preventDefault();
             submit.disabled = true;

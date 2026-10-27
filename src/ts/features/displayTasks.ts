@@ -146,7 +146,8 @@ function huntStatusPresentation(
     return {
       tone: "soon",
       label: "Future Hunt",
-      message: "This Hunt has not started yet. You can review its details here.",
+      message:
+        "This Hunt has not started yet. You can review its details here.",
     };
   }
   if (!hunt.tasks.length) {

@@ -21,6 +21,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       }),
     );
   });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
   await page.route("**/api/auth/logout", (route) =>
     route.fulfill({ json: { signedOut: true } }),
   );
@@ -297,6 +303,12 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
           expiresAt: Math.floor(Date.now() / 1000) + 3600,
         },
       },
+    }),
+  );
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
     }),
   );
   await page.route("**/api/admin/session", (route) =>

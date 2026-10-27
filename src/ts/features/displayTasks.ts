@@ -33,20 +33,18 @@ function storedIdentity(): PlayerIdentity | null {
   return null;
 }
 
-async function currentAccountRole(): Promise<"administrator" | "user"> {
+async function currentAccountRole(): Promise<"administrator" | "user" | null> {
   try {
-    const response = await fetch("/api/auth/session", {
+    const response = await fetch("/api/admin/capabilities", {
       credentials: "same-origin",
       cache: "no-store",
     });
-    if (!response.ok) return "user";
-    const payload = (await response.json()) as {
-      user?: { role?: unknown };
-    };
-    return payload.user?.role === "administrator" ? "administrator" : "user";
+    if (response.ok) return "administrator";
+    if (response.status === 403) return "user";
   } catch {
-    return "user";
+    // Do not mislabel an account when its administrator status is unavailable.
   }
+  return null;
 }
 
 function taskLocationElement(
@@ -238,11 +236,13 @@ export function mountDisplayTasks(
     heading.textContent = "Your Hunts";
     signOut.hidden = false;
     account.hidden = false;
-    displayName.textContent = `${name} (Player)`;
+    displayName.textContent = `${name} (Checking access…)`;
     void currentAccountRole().then((role) => {
       if (account.hidden || storedIdentity()?.accountId !== signedIn.accountId)
         return;
-      displayName.textContent = `${name} (${role === "administrator" ? "Admin" : "Player"})`;
+      displayName.textContent = role
+        ? `${name} (${role === "administrator" ? "Admin" : "Player"})`
+        : name;
     });
     email.textContent = signedIn.email;
     emailDetails.hidden = false;

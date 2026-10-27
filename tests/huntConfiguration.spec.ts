@@ -340,6 +340,7 @@ test(
       await expect(member.getByTestId("my-hunts")).not.toContainText(
         "Shared hunt",
       );
+      console.log("creator-flow: member confirmed removal");
       console.log("creator-flow: contributor page ready");
       expect(
         (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
@@ -395,6 +396,7 @@ test(
         "was saved and appears",
       );
       console.log("creator-flow: contributor task saved");
+      console.log("creator-flow: checking forbidden contributor update");
       expect(
         (
           await contributor.request.post(
@@ -409,12 +411,14 @@ test(
           )
         ).status(),
       ).toBe(403);
+      console.log("creator-flow: forbidden update checked");
       await page
         .getByRole("button", { name: "Remove contributor", exact: true })
         .click();
       await expect(page.getByTestId("contributor-status")).toHaveText(
         "Contributor removed.",
       );
+      console.log("creator-flow: owner removed contributor");
       expect(
         (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
       ).toBe(403);

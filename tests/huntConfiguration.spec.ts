@@ -419,16 +419,29 @@ test(
         "Contributor removed.",
       );
       console.log("creator-flow: owner removed contributor");
+      console.log("creator-flow: checking removed contributor access");
       expect(
-        (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
+        (
+          await contributor.request.get(`/api/admin/hunts/${id}`, {
+            timeout: 5000,
+          })
+        ).status(),
       ).toBe(403);
+      console.log("creator-flow: removed contributor denied");
       await member.getByTestId("refresh-my-hunts").click();
       await expect(member.getByTestId("my-hunts")).not.toContainText(
         "Shared hunt",
       );
+      console.log("creator-flow: member no longer sees hunt");
+      console.log("creator-flow: checking stranger access");
       expect(
-        (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
+        (
+          await stranger.request.get(`/api/admin/hunts/${id}`, {
+            timeout: 5000,
+          })
+        ).status(),
       ).toBe(403);
+      console.log("creator-flow: stranger denied");
     } finally {
       await contributor.close();
       await stranger.close();

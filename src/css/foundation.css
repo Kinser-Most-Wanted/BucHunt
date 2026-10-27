@@ -1085,7 +1085,8 @@ body[data-page="player"] {
 }
 body[data-page="admin"] > header,
 body[data-page="player"] > header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 2;
   min-height: 5.25rem;
   padding: 0.8rem max(5%, calc((100vw - 76rem) / 2));
@@ -1705,4 +1706,217 @@ body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
     border-radius: 0.9rem;
   }
   .hunt-details-dialog .details-actions > * { flex: 1 1 100%; }
+}
+
+
+/* Player Hunt overview, schedule categories and live status. */
+body[data-page="player"] > header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+body[data-page="player"] .hunt-access-code {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 750;
+}
+.player-hunt-categories {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.player-hunt-category {
+  margin: 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid #d9e2ec;
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse at 95% 0%, rgb(255 199 44 / 7%), transparent 20rem),
+    linear-gradient(145deg, #10294a, #0b203d);
+  color: #f4f5f9;
+  box-shadow: 0 18px 48px rgb(9 30 58 / 10%);
+}
+.player-hunt-category-heading,
+.player-hunt-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.player-hunt-category-heading {
+  margin-bottom: 1rem;
+}
+.player-hunt-category-heading .eyebrow {
+  margin: 0 0 0.3rem;
+  color: #ffc72c;
+}
+.player-hunt-category-heading h2 {
+  margin: 0;
+  color: #f8f9fb;
+}
+.player-hunt-category .hunt-state-badge,
+.player-hunt .hunt-state-badge {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgb(255 199 44 / 28%);
+  border-radius: 999px;
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+.player-hunt-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.player-hunt {
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 4%);
+  color: #f4f5f9;
+}
+.player-hunt h3 {
+  margin: 0;
+  color: #f8f9fb;
+}
+.player-hunt > p {
+  margin: 0.7rem 0;
+  color: #aab7c7;
+}
+.player-hunt .player-hunt-countdown {
+  color: #ffc72c;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+.player-hunt-progress {
+  font-size: 0.9rem;
+}
+.player-hunt button,
+.player-hunt-details .details-actions button {
+  margin: 0.25rem 0 0;
+  border: 1px solid rgb(255 199 44 / 28%);
+  border-radius: 0.65rem;
+  background: rgb(255 199 44 / 10%);
+  color: #ffc72c;
+}
+.player-hunt-empty {
+  margin: 0.5rem 0 0;
+  color: #aab7c7;
+}
+.player-hunt-details {
+  margin: 1rem 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(ellipse at 92% 5%, rgb(255 199 44 / 8%), transparent 25rem),
+    linear-gradient(145deg, #10294a, #0b203d);
+  box-shadow: 0 24px 70px rgb(9 30 58 / 20%);
+  color: #f4f5f9;
+}
+.player-hunt-details .hunt-details-dialog-heading .eyebrow,
+.player-hunt-details .details-section-heading .eyebrow {
+  color: #ffc72c;
+}
+.player-hunt-details .dialog-close-button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #e8ebf0;
+  font-size: 1.5rem;
+}
+.player-hunt-details > h2 {
+  margin: 0.25rem 0 0.4rem;
+  color: #f7f7fa;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: -0.05em;
+}
+.player-hunt-details .details-status,
+.player-hunt-details .details-description,
+.player-hunt-details .details-muted {
+  color: #aab3c1;
+}
+.player-hunt-details > section {
+  margin: 1rem 0 0;
+  padding: 1.1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 3%);
+  color: #f4f5f9;
+}
+.player-hunt-details .details-section-heading h3 {
+  margin: 0;
+  color: #f5f6f8;
+  font-size: 1.1rem;
+}
+.player-hunt-details .hunt-fact dt {
+  color: #8f99a9;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.player-hunt-details .hunt-fact dd {
+  color: #e7eaf0;
+  font-variant-numeric: tabular-nums;
+}
+.player-hunt-details .hunt-detail-task-list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0 0;
+  padding-left: 1.5rem;
+}
+.player-hunt-details .hunt-detail-task {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 3%);
+}
+.player-hunt-details .hunt-detail-task h4 {
+  margin: 0;
+  color: #f4f5f9;
+}
+.player-hunt-details .hunt-detail-task p {
+  color: #aab7c7;
+}
+.player-hunt-details .task-completion {
+  margin: 0.35rem 0;
+  color: #ffc72c;
+  font-weight: 700;
+}
+.player-hunt-details form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+.player-hunt-details form label {
+  flex: 1 1 15rem;
+}
+.player-hunt-details form input {
+  margin-top: 0.35rem;
+}
+@media (max-width: 38rem) {
+  body[data-page="player"] > header {
+    padding-inline: 1rem;
+  }
+  .player-hunt-category-heading,
+  .player-hunt-card-heading {
+    align-items: flex-start;
+  }
+  .player-hunt-details .details-actions > * {
+    flex: 1 1 100%;
+  }
 }

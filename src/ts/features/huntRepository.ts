@@ -1,5 +1,6 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
+  HuntStatus,
   OperationResult,
   PlayerHunt,
   PlayerIdentity,
@@ -165,6 +166,14 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     typeof candidate.id !== "string" ||
     typeof candidate.name !== "string" ||
     typeof candidate.description !== "string" ||
+    typeof candidate.beginsAt !== "string" ||
+    !Number.isFinite(Date.parse(candidate.beginsAt)) ||
+    !(candidate.endsAt === null ||
+      (typeof candidate.endsAt === "string" &&
+        Number.isFinite(Date.parse(candidate.endsAt)))) ||
+    (candidate.status !== "draft" &&
+      candidate.status !== "published" &&
+      candidate.status !== "archived") ||
     !Array.isArray(candidate.tasks)
   ) {
     throw new TypeError("Invalid Player Hunt response.");
@@ -201,6 +210,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     id: candidate.id,
     name: candidate.name,
     description: candidate.description,
+    beginsAt: candidate.beginsAt as string,
+    endsAt: candidate.endsAt as string | null,
+    status: candidate.status as HuntStatus,
     tasks,
   };
 }

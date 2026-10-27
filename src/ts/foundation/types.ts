@@ -47,6 +47,9 @@ export interface PlayerHunt {
   id: string;
   name: string;
   description: string;
+  beginsAt: string;
+  endsAt: string | null;
+  status: HuntStatus;
   tasks: PlayerTask[];
 }
 export interface PlayerIdentity {

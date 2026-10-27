@@ -13,7 +13,8 @@ import {
   HuntStore,
   StoreError,
   ContributorStore,
-  isHuntAvailable,
+  isHuntActive,
+  isHuntJoinable,
 } from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 
@@ -113,6 +114,9 @@ export function createApplication(options: ServerOptions = {}) {
       id: hunt.id,
       name: hunt.name,
       description: hunt.description,
+      beginsAt: hunt.beginsAt,
+      endsAt: hunt.endsAt,
+      status: hunt.status,
       tasks: [...hunt.tasks]
         .sort((a, b) => a.order - b.order)
         .map((task) => ({
@@ -180,7 +184,7 @@ export function createApplication(options: ServerOptions = {}) {
           const hunt = /^[A-F0-9]{8}$/.test(normalized)
             ? await hunts.findByAccessCode(normalized)
             : undefined;
-          if (!hunt || !isHuntAvailable(hunt))
+          if (!hunt || !isHuntJoinable(hunt))
             throw new StoreError(
               "validation",
               "Invalid access code. The hunt may be unavailable.",
@@ -234,6 +238,14 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (method === "POST" && accountMatch[2]) {
+            if (!isHuntActive(hunt)) {
+              const message =
+                hunt.status === "archived" ||
+                (hunt.endsAt !== null && Date.parse(hunt.endsAt) <= Date.now())
+                  ? "Hunt Ended. Answers can no longer be submitted."
+                  : "This Hunt has not started yet.";
+              throw new StoreError("validation", message);
+            }
             const task = hunt.tasks.find((task) => task.id === accountMatch[2]);
             if (!task) throw new StoreError("not-found", "Task not found.");
             const input = await body(request);
@@ -482,6 +494,9 @@ export function createApplication(options: ServerOptions = {}) {
               id: hunt.id,
               name: hunt.name,
               description: hunt.description,
+              beginsAt: hunt.beginsAt,
+              endsAt: hunt.endsAt,
+              status: hunt.status,
               tasks: [...hunt.tasks]
                 .sort((a, b) => a.order - b.order)
                 .map((task) => ({

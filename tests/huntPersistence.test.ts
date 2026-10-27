@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApplication } from "../src/ts/server/server.js";
-import { HuntStore, isHuntAvailable } from "../src/ts/server/huntStore.js";
+import { HuntStore, isHuntActive, isHuntJoinable } from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
 
 const input = {
@@ -819,6 +819,15 @@ test("access code joins persist before answers and reject unavailable hunts and 
     "owner",
   );
   await store.addTask(hunt.id, task);
+  const expiring = await store.create(
+    {
+      ...input,
+      beginsAt: "2020-01-01T00:00:00Z",
+      endsAt: null,
+    },
+    "owner",
+  );
+  const expiringTask = await store.addTask(expiring.id, task);
   const empty = await store.create(
     { ...input, beginsAt: "2020-01-01T00:00:00Z" },
     "owner",
@@ -855,20 +864,16 @@ test("access code joins persist before answers and reject unavailable hunts and 
     });
   try {
     expect(hunt.accessCode).toMatch(/^[A-F0-9]{8}$/);
-    expect(new Set((await store.list()).map((h) => h.accessCode)).size).toBe(4);
+    expect(new Set((await store.list()).map((h) => h.accessCode)).size).toBe(5);
     expect((await joinHunt(hunt.accessCode, "forged-token")).status).toBe(401);
-    for (const code of [
-      "wrong",
-      hunt.id,
-      null,
-      empty.accessCode,
-      future.accessCode,
-      ended.accessCode,
-    ]) {
+    for (const code of ["wrong", hunt.id, null, ended.accessCode]) {
       const rejected = await joinHunt(code);
       expect(rejected.status).toBe(400);
       expect((await rejected.json()).message).toContain("Invalid access code");
     }
+    expect((await joinHunt(empty.accessCode)).status).toBe(200);
+    expect((await joinHunt(future.accessCode)).status).toBe(200);
+    expect((await joinHunt(expiring.accessCode)).status).toBe(200);
     expect((await fetch(base + `/api/player/hunts/${hunt.id}`)).status).toBe(
       403,
     );
@@ -888,20 +893,60 @@ test("access code joins persist before answers and reject unavailable hunts and 
       headers: { Authorization: "Bearer player-a-new-token" },
     });
     const saved = (await restored.json()).value;
-    expect(saved).toHaveLength(1);
-    expect(saved[0].tasks[0].completed).toBe(false);
+    expect(saved).toHaveLength(4);
+    const savedMain = saved.find((item) => item.id === hunt.id);
+    const savedEmpty = saved.find((item) => item.id === empty.id);
+    const savedFuture = saved.find((item) => item.id === future.id);
+    expect(savedMain?.tasks[0].completed).toBe(false);
+    expect(savedEmpty?.tasks).toEqual([]);
+    expect(savedEmpty).toMatchObject({
+      beginsAt: empty.beginsAt,
+      endsAt: null,
+      status: "draft",
+    });
+    expect(savedFuture?.beginsAt).toBe(future.beginsAt);
+    expect(saved.find((item) => item.id === expiring.id)).toMatchObject({
+      beginsAt: expiring.beginsAt,
+      endsAt: null,
+      status: "draft",
+    });
     expect(JSON.stringify(saved)).not.toContain(hunt.accessCode);
     const definition = await store.get(hunt.id);
     const begins = Date.parse(definition.beginsAt);
-    expect(isHuntAvailable(definition, begins)).toBe(true);
-    expect(isHuntAvailable(definition, begins - 1)).toBe(false);
+    expect(isHuntActive(definition, begins)).toBe(true);
+    expect(isHuntActive(definition, begins - 1)).toBe(false);
+    expect(isHuntJoinable(definition, begins - 1)).toBe(true);
     expect(
-      isHuntAvailable(
+      isHuntActive(
         { ...definition, endsAt: "2021-01-01T00:00:00Z" },
         Date.parse("2021-01-01T00:00:00Z"),
       ),
     ).toBe(false);
-    expect(isHuntAvailable({ ...definition, status: "archived" })).toBe(false);
+    expect(
+      isHuntJoinable(
+        { ...definition, endsAt: "2021-01-01T00:00:00Z" },
+        Date.parse("2021-01-01T00:00:00Z"),
+      ),
+    ).toBe(false);
+    expect(isHuntJoinable({ ...definition, status: "archived" })).toBe(false);
+    const huntsPath = join(directory, "hunts.json");
+    const storedHunts = JSON.parse(await readFile(huntsPath, "utf8"));
+    storedHunts.hunts.find((item: { id: string }) => item.id === expiring.id).endsAt =
+      new Date(Date.now() - 1000).toISOString();
+    await writeFile(huntsPath, JSON.stringify(storedHunts));
+    const answerResponse = await fetch(
+      base + `/api/player/account/hunts/${expiring.id}/tasks/${expiringTask.id}/answer`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer player-a-new-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ answer: task.requiredAnswer }),
+      },
+    );
+    expect(answerResponse.status).toBe(400);
+    expect((await answerResponse.json()).message).toContain("Hunt Ended");
     const path = join(directory, "hunts.json");
     const legacy = JSON.parse(await readFile(path, "utf8"));
     legacy.hunts[0].accessCode = null;

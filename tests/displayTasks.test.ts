@@ -34,6 +34,9 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     id: "hunt-1",
     name: "Campus Hunt",
     description: "Find the campus landmarks.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: "2099-01-01T00:00:00.000Z",
+    status: "published",
     tasks: [
       {
         id: "task-1",
@@ -44,6 +47,34 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       { id: "task-2", displayLabel: "Library Steps", completed: false },
     ],
   };
+  const futureHunt = {
+    id: "hunt-future",
+    name: "Future Hunt",
+    description: "Coming soon.",
+    beginsAt: "2099-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  const pastHunt = {
+    id: "hunt-past",
+    name: "Past Hunt",
+    description: "A finished adventure.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: "2021-01-01T00:00:00.000Z",
+    status: "published",
+    tasks: [],
+  };
+  const tasklessHunt = {
+    id: "hunt-empty",
+    name: "Taskless Hunt",
+    description: "Join before tasks are ready.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  const savedHunts = [hunt, futureHunt, pastHunt, tasklessHunt];
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",
@@ -59,28 +90,14 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       return;
     }
     if (path.endsWith("/hunts")) {
-      await route.fulfill({ json: { ok: true, value: [hunt] } });
+      await route.fulfill({ json: { ok: true, value: savedHunts } });
       return;
     }
+    const huntId = path.split("/").at(-1);
+    const detail = savedHunts.find((item) => item.id === huntId) ?? hunt;
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        value: {
-          id: "hunt-1",
-          name: "Campus Hunt",
-          description: "Find the campus landmarks.",
-          tasks: [
-            {
-              id: "task-1",
-              displayLabel: "Old Fountain",
-              completed: true,
-              location: { latitude: 36.304, longitude: -82.368 },
-            },
-            { id: "task-2", displayLabel: "Library Steps", completed: false },
-          ],
-        },
-      }),
+      body: JSON.stringify({ ok: true, value: detail }),
     });
   });
 
@@ -94,6 +111,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "Signed in as Baja (Player)",
   );
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.locator('body[data-page="player"] > header')).toHaveCSS("position", "sticky");
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
   await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
@@ -133,33 +151,47 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "",
   );
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
+  await expect(page.getByTestId("player-hunt-list")).toContainText("Campus Hunt");
+  await expect(page.getByTestId("player-hunt-list")).toContainText("Time remaining");
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText("Future Hunt");
+  await expect(page.getByTestId("player-past-hunt-list")).toContainText("Hunt Ended");
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText("Starts in");
+  await page.getByTestId("player-hunt-list").locator('[data-hunt-id="hunt-empty"]').click();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText("Taskless Hunt");
+  await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
+  await page.getByTestId("back-to-hunts").click();
+  await page.getByTestId("player-future-hunt-list").locator('[data-hunt-id="hunt-future"]').click();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText("Future Hunt");
+  await expect(page.getByTestId("player-task-list")).toBeEmpty();
+  await page.getByTestId("back-to-hunts").click();
+  await page.getByTestId("player-past-hunt-list").locator('[data-hunt-id="hunt-past"]').click();
+  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText("Hunt Ended");
+  await page.getByTestId("back-to-hunts").click();
+  await page.getByLabel("Access code").fill("abcd1234");
+  await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("Campus Hunt");
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "1 saved Hunt",
+    "4 saved Hunts",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Campus Hunt",
-  );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Old Fountain",
-  );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
+  await expect(page.getByTestId("player-hunt-list")).toContainText("Campus Hunt");
+  await expect(page.getByTestId("player-task-list")).toContainText("Old Fountain");
+  await expect(page.getByTestId("player-task-list")).toContainText(
     "Location: 36.304000, -82.368000",
   );
   await expect(
     page
-      .getByTestId("player-hunt-list")
+      .getByTestId("player-task-list")
       .getByRole("link", { name: "Open map" }),
   ).toHaveAttribute(
     "href",
     "https://www.openstreetmap.org/?mlat=36.304000&mlon=-82.368000#map=18/36.304000/-82.368000",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText("Completed");
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Not completed",
+  await expect(page.getByTestId("player-task-list")).toContainText("Completed");
+  await expect(page.getByTestId("player-task-list")).toContainText(
+    "Incomplete",
   );
-  await expect(page.getByTestId("player-hunt-list")).not.toContainText(
+  await expect(page.getByTestId("player-task-list")).not.toContainText(
     "secret-answer",
   );
 

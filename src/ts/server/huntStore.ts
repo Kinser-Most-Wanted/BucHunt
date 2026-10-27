@@ -129,13 +129,22 @@ function newAccessCode(hunts: HuntDefinition[]): string {
   } while (hunts.some((hunt) => hunt.accessCode === code));
   return code;
 }
-export function isHuntAvailable(
+export function isHuntJoinable(
   hunt: HuntDefinition,
   now = Date.now(),
 ): boolean {
   return (
     hunt.status !== "archived" &&
-    hunt.tasks.length > 0 &&
+    (hunt.endsAt === null || now < Date.parse(hunt.endsAt))
+  );
+}
+
+export function isHuntActive(
+  hunt: HuntDefinition,
+  now = Date.now(),
+): boolean {
+  return (
+    hunt.status !== "archived" &&
     Date.parse(hunt.beginsAt) <= now &&
     (hunt.endsAt === null || now < Date.parse(hunt.endsAt))
   );

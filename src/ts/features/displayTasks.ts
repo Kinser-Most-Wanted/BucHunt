@@ -67,35 +67,85 @@ function taskLocationElement(
   return details;
 }
 
-function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
+type HuntPhase = "active" | "future" | "past";
+
+function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
+  if (
+    hunt.status === "archived" ||
+    (hunt.endsAt !== null && Date.parse(hunt.endsAt) <= now)
+  ) return "past";
+  return Date.parse(hunt.beginsAt) > now ? "future" : "active";
+}
+
+function durationText(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const clock = [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+  return days ? `${days}d ${clock}` : clock;
+}
+
+function countdownText(hunt: PlayerHunt, now: number): string {
+  const phase = huntPhase(hunt, now);
+  if (phase === "past") return "Hunt Ended";
+  if (phase === "future")
+    return `Starts in ${durationText(Date.parse(hunt.beginsAt) - now)}`;
+  if (hunt.endsAt === null) return "No end time set";
+  return `Time remaining ${durationText(Date.parse(hunt.endsAt) - now)}`;
+}
+
+function formattedTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function renderHunts(
+  list: HTMLUListElement,
+  hunts: PlayerHunt[],
+  now: number,
+): void {
   list.replaceChildren();
-  for (const hunt of hunts) {
+  for (const hunt of [...hunts].sort(
+    (left, right) => Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
+  )) {
     const item = document.createElement("li");
     item.className = "player-hunt";
+    const header = document.createElement("div");
+    header.className = "player-hunt-card-heading";
     const heading = document.createElement("h3");
     heading.textContent = hunt.name;
+    const phase = huntPhase(hunt, now);
+    const badge = document.createElement("span");
+    badge.className = `hunt-state-badge hunt-state-${phase}`;
+    badge.textContent = phase === "past"
+      ? "Hunt Ended"
+      : phase === "future"
+        ? "Future Hunt"
+        : "Active";
+    header.append(heading, badge);
     const description = document.createElement("p");
     description.textContent = hunt.description;
+    const countdown = document.createElement("p");
+    countdown.className = "player-hunt-countdown";
+    countdown.dataset.huntCountdown = hunt.id;
+    countdown.textContent = countdownText(hunt, now);
+    const completed = hunt.tasks.filter((task) => task.completed).length;
+    const progress = document.createElement("p");
+    progress.className = "player-hunt-progress";
+    progress.textContent = hunt.tasks.length
+      ? `${completed} of ${hunt.tasks.length} tasks completed`
+      : "No tasks added yet";
     const open = document.createElement("button");
     open.type = "button";
     open.dataset.huntId = hunt.id;
-    open.textContent = "Open Hunt";
-    const tasks = document.createElement("ul");
-    tasks.setAttribute("aria-label", `${hunt.name} tasks`);
-    for (const task of hunt.tasks) {
-      const taskItem = document.createElement("li");
-      const label = document.createElement("span");
-      label.textContent = task.displayLabel;
-      const completion = document.createElement("span");
-      completion.className = "task-completion";
-      completion.textContent = task.completed ? "Completed" : "Not completed";
-      taskItem.append(label);
-      const location = taskLocationElement(task.location);
-      if (location) taskItem.append(location);
-      taskItem.append(completion);
-      tasks.append(taskItem);
-    }
-    item.append(heading, description, open, tasks);
+    open.textContent = "View Hunt";
+    item.append(header, description, countdown, progress, open);
     list.append(item);
   }
 }
@@ -114,8 +164,29 @@ export function mountDisplayTasks(
   const providerStatus = root.querySelector<HTMLElement>(
     '[data-testid="player-provider-status"]',
   );
+  const categories = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-categories"]',
+  );
   const list = root.querySelector<HTMLUListElement>(
     '[data-testid="player-hunt-list"]',
+  );
+  const futureList = root.querySelector<HTMLUListElement>(
+    '[data-testid="player-future-hunt-list"]',
+  );
+  const pastList = root.querySelector<HTMLUListElement>(
+    '[data-testid="player-past-hunt-list"]',
+  );
+  const activeEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="active-hunts-empty"]',
+  );
+  const futureEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="future-hunts-empty"]',
+  );
+  const pastEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunts-empty"]',
+  );
+  const huntDetails = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-details"]',
   );
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
@@ -170,7 +241,14 @@ export function mountDisplayTasks(
     !heading ||
     !status ||
     !providerStatus ||
+    !categories ||
     !list ||
+    !futureList ||
+    !pastList ||
+    !activeEmpty ||
+    !futureEmpty ||
+    !pastEmpty ||
+    !huntDetails ||
     !googleSignIn ||
     !signOut ||
     !account ||
@@ -220,10 +298,48 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
+    categories.hidden = true;
     huntLookup.hidden = true;
+    huntDetails.hidden = true;
     heading.textContent = "Sign in to see active Hunts";
     list.replaceChildren();
+    futureList.replaceChildren();
+    pastList.replaceChildren();
     status.textContent = message;
+  };
+
+  let displayedHunts: PlayerHunt[] = [];
+  let categorySignature = "";
+  let selectedHuntId: string | null = null;
+  let reloadSelectedHunt: (() => void) | undefined;
+  const renderCategories = (force = false): void => {
+    const now = Date.now();
+    const groups: Record<HuntPhase, PlayerHunt[]> = {
+      active: [],
+      future: [],
+      past: [],
+    };
+    for (const hunt of displayedHunts) groups[huntPhase(hunt, now)].push(hunt);
+    const signature = (Object.keys(groups) as HuntPhase[])
+      .map((phase) => `${phase}:${groups[phase].map((hunt) => hunt.id).join(",")}`)
+      .join("|");
+    if (force || signature !== categorySignature) {
+      const changed = Boolean(categorySignature && signature !== categorySignature);
+      categorySignature = signature;
+      renderHunts(list, groups.active, now);
+      renderHunts(futureList, groups.future, now);
+      renderHunts(pastList, groups.past, now);
+      activeEmpty.hidden = groups.active.length > 0;
+      futureEmpty.hidden = groups.future.length > 0;
+      pastEmpty.hidden = groups.past.length > 0;
+      if (!force && changed && selectedHuntId)
+        window.setTimeout(() => reloadSelectedHunt?.(), 0);
+    }
+    const byId = new Map(displayedHunts.map((hunt) => [hunt.id, hunt]));
+    root.querySelectorAll<HTMLElement>("[data-hunt-countdown]").forEach((element) => {
+      const hunt = byId.get(element.dataset.huntCountdown ?? "");
+      if (hunt) element.textContent = countdownText(hunt, now);
+    });
   };
 
   const loadHunts = async (
@@ -234,6 +350,8 @@ export function mountDisplayTasks(
     providerStatus.hidden = true;
     nameForm.hidden = true;
     heading.textContent = "Your Hunts";
+    categories.hidden = false;
+    huntLookup.hidden = false;
     signOut.hidden = false;
     account.hidden = false;
     displayName.textContent = `${name} (Checking access…)`;
@@ -259,7 +377,8 @@ export function mountDisplayTasks(
     accountIdToggle.setAttribute("aria-expanded", "false");
     copyAccountId.hidden = true;
     list.replaceChildren();
-    huntLookup.hidden = false;
+    futureList.replaceChildren();
+    pastList.replaceChildren();
     status.textContent = "Loading your hunts...";
     const result = await repository.listActiveHunts(signedIn);
     if (!result.ok) {
@@ -267,7 +386,8 @@ export function mountDisplayTasks(
       if (result.code === "unauthorized") void preparePlayerSignIn();
       return;
     }
-    renderHunts(list, result.value);
+    displayedHunts = result.value;
+    renderCategories(true);
     status.textContent = result.value.length
       ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
       : "You have no saved hunts yet. Join one with its access code below.";
@@ -307,7 +427,9 @@ export function mountDisplayTasks(
     accountIdDetails.hidden = true;
     heading.textContent = "Set up your player profile";
     nameForm.hidden = false;
+    categories.hidden = true;
     huntLookup.hidden = true;
+    huntDetails.hidden = true;
     signOut.hidden = false;
     nameInput.value = "";
     nameInput.focus();
@@ -396,18 +518,53 @@ export function mountDisplayTasks(
   const huntName = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-name"]',
   );
-  const huntTasks = root.querySelector<HTMLUListElement>(
+  const huntDescription = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-description"]',
+  );
+  const huntFacts = root.querySelector<HTMLDListElement>(
+    '[data-testid="player-hunt-facts"]',
+  );
+  const huntTasks = root.querySelector<HTMLOListElement>(
     '[data-testid="player-task-list"]',
+  );
+  const huntNoTasks = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-no-tasks"]',
   );
   const huntStatus = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-lookup-status"]',
   );
-  if (huntForm && huntInput && huntName && huntTasks && huntStatus) {
+  const closeHuntDetails = root.querySelectorAll<HTMLButtonElement>(
+    '[data-testid="close-player-hunt-details"], [data-testid="back-to-hunts"]',
+  );
+  if (
+    huntForm &&
+    huntInput &&
+    huntName &&
+    huntDescription &&
+    huntFacts &&
+    huntTasks &&
+    huntNoTasks &&
+    huntStatus
+  ) {
     let huntRequest = 0;
+    const addFact = (labelText: string, valueText: string): void => {
+      const fact = document.createElement("div");
+      fact.className = "hunt-fact";
+      const label = document.createElement("dt");
+      label.textContent = labelText;
+      const value = document.createElement("dd");
+      value.textContent = valueText;
+      fact.append(label, value);
+      huntFacts.append(fact);
+    };
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
+      selectedHuntId = huntId;
+      huntDetails.hidden = false;
       huntTasks.replaceChildren();
-      huntStatus.textContent = "Loading hunt...";
+      huntFacts.replaceChildren();
+      huntNoTasks.hidden = true;
+      huntStatus.textContent = "Loading Hunt details...";
       const identity = storedIdentity();
       if (!identity) {
         huntStatus.textContent = "Sign in with Google first.";
@@ -420,22 +577,60 @@ export function mountDisplayTasks(
         if (result.code === "unauthorized") void preparePlayerSignIn();
         return;
       }
-      huntId = result.value.id;
+      const hunt = result.value;
+      huntId = hunt.id;
       await loadHunts(
         identity,
         storedDisplayName(identity.accountId) ?? identity.email,
       );
       if (requestId !== huntRequest) return;
-      huntName.textContent = result.value.name;
-      huntStatus.textContent = result.value.tasks.length
-        ? `${result.value.tasks.length} tasks loaded.`
-        : "This Hunt has no tasks yet.";
-      for (const task of result.value.tasks) {
+      const now = Date.now();
+      const phase = huntPhase(hunt, now);
+      const completed = hunt.tasks.filter((task) => task.completed).length;
+      huntName.textContent = hunt.name;
+      huntDescription.textContent = hunt.description;
+      huntStatus.textContent =
+        phase === "past"
+          ? "Hunt Ended. Your progress is still available to review."
+          : phase === "future"
+            ? "This Hunt has not started yet. You can review its details here."
+            : hunt.tasks.length
+              ? "Hunt in progress."
+              : "This Hunt has no tasks yet.";
+      addFact(
+        "Status",
+        phase === "past" ? "Hunt Ended" : phase === "future" ? "Future Hunt" : "Active",
+      );
+      addFact("Starts", formattedTime(hunt.beginsAt));
+      addFact(
+        "Ends",
+        hunt.endsAt ? formattedTime(hunt.endsAt) : "No end time set",
+      );
+      const timeFact = document.createElement("div");
+      timeFact.className = "hunt-fact";
+      const timeLabel = document.createElement("dt");
+      timeLabel.textContent = phase === "future" ? "Starts in" : "Time remaining";
+      const timeValue = document.createElement("dd");
+      timeValue.dataset.huntCountdown = hunt.id;
+      timeValue.textContent = countdownText(hunt, now);
+      timeFact.append(timeLabel, timeValue);
+      huntFacts.append(timeFact);
+      addFact(
+        "Progress",
+        hunt.tasks.length
+          ? `${completed} of ${hunt.tasks.length} tasks completed`
+          : "No tasks added yet",
+      );
+      huntNoTasks.hidden = hunt.tasks.length > 0;
+      const canAnswer = phase === "active";
+      for (const task of hunt.tasks) {
         const item = document.createElement("li");
+        item.className = "hunt-detail-task";
         item.dataset.testid = "player-task";
-        const label = document.createElement("strong");
+        const label = document.createElement("h4");
         label.textContent = task.displayLabel;
         const state = document.createElement("p");
+        state.className = task.completed ? "task-completion completed" : "task-completion";
         state.textContent = task.completed ? "Completed" : "Incomplete";
         item.append(label, state);
         if (task.description) {
@@ -445,7 +640,7 @@ export function mountDisplayTasks(
         }
         const location = taskLocationElement(task.location);
         if (location) item.append(location);
-        if (!task.completed) {
+        if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
           const answerLabel = document.createElement("label");
           answerLabel.textContent = `Answer for ${task.displayLabel}`;
@@ -462,15 +657,20 @@ export function mountDisplayTasks(
             event.preventDefault();
             submit.disabled = true;
             try {
-              const result = await repository.answerAccountTask(
+              const answerResult = await repository.answerAccountTask(
                 huntId,
                 task.id,
                 answer.value,
                 identity,
               );
-              if (!result.ok) {
-                message.textContent = result.message;
-                if (result.code === "unauthorized") void preparePlayerSignIn();
+              if (!answerResult.ok) {
+                if (answerResult.message.includes("Hunt Ended")) {
+                  await loadHunt(huntId);
+                  return;
+                }
+                message.textContent = answerResult.message;
+                if (answerResult.code === "unauthorized")
+                  void preparePlayerSignIn();
                 return;
               }
               await loadHunt(huntId);
@@ -485,6 +685,23 @@ export function mountDisplayTasks(
         huntTasks.append(item);
       }
     };
+    reloadSelectedHunt = () => {
+      if (selectedHuntId) void loadHunt(selectedHuntId);
+    };
+    const closeDetails = (): void => {
+      selectedHuntId = null;
+      huntDetails.hidden = true;
+    };
+    closeHuntDetails.forEach((button) =>
+      button.addEventListener("click", closeDetails),
+    );
+    huntInput.addEventListener("input", () => {
+      const start = huntInput.selectionStart;
+      const end = huntInput.selectionEnd;
+      huntInput.value = huntInput.value.toUpperCase();
+      if (start !== null && end !== null)
+        huntInput.setSelectionRange(start, end);
+    });
     huntForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const identity = storedIdentity();
@@ -492,17 +709,16 @@ export function mountDisplayTasks(
         huntStatus.textContent = "Sign in with Google first.";
         return;
       }
+      const accessCode = huntInput.value.trim().toUpperCase();
+      huntInput.value = accessCode;
       const button = huntForm.querySelector<HTMLButtonElement>(
         'button[type="submit"], button',
       );
       if (button) button.disabled = true;
       const requestId = ++huntRequest;
-      huntStatus.textContent = "Joining hunt...";
+      huntStatus.textContent = "Joining Hunt...";
       try {
-        const result = await repository.joinHunt(
-          huntInput.value.trim(),
-          identity,
-        );
+        const result = await repository.joinHunt(accessCode, identity);
         if (requestId !== huntRequest) return;
         if (!result.ok) {
           huntStatus.textContent = result.message;
@@ -510,20 +726,28 @@ export function mountDisplayTasks(
           return;
         }
         await loadHunt(result.value.huntId);
+      } catch {
+        huntStatus.textContent = "The Hunt service could not be reached.";
       } finally {
         if (button) button.disabled = false;
       }
     });
-    list.addEventListener("click", (event) => {
+    categories.addEventListener("click", (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
         "button[data-hunt-id]",
       );
       if (button) void loadHunt(button.dataset.huntId ?? "");
     });
+    const timer = window.setInterval(() => renderCategories(), 1000);
+    window.addEventListener(
+      "pagehide",
+      () => window.clearInterval(timer),
+      { once: true },
+    );
     const sharedCode = new URLSearchParams(location.search).get("accessCode");
-    if (sharedCode) huntInput.value = sharedCode;
-    const selectedHunt = new URLSearchParams(location.search).get("huntId");
-    if (selectedHunt && previousIdentity) void loadHunt(selectedHunt);
+    if (sharedCode) huntInput.value = sharedCode.toUpperCase();
+    const requestedHunt = new URLSearchParams(location.search).get("huntId");
+    if (requestedHunt && previousIdentity) void loadHunt(requestedHunt);
   }
 
   signOut.addEventListener("click", () => {

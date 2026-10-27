@@ -2160,6 +2160,20 @@ body[data-page="player"] .hunt-access-code {
   border-radius: 0.85rem;
   background: rgb(255 255 255 / 4%);
   color: #f4f5f9;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+.player-hunt:hover,
+.player-hunt:focus-visible {
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 6%);
+  outline: none;
+}
+.player-hunt:active {
+  transform: translateY(1px);
 }
 .player-hunt h3 {
   margin: 0;
@@ -2190,16 +2204,24 @@ body[data-page="player"] .hunt-access-code {
   color: #aab7c7;
 }
 .player-hunt-details {
-  margin: 1rem 0;
+  position: fixed;
+  width: min(68rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(88dvh, 58rem);
+  margin: auto;
   padding: clamp(1rem, 3vw, 2rem);
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.2rem;
   background:
     radial-gradient(ellipse at 92% 5%, rgb(255 199 44 / 8%), transparent 25rem),
     linear-gradient(145deg, #10294a, #0b203d);
-  box-shadow: 0 24px 70px rgb(9 30 58 / 20%);
+  box-shadow: 0 32px 100px rgb(0 0 0 / 55%);
   color: #f4f5f9;
+}
+.player-hunt-details::backdrop {
+  background: rgb(6 9 14 / 76%);
+  backdrop-filter: blur(8px);
 }
 .player-hunt-details .hunt-details-dialog-heading .eyebrow,
 .player-hunt-details .details-section-heading .eyebrow {
@@ -2276,6 +2298,28 @@ body[data-page="player"] .hunt-access-code {
   margin: 0.35rem 0;
   color: #ffc72c;
   font-weight: 700;
+}
+.player-hunt-details .task-location {
+  margin-top: 0.65rem;
+}
+.player-hunt-details .task-location > button {
+  margin: 0;
+  border: 1px solid rgb(255 199 44 / 28%);
+  border-radius: 0.65rem;
+  background: rgb(255 199 44 / 10%);
+  color: #ffc72c;
+}
+.player-hunt-details .task-location-map {
+  display: block;
+  width: 100%;
+  height: 18rem;
+  margin-top: 0.65rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.65rem;
+  background: #e8edf2;
+}
+.player-hunt-details .task-location-map[hidden] {
+  display: none;
 }
 .player-hunt-details form {
   display: flex;

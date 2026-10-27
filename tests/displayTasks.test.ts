@@ -208,6 +208,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-hunt-name")).toHaveText(
     "Taskless Hunt",
   );
+  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
   await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
   await page.getByTestId("back-to-hunts").click();
   await page
@@ -238,17 +239,21 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Old Fountain",
   );
-  await expect(page.getByTestId("player-task-list")).toContainText(
-    "Location: 36.304000, -82.368000",
+  await expect(page.getByTestId("player-task-list")).not.toContainText(
+    "36.304000, -82.368000",
   );
-  await expect(
-    page
-      .getByTestId("player-task-list")
-      .getByRole("link", { name: "Open map" }),
-  ).toHaveAttribute(
-    "href",
-    "https://www.openstreetmap.org/?mlat=36.304000&mlon=-82.368000#map=18/36.304000/-82.368000",
+  const mapToggle = page.getByRole("button", {
+    name: "Show map for Old Fountain",
+  });
+  await mapToggle.click();
+  const taskMap = page.getByTitle("Map for Old Fountain");
+  await expect(taskMap).toBeVisible();
+  await expect(taskMap).toHaveAttribute(
+    "src",
+    /marker=36\.304000%2C-82\.368000/,
   );
+  await page.getByRole("button", { name: "Hide map for Old Fountain" }).click();
+  await expect(taskMap).toBeHidden();
   await expect(page.getByTestId("player-task-list")).toContainText("Completed");
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Incomplete",

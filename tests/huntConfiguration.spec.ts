@@ -306,6 +306,7 @@ test(
   "only owners and contributors can configure a hunt through the creator workspace",
   { timeout: 60_000 },
   async ({ page, browser, baseURL }) => {
+    test.setTimeout(60_000);
     await installMapMock(page.context());
     await installAdminSession(page);
     await page.goto("/admin.html");

@@ -112,7 +112,19 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     status: "published",
     tasks: [],
   };
-  const savedHunts = [hunt, futureHunt, pastHunt, tasklessHunt];
+  const endingSoonHunt = {
+    ...hunt,
+    id: "hunt-ending-soon",
+    name: "Ending Soon Hunt",
+    endsAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+  };
+  const savedHunts = [
+    hunt,
+    endingSoonHunt,
+    futureHunt,
+    pastHunt,
+    tasklessHunt,
+  ];
   let huntListRequests = 0;
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
@@ -206,6 +218,45 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-past-hunt-list")).toContainText(
     "Hunt Ended",
   );
+  const activeCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-1"]');
+  await expect(activeCard).toHaveAttribute("data-hunt-status", "active");
+  await expect(activeCard.locator(".hunt-state-badge")).toHaveText("Active");
+  await expect(activeCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "active",
+  );
+  const endingSoonCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-ending-soon"]');
+  await expect(endingSoonCard.locator(".hunt-state-badge")).toHaveText(
+    "Ending soon",
+  );
+  await expect(endingSoonCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "soon",
+  );
+  const futureCard = page
+    .getByTestId("player-future-hunt-list")
+    .locator('[data-hunt-id="hunt-future"]');
+  await expect(futureCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "soon",
+  );
+  const pastCard = page
+    .getByTestId("player-past-hunt-list")
+    .locator('[data-hunt-id="hunt-past"]');
+  await expect(pastCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "ended",
+  );
+  const tasklessCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-empty"]');
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveText(
+    "Needs tasks",
+  );
   await expect(page.getByTestId("player-future-hunt-list")).toContainText(
     "Starts in",
   );
@@ -241,7 +292,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-hunt-details")).toBeVisible();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("test");
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "4 saved Hunts",
+    "5 saved Hunts",
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "test",
@@ -329,6 +380,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     ),
   ).toBe(false);
   await expect(huntStatus).toHaveCSS("position", "absolute");
+  await expect(huntStatus).toHaveAttribute("data-status", "active");
   expect(
     await huntStatus.evaluate((status) =>
       Boolean(status.closest(".player-hunt-intro")),

@@ -122,6 +122,74 @@ function countdownText(hunt: PlayerHunt, now: number): string {
   return `Time remaining ${durationText(Date.parse(hunt.endsAt) - now)}`;
 }
 
+type HuntStatusTone = "active" | "soon" | "ended";
+
+interface HuntStatusPresentation {
+  tone: HuntStatusTone;
+  label: string;
+  message: string;
+}
+
+function huntStatusPresentation(
+  hunt: PlayerHunt,
+  now: number,
+): HuntStatusPresentation {
+  const phase = huntPhase(hunt, now);
+  if (phase === "past") {
+    return {
+      tone: "ended",
+      label: "Hunt Ended",
+      message: "Hunt Ended. Your progress is still available to review.",
+    };
+  }
+  if (phase === "future") {
+    return {
+      tone: "soon",
+      label: "Future Hunt",
+      message: "This Hunt has not started yet. You can review its details here.",
+    };
+  }
+  if (!hunt.tasks.length) {
+    return {
+      tone: "soon",
+      label: "Needs tasks",
+      message: "This Hunt has no tasks yet.",
+    };
+  }
+  if (
+    hunt.endsAt !== null &&
+    Date.parse(hunt.endsAt) - now <= 24 * 60 * 60 * 1000
+  ) {
+    return {
+      tone: "soon",
+      label: "Ending soon",
+      message: "Hunt in progress. This Hunt ends within 24 hours.",
+    };
+  }
+  return {
+    tone: "active",
+    label: "Active",
+    message: "Hunt in progress.",
+  };
+}
+
+function updateHuntCardStatus(
+  card: HTMLElement,
+  hunt: PlayerHunt,
+  now: number,
+): void {
+  const presentation = huntStatusPresentation(hunt, now);
+  card.dataset.huntStatus = presentation.tone;
+  const badge = card.querySelector<HTMLElement>(".hunt-state-badge");
+  if (badge) {
+    badge.className = `hunt-state-badge hunt-state-${presentation.tone}`;
+    badge.dataset.status = presentation.tone;
+    badge.textContent = presentation.label;
+  }
+  const countdown = card.querySelector<HTMLElement>("[data-hunt-countdown]");
+  if (countdown) countdown.dataset.status = presentation.tone;
+}
+
 function formattedTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -155,15 +223,11 @@ function renderHunts(
     header.className = "player-hunt-card-heading";
     const heading = document.createElement("h3");
     heading.textContent = hunt.name;
-    const phase = huntPhase(hunt, now);
     const badge = document.createElement("span");
-    badge.className = `hunt-state-badge hunt-state-${phase}`;
-    badge.textContent =
-      phase === "past"
-        ? "Hunt Ended"
-        : phase === "future"
-          ? "Future Hunt"
-          : "Active";
+    badge.className = "hunt-state-badge";
+    const presentation = huntStatusPresentation(hunt, now);
+    badge.dataset.status = presentation.tone;
+    badge.textContent = presentation.label;
     header.append(heading, badge);
     const description = document.createElement("p");
     description.className = "player-hunt-description";
@@ -179,6 +243,7 @@ function renderHunts(
       ? `${completed} of ${hunt.tasks.length} tasks completed`
       : "No tasks added yet";
     item.dataset.huntId = hunt.id;
+    updateHuntCardStatus(item, hunt, now);
     item.tabIndex = 0;
     item.setAttribute("role", "button");
     item.setAttribute("aria-label", `Open ${hunt.name}`);
@@ -384,6 +449,8 @@ export function mountDisplayTasks(
         if (hunt) {
           const text = countdownText(hunt, now);
           if (element.textContent !== text) element.textContent = text;
+          const card = element.closest<HTMLElement>(".player-hunt");
+          if (card) updateHuntCardStatus(card, hunt, now);
         }
       });
   };
@@ -402,6 +469,7 @@ export function mountDisplayTasks(
       root.querySelectorAll<HTMLElement>(".player-hunt[data-hunt-id]"),
     ).find((item) => item.dataset.huntId === hunt.id);
     if (!card) return;
+    updateHuntCardStatus(card, hunt, now);
     card.setAttribute("aria-label", `Open ${hunt.name}`);
     const name = card.querySelector<HTMLElement>(
       ".player-hunt-card-heading h3",
@@ -699,21 +767,12 @@ export function mountDisplayTasks(
         120,
         280,
       );
-      huntStatus.textContent =
-        phase === "past"
-          ? "Hunt Ended. Your progress is still available to review."
-          : phase === "future"
-            ? "This Hunt has not started yet. You can review its details here."
-            : hunt.tasks.length
-              ? "Hunt in progress."
-              : "This Hunt has no tasks yet.";
+      const presentation = huntStatusPresentation(hunt, now);
+      huntStatus.textContent = presentation.message;
+      huntStatus.dataset.status = presentation.tone;
       addFact(
         "Status",
-        phase === "past"
-          ? "Hunt Ended"
-          : phase === "future"
-            ? "Future Hunt"
-            : "Active",
+        presentation.label,
       );
       addFact("Starts", formattedTime(hunt.beginsAt));
       addFact(
@@ -727,6 +786,7 @@ export function mountDisplayTasks(
         phase === "future" ? "Starts in" : "Time remaining";
       const timeValue = document.createElement("dd");
       timeValue.dataset.huntCountdown = hunt.id;
+      timeValue.dataset.status = presentation.tone;
       timeValue.textContent = countdownText(hunt, now);
       timeFact.append(timeLabel, timeValue);
       huntFacts.append(timeFact);

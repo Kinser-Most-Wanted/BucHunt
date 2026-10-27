@@ -2149,6 +2149,30 @@ body[data-page="player"] .hunt-access-code {
   font-size: 0.75rem;
   font-weight: 750;
 }
+.hunt-state-badge[data-status="active"] {
+  border-color: rgb(93 220 163 / 32%);
+  background: rgb(93 220 163 / 10%);
+  color: #7ee3b2;
+}
+.hunt-state-badge[data-status="soon"] {
+  border-color: rgb(255 199 44 / 32%);
+  background: rgb(255 199 44 / 10%);
+  color: #ffd45c;
+}
+.hunt-state-badge[data-status="ended"] {
+  border-color: rgb(255 129 121 / 34%);
+  background: rgb(255 129 121 / 10%);
+  color: #ff9289;
+}
+.player-hunt[data-hunt-status="active"] {
+  border-left: 3px solid rgb(93 220 163 / 72%);
+}
+.player-hunt[data-hunt-status="soon"] {
+  border-left: 3px solid rgb(255 199 44 / 72%);
+}
+.player-hunt[data-hunt-status="ended"] {
+  border-left: 3px solid rgb(255 129 121 / 72%);
+}
 .player-hunt-list {
   display: grid;
   gap: 0.75rem;
@@ -2928,6 +2952,42 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   right: 1rem;
   max-width: calc(100% - 2rem);
   margin: 0;
+}
+.player-hunt-details .details-status[data-status="active"] {
+  border-color: rgb(93 220 163 / 34%);
+  background: rgb(93 220 163 / 11%);
+  color: #7ee3b2;
+}
+.player-hunt-details .details-status[data-status="soon"] {
+  border-color: rgb(255 199 44 / 34%);
+  background: rgb(255 199 44 / 11%);
+  color: #ffd45c;
+}
+.player-hunt-details .details-status[data-status="ended"] {
+  border-color: rgb(255 129 121 / 34%);
+  background: rgb(255 129 121 / 11%);
+  color: #ff9289;
+}
+.player-hunt-details .hunt-fact dd[data-status="active"],
+.player-hunt-details .task-countdown[data-status="active"] {
+  color: #7ee3b2;
+}
+.player-hunt-details .hunt-fact dd[data-status="soon"],
+.player-hunt-details .task-countdown[data-status="soon"] {
+  color: #ffd45c;
+}
+.player-hunt-details .hunt-fact dd[data-status="ended"],
+.player-hunt-details .task-countdown[data-status="ended"] {
+  color: #ff9289;
+}
+.player-hunt .player-hunt-countdown[data-status="active"] {
+  color: #7ee3b2;
+}
+.player-hunt .player-hunt-countdown[data-status="soon"] {
+  color: #ffd45c;
+}
+.player-hunt .player-hunt-countdown[data-status="ended"] {
+  color: #ff9289;
 }
 .player-hunt-details > .details-actions {
   margin: -0.35rem 0 1.25rem;

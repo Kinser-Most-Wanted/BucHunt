@@ -34,6 +34,7 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     role: "administrator",
   };
+  const sessionUser = { ...administrator, role: "user" as const };
 
   await page.addInitScript(() => {
     type Callback = (response: { credential: string }) => void;
@@ -88,14 +89,14 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
       await route.fulfill({
         status: authenticated ? 200 : 401,
         json: authenticated
-          ? { user: administrator }
+          ? { user: sessionUser }
           : { error: "Sign-in required." },
       });
       return;
     }
     if (path === "/api/auth/login") {
       authenticated = true;
-      await route.fulfill({ json: { user: administrator } });
+      await route.fulfill({ json: { user: sessionUser } });
       return;
     }
     if (path === "/api/auth/logout") {
@@ -183,6 +184,13 @@ test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   };
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({ json: { user: visitor } }),
+  );
+
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
   );
 
   await page.goto("/admin.html");

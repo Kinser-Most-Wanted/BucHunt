@@ -2228,19 +2228,25 @@ body[data-page="player"] .hunt-access-code {
 .player-hunt-details .hunt-details-dialog-heading {
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 6;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: calc(-1 * clamp(1rem, 3vw, 2rem)) calc(-1 * clamp(1rem, 3vw, 2rem))
-    1rem;
-  padding: 0.65rem clamp(1rem, 3vw, 2rem);
-  border-bottom: 1px solid rgb(255 255 255 / 10%);
-  background: linear-gradient(145deg, #10294a, #0b203d);
+  justify-content: flex-end;
+  height: 0;
+  margin: calc(-1 * clamp(1rem, 3vw, 2rem));
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+.player-hunt-details .hunt-details-dialog-heading > .eyebrow {
+  display: none;
 }
 .player-hunt-details .dialog-close-button {
+  position: relative;
   flex: 0 0 auto;
+  transform: translate(50%, -50%);
+  border-color: rgb(255 255 255 / 28%);
+  background: #17406f;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 .player-hunt-details .hunt-details-dialog-heading .eyebrow,
 .player-hunt-details .details-section-heading .eyebrow {
@@ -2953,14 +2959,25 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt-details .hunt-detail-task {
   display: grid;
-  gap: 0.65rem;
+  min-width: 0;
+  gap: 0.85rem;
   padding: clamp(1rem, 2.5vw, 1.4rem);
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 0.95rem;
   background: linear-gradient(145deg, rgb(21 52 93 / 58%), rgb(8 27 49 / 74%));
   box-shadow: 0 12px 30px rgb(0 0 0 / 14%);
 }
-.player-hunt-details .hunt-detail-task > h4 {
+.player-hunt-details .hunt-detail-task-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.55rem 1rem;
+  min-width: 0;
+}
+.player-hunt-details .hunt-detail-task-heading > h4 {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   margin: 0;
   color: #fff;
   font-size: clamp(1.2rem, 2vw, 1.45rem);
@@ -2975,7 +2992,9 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
-.player-hunt-details .task-completion {
+.player-hunt-details .hunt-detail-task-heading > .task-completion {
+  grid-column: 1;
+  grid-row: 2;
   justify-self: start;
   margin: 0;
   padding: 0.32rem 0.65rem;
@@ -2991,12 +3010,22 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   background: rgb(91 214 163 / 9%);
   color: #8ce0b8;
 }
-.player-hunt-details .task-location {
+.player-hunt-details .hunt-detail-task-heading > .task-location {
+  grid-column: 2;
+  grid-row: 1 / span 2;
   display: grid;
-  justify-items: start;
+  justify-items: end;
   gap: 0.7rem;
-  margin: 0.25rem 0 0.15rem;
-  padding: 0.9rem 0 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.player-hunt-details .hunt-detail-task-heading > .task-location:has(.task-location-map:not([hidden])) {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  justify-items: stretch;
+  margin-top: 0.25rem;
+  padding-top: 0.8rem;
   border-top: 1px solid rgb(255 255 255 / 8%);
 }
 .player-hunt-details .task-location-toggle {
@@ -3021,6 +3050,9 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt-details form.task-answer-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
   gap: 0.65rem;
   margin: 0.35rem 0 0;
   padding: 1rem 0 0;
@@ -3028,13 +3060,21 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt-details .task-answer-label {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
   gap: 0.45rem;
   color: #e8eef7;
   font-size: 0.94rem;
   font-weight: 750;
 }
 .player-hunt-details .task-answer-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
   min-height: 3.75rem;
+  height: 3.75rem;
+  box-sizing: border-box;
   margin: 0;
   padding: 0.9rem 1rem;
   border: 1px solid rgb(255 255 255 / 23%);
@@ -3077,6 +3117,14 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   line-height: 1.45;
 }
 @media (max-width: 38rem) {
+  .player-hunt-details .hunt-detail-task-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+  .player-hunt-details .hunt-detail-task-heading > .task-location {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
   .player-hunt-details .player-hunt-intro {
     margin: 0.8rem 0 1rem;
     padding: 1rem;

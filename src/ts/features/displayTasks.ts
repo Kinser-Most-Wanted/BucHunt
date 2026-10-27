@@ -122,12 +122,7 @@ function countdownText(hunt: PlayerHunt, now: number): string {
   return `Time remaining ${durationText(Date.parse(hunt.endsAt) - now)}`;
 }
 
-type HuntStatusTone =
-  | "active"
-  | "soon"
-  | "upcoming"
-  | "needs-tasks"
-  | "ended";
+type HuntStatusTone = "active" | "soon" | "upcoming" | "needs-tasks" | "ended";
 
 interface HuntStatusPresentation {
   tone: HuntStatusTone;

@@ -310,6 +310,7 @@ test(
     await installMapMock(page.context());
     await installAdminSession(page);
     await page.goto("/admin.html");
+    console.log("creator-flow: owner page ready");
     await expect(page.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,
     );
@@ -325,6 +326,7 @@ test(
     await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
     const id = await page.locator('#define-task [name="huntId"]').inputValue();
     await page.getByTestId("close-hunt-details").click();
+    console.log("creator-flow: owner hunt created");
     const contributor = await browser.newContext({ baseURL });
     const stranger = await browser.newContext({ baseURL });
     try {
@@ -338,6 +340,7 @@ test(
       await expect(member.getByTestId("my-hunts")).not.toContainText(
         "Shared hunt",
       );
+      console.log("creator-flow: contributor page ready");
       expect(
         (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
       ).toBe(403);
@@ -347,6 +350,7 @@ test(
       await expect(visitor.getByTestId("creator-id")).toHaveText(
         /^browser:[a-f0-9]{64}$/,
       );
+      console.log("creator-flow: visitor page ready");
       expect(
         (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
       ).toBe(403);
@@ -358,6 +362,7 @@ test(
       await expect(page.getByTestId("contributor-status")).toContainText(
         "Contributor added",
       );
+      console.log("creator-flow: contributor added");
       await member.getByTestId("refresh-my-hunts").click();
       await member
         .getByRole("button", { name: "Shared hunt (contributor)", exact: true })
@@ -374,6 +379,7 @@ test(
       await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
       await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
       await expect(member.getByTestId("hunt-details-editor")).toBeVisible();
+      console.log("creator-flow: editor opened");
       await expect(member).toHaveURL(/admin\.html$/);
       await expect(member.getByTestId("contributors-panel")).toBeHidden();
       await member
@@ -388,6 +394,7 @@ test(
       await expect(member.getByTestId("task-status")).toContainText(
         "was saved and appears",
       );
+      console.log("creator-flow: contributor task saved");
       expect(
         (
           await contributor.request.post(

@@ -257,10 +257,7 @@ export class HuntStore {
       return task;
     });
   }
-  async deleteTask(
-    id: string,
-    taskId: string,
-  ): Promise<{ deleted: true }> {
+  async deleteTask(id: string, taskId: string): Promise<{ deleted: true }> {
     return this.file.update((data) => {
       const hunt = data.hunts.find((item) => item.id === id);
       if (!hunt) throw new StoreError("not-found", "Hunt not found.");
@@ -344,3 +341,4 @@ export class ContributorStore {
     });
   }
 }
+

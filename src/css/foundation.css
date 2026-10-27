@@ -2243,7 +2243,7 @@ body[data-page="player"] .hunt-access-code {
 .player-hunt-details .dialog-close-button {
   position: relative;
   flex: 0 0 auto;
-  transform: translate(50%, -50%);
+  transform: translate(-0.25rem, 0.25rem);
   border-color: rgb(255 255 255 / 28%);
   background: #17406f;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);

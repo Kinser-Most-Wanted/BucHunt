@@ -2058,7 +2058,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
   background: rgb(255 199 44 / 10%);
   color: #ffc72c;
 }
-.hunt-details-dialog > section {
+body[data-page="admin"] dialog.hunt-details-dialog section {
   margin: 1rem 0 0;
   padding: 1.1rem;
   border: 1px solid rgb(255 255 255 / 8%);
@@ -2240,20 +2240,31 @@ body[data-page="player"] .hunt-access-code {
   color: #e8ebf0;
   font-size: 1.5rem;
 }
-.player-hunt-details > h2 {
+.player-hunt-intro {
+  margin: 0.65rem 0 1.2rem;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  border: 1px solid rgb(100 181 246 / 24%);
+  border-left: 4px solid #ffc72c;
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(255 199 44 / 14%), transparent 22rem),
+    linear-gradient(125deg, rgb(21 52 93 / 92%), rgb(13 37 67 / 92%));
+  box-shadow: inset 0 1px rgb(255 255 255 / 6%), 0 14px 38px rgb(0 0 0 / 18%);
+}
+.player-hunt-details .player-hunt-intro > h2 {
   max-width: 30ch;
-  margin: 0.25rem 0 0.4rem;
-  color: #f7f7fa;
+  margin: 0;
+  color: #fff;
   font-size: clamp(2rem, 4vw, 2.6rem);
   line-height: 1.12;
   letter-spacing: -0.04em;
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
-.player-hunt-details > h2[data-content-length="medium"] {
+.player-hunt-details .player-hunt-intro > h2[data-content-length="medium"] {
   font-size: clamp(1.75rem, 3.5vw, 2.3rem);
 }
-.player-hunt-details > h2[data-content-length="long"] {
+.player-hunt-details .player-hunt-intro > h2[data-content-length="long"] {
   font-size: clamp(1.5rem, 3vw, 2rem);
 }
 .player-hunt-details .details-status,
@@ -2262,8 +2273,9 @@ body[data-page="player"] .hunt-access-code {
   color: #aab3c1;
 }
 .player-hunt-details .details-description {
-  max-width: 54ch;
-  margin: 0.75rem 0 1rem;
+  max-width: 72ch;
+  margin: 0.8rem 0 0;
+  color: #d8e6f5;
   font-size: 1.05rem;
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -2329,19 +2341,8 @@ body[data-page="player"] .hunt-access-code {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  margin-top: 0.9rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid rgb(255 255 255 / 8%);
-  border-radius: 0.7rem;
-  background: rgb(255 255 255 / 3%);
-}
-.player-hunt-details .task-location-caption {
-  margin: 0;
-  color: #99a7b9;
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  margin-top: 0.7rem;
+  padding: 0;
 }
 .player-hunt-details .task-location-toggle {
   display: inline-flex;

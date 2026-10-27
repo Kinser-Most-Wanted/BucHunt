@@ -202,6 +202,8 @@ export class HuntStore {
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "taskType",
+      "choices",
       "displayLabel",
       "description",
       "requiredAnswer",

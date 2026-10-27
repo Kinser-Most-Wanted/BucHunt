@@ -264,6 +264,12 @@
               <span id="hunt-id-help" class="field-help">
                 Automatically set when you create or select a hunt.
               </span>
+              <label for="task-type">Task type</label>
+              <select id="task-type" name="taskType" required>
+                <option value="" disabled selected>Select a task type</option>
+                <option value="single-word-trivia">Single-Word Trivia</option>
+                <option value="multiple-choice">Multiple-Choice</option>
+              </select>
               <div class="field-grid">
                 <div>
                   <label for="task-label">Display label</label>
@@ -288,22 +294,67 @@
                   />
                 </div>
               </div>
-              <label for="task-description">Clue and instructions</label>
-              <textarea
-                id="task-description"
-                name="description"
-                rows="3"
-                required
-                placeholder="Tell participants what to look for"
-              ></textarea>
-              <label for="task-answer">Required answer</label>
-              <input
-                id="task-answer"
-                name="requiredAnswer"
-                required
-                autocomplete="off"
-                placeholder="The answer participants must submit"
-              />
+              <div data-task-fields="single-word-trivia" hidden>
+                <label for="task-description">Clue and instructions</label>
+                <textarea
+                  id="task-description"
+                  name="description"
+                  rows="3"
+                  required
+                  placeholder="Tell participants what to look for"
+                ></textarea>
+                <label for="task-answer">Required answer</label>
+                <input
+                  id="task-answer"
+                  name="requiredAnswer"
+                  required
+                  autocomplete="off"
+                  placeholder="The answer participants must submit"
+                />
+              </div>
+              <div data-task-fields="multiple-choice" hidden>
+                <label for="task-question"
+                  >What is the question being asked?</label
+                >
+                <input
+                  id="task-question"
+                  name="question"
+                  required
+                  disabled
+                  placeholder="What shape is the sign on xyz street at abc building?"
+                />
+                <label for="task-correct">Correct Answer</label>
+                <input
+                  id="task-correct"
+                  name="correctAnswer"
+                  required
+                  disabled
+                />
+                <fieldset>
+                  <legend>Incorrect Answers</legend>
+                  <label for="task-incorrect-1">Incorrect Answer 1</label>
+                  <input
+                    id="task-incorrect-1"
+                    name="incorrectAnswer1"
+                    required
+                    disabled
+                  />
+                  <label for="task-incorrect-2">Incorrect Answer 2</label>
+                  <input
+                    id="task-incorrect-2"
+                    name="incorrectAnswer2"
+                    required
+                    disabled
+                  />
+                  <label for="task-incorrect-3">Incorrect Answer 3</label>
+                  <input
+                    id="task-incorrect-3"
+                    name="incorrectAnswer3"
+                    required
+                    disabled
+                  />
+                </fieldset>
+              </div>
               <section
                 class="task-location-picker"
                 aria-labelledby="task-location-heading"
@@ -370,7 +421,11 @@
                       value="0"
                     />
                   </div>
-                  <div class="checkbox-field">
+                  <div
+                    class="checkbox-field"
+                    data-task-fields="single-word-trivia"
+                    hidden
+                  >
                     <input
                       id="task-case-sensitive"
                       name="answerCaseSensitive"

@@ -124,7 +124,49 @@ function checkTask(
     });
     return;
   }
-  checkFields(value, taskFields, prefix, issues);
+  checkFields(
+    value,
+    [
+      ...taskFields,
+      ...(Object.hasOwn(value, "taskType") ? ["taskType"] : []),
+      ...(Object.hasOwn(value, "choices") ? ["choices"] : []),
+    ],
+    prefix,
+    issues,
+  );
+  if (
+    value.taskType !== undefined &&
+    value.taskType !== "single-word-trivia" &&
+    value.taskType !== "multiple-choice"
+  )
+    issues.push({
+      field: prefix + "taskType",
+      message: "Choose a supported task type.",
+    });
+  if (value.taskType === "multiple-choice") {
+    const choices = value.choices;
+    if (
+      !Array.isArray(choices) ||
+      choices.length !== 4 ||
+      choices.some((choice) => typeof choice !== "string" || !choice.trim()) ||
+      new Set(
+        choices.map((choice) =>
+          typeof choice === "string" ? choice.trim().toLowerCase() : choice,
+        ),
+      ).size !== 4 ||
+      !choices.includes(value.requiredAnswer)
+    )
+      issues.push({
+        field: prefix + "choices",
+        message:
+          "Provide four distinct, nonblank choices including the correct answer.",
+      });
+  } else if (value.choices !== undefined) {
+    issues.push({
+      field: prefix + "choices",
+      message: "Choices are only supported for multiple-choice tasks.",
+    });
+  }
   for (const field of ["id", "displayLabel", "description", "requiredAnswer"])
     checkText(value[field], prefix + field, issues);
   if (value.hint !== null) checkText(value.hint, prefix + "hint", issues);

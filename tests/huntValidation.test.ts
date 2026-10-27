@@ -183,3 +183,27 @@ test("accepts generated access codes and legacy null codes", () => {
   hunt.accessCode = "ABCD1234";
   expect(validateHunt(hunt).ok).toBe(true);
 });
+
+test("multiple choice requires four distinct choices and the configured correct answer", () => {
+  const hunt = fixture();
+  Object.assign(hunt.tasks[0], {
+    taskType: "multiple-choice",
+    requiredAnswer: "Square",
+    choices: ["Square", "Circle", "Triangle", "Octagon"],
+  });
+  expect(validateHunt(hunt).ok).toBe(true);
+  for (const choices of [
+    [],
+    ["Square", "Circle", "Triangle"],
+    ["Square", " square ", "Triangle", "Octagon"],
+    ["Square", "", "Triangle", "Octagon"],
+    ["Star", "Circle", "Triangle", "Octagon"],
+  ]) {
+    hunt.tasks[0].choices = choices;
+    expectInvalid(hunt, "tasks[0].choices");
+  }
+  hunt.tasks[0].taskType = "single-word-trivia";
+  expectInvalid(hunt, "tasks[0].choices");
+  delete hunt.tasks[0].choices;
+  expect(validateHunt(hunt).ok).toBe(true);
+});

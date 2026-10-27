@@ -262,6 +262,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "secret-answer",
   );
 
+  await page.getByTestId("close-player-hunt-details").click();
   await page.getByTestId("player-sign-out").click();
   await expect(page).toHaveURL(/\/index\.html$/);
 });

@@ -238,10 +238,6 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await page.getByLabel("Access code").fill("abcd1234");
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();
-  await page
-    .getByTestId("player-hunt-list")
-    .locator('[data-hunt-id="hunt-1"]')
-    .click();
   await expect(page.getByTestId("player-hunt-details")).toBeVisible();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("test");
   await expect(page.getByTestId("player-task-status")).toContainText(
@@ -259,9 +255,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const answerTask = page
     .getByTestId("player-task")
     .filter({ hasText: "Library Steps" });
-  await expect(
-    answerTask.getByRole("heading", { name: "Library Steps" }),
-  ).toBeVisible();
+  await expect(answerTask).toBeVisible();
+  await expect(answerTask.locator(".hunt-detail-task-heading")).toContainText(
+    "Library Steps",
+  );
   await expect(answerTask).toContainText("Look for the carved stone marker.");
   const playerIntro = page.locator(".player-hunt-intro");
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText(

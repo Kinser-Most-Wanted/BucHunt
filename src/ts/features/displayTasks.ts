@@ -73,7 +73,8 @@ function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
   if (
     hunt.status === "archived" ||
     (hunt.endsAt !== null && Date.parse(hunt.endsAt) <= now)
-  ) return "past";
+  )
+    return "past";
   return Date.parse(hunt.beginsAt) > now ? "future" : "active";
 }
 
@@ -123,11 +124,12 @@ function renderHunts(
     const phase = huntPhase(hunt, now);
     const badge = document.createElement("span");
     badge.className = `hunt-state-badge hunt-state-${phase}`;
-    badge.textContent = phase === "past"
-      ? "Hunt Ended"
-      : phase === "future"
-        ? "Future Hunt"
-        : "Active";
+    badge.textContent =
+      phase === "past"
+        ? "Hunt Ended"
+        : phase === "future"
+          ? "Future Hunt"
+          : "Active";
     header.append(heading, badge);
     const description = document.createElement("p");
     description.textContent = hunt.description;
@@ -321,10 +323,14 @@ export function mountDisplayTasks(
     };
     for (const hunt of displayedHunts) groups[huntPhase(hunt, now)].push(hunt);
     const signature = (Object.keys(groups) as HuntPhase[])
-      .map((phase) => `${phase}:${groups[phase].map((hunt) => hunt.id).join(",")}`)
+      .map(
+        (phase) => `${phase}:${groups[phase].map((hunt) => hunt.id).join(",")}`,
+      )
       .join("|");
     if (force || signature !== categorySignature) {
-      const changed = Boolean(categorySignature && signature !== categorySignature);
+      const changed = Boolean(
+        categorySignature && signature !== categorySignature,
+      );
       categorySignature = signature;
       renderHunts(list, groups.active, now);
       renderHunts(futureList, groups.future, now);
@@ -336,10 +342,12 @@ export function mountDisplayTasks(
         window.setTimeout(() => reloadSelectedHunt?.(), 0);
     }
     const byId = new Map(displayedHunts.map((hunt) => [hunt.id, hunt]));
-    root.querySelectorAll<HTMLElement>("[data-hunt-countdown]").forEach((element) => {
-      const hunt = byId.get(element.dataset.huntCountdown ?? "");
-      if (hunt) element.textContent = countdownText(hunt, now);
-    });
+    root
+      .querySelectorAll<HTMLElement>("[data-hunt-countdown]")
+      .forEach((element) => {
+        const hunt = byId.get(element.dataset.huntCountdown ?? "");
+        if (hunt) element.textContent = countdownText(hunt, now);
+      });
   };
 
   const loadHunts = async (
@@ -599,7 +607,11 @@ export function mountDisplayTasks(
               : "This Hunt has no tasks yet.";
       addFact(
         "Status",
-        phase === "past" ? "Hunt Ended" : phase === "future" ? "Future Hunt" : "Active",
+        phase === "past"
+          ? "Hunt Ended"
+          : phase === "future"
+            ? "Future Hunt"
+            : "Active",
       );
       addFact("Starts", formattedTime(hunt.beginsAt));
       addFact(
@@ -609,7 +621,8 @@ export function mountDisplayTasks(
       const timeFact = document.createElement("div");
       timeFact.className = "hunt-fact";
       const timeLabel = document.createElement("dt");
-      timeLabel.textContent = phase === "future" ? "Starts in" : "Time remaining";
+      timeLabel.textContent =
+        phase === "future" ? "Starts in" : "Time remaining";
       const timeValue = document.createElement("dd");
       timeValue.dataset.huntCountdown = hunt.id;
       timeValue.textContent = countdownText(hunt, now);
@@ -630,7 +643,9 @@ export function mountDisplayTasks(
         const label = document.createElement("h4");
         label.textContent = task.displayLabel;
         const state = document.createElement("p");
-        state.className = task.completed ? "task-completion completed" : "task-completion";
+        state.className = task.completed
+          ? "task-completion completed"
+          : "task-completion";
         state.textContent = task.completed ? "Completed" : "Incomplete";
         item.append(label, state);
         if (task.description) {
@@ -739,11 +754,9 @@ export function mountDisplayTasks(
       if (button) void loadHunt(button.dataset.huntId ?? "");
     });
     const timer = window.setInterval(() => renderCategories(), 1000);
-    window.addEventListener(
-      "pagehide",
-      () => window.clearInterval(timer),
-      { once: true },
-    );
+    window.addEventListener("pagehide", () => window.clearInterval(timer), {
+      once: true,
+    });
     const sharedCode = new URLSearchParams(location.search).get("accessCode");
     if (sharedCode) huntInput.value = sharedCode.toUpperCase();
     const requestedHunt = new URLSearchParams(location.search).get("huntId");

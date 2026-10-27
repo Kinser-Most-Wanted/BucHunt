@@ -139,10 +139,7 @@ export function isHuntJoinable(
   );
 }
 
-export function isHuntActive(
-  hunt: HuntDefinition,
-  now = Date.now(),
-): boolean {
+export function isHuntActive(hunt: HuntDefinition, now = Date.now()): boolean {
   return (
     hunt.status !== "archived" &&
     Date.parse(hunt.beginsAt) <= now &&

@@ -8,7 +8,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApplication } from "../src/ts/server/server.js";
-import { HuntStore, isHuntActive, isHuntJoinable } from "../src/ts/server/huntStore.js";
+import {
+  HuntStore,
+  isHuntActive,
+  isHuntJoinable,
+} from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
 
 const input = {
@@ -931,11 +935,13 @@ test("access code joins persist before answers and reject unavailable hunts and 
     expect(isHuntJoinable({ ...definition, status: "archived" })).toBe(false);
     const huntsPath = join(directory, "hunts.json");
     const storedHunts = JSON.parse(await readFile(huntsPath, "utf8"));
-    storedHunts.hunts.find((item: { id: string }) => item.id === expiring.id).endsAt =
-      new Date(Date.now() - 1000).toISOString();
+    storedHunts.hunts.find(
+      (item: { id: string }) => item.id === expiring.id,
+    ).endsAt = new Date(Date.now() - 1000).toISOString();
     await writeFile(huntsPath, JSON.stringify(storedHunts));
     const answerResponse = await fetch(
-      base + `/api/player/account/hunts/${expiring.id}/tasks/${expiringTask.id}/answer`,
+      base +
+        `/api/player/account/hunts/${expiring.id}/tasks/${expiringTask.id}/answer`,
       {
         method: "POST",
         headers: {

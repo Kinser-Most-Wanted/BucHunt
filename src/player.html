@@ -158,44 +158,159 @@
         <p role="status" data-testid="player-task-status" aria-live="polite">
           No hunts loaded.
         </p>
-        <div class="player-hunt-categories" data-testid="player-hunt-categories" hidden>
-          <section class="player-hunt-category" aria-labelledby="active-hunts-heading">
-            <div class="player-hunt-category-heading"><div><p class="eyebrow">READY WHEN YOU ARE</p><h2 id="active-hunts-heading">Active Hunts</h2></div><span class="hunt-state-badge">In progress</span></div>
-            <ul data-testid="player-hunt-list" aria-label="Active Hunts" class="player-hunt-list"></ul>
-            <p class="player-hunt-empty" data-testid="active-hunts-empty" hidden>No active Hunts right now.</p>
+        <div
+          class="player-hunt-categories"
+          data-testid="player-hunt-categories"
+          hidden
+        >
+          <section
+            class="player-hunt-category"
+            aria-labelledby="active-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">READY WHEN YOU ARE</p>
+                <h2 id="active-hunts-heading">Active Hunts</h2>
+              </div>
+              <span class="hunt-state-badge">In progress</span>
+            </div>
+            <ul
+              data-testid="player-hunt-list"
+              aria-label="Active Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p
+              class="player-hunt-empty"
+              data-testid="active-hunts-empty"
+              hidden
+            >
+              No active Hunts right now.
+            </p>
           </section>
-          <section class="player-hunt-category" aria-labelledby="future-hunts-heading">
-            <div class="player-hunt-category-heading"><div><p class="eyebrow">COMING UP</p><h2 id="future-hunts-heading">Future Hunts</h2></div><span class="hunt-state-badge">Starts soon</span></div>
-            <ul data-testid="player-future-hunt-list" aria-label="Future Hunts" class="player-hunt-list"></ul>
-            <p class="player-hunt-empty" data-testid="future-hunts-empty" hidden>No upcoming Hunts.</p>
+          <section
+            class="player-hunt-category"
+            aria-labelledby="future-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">COMING UP</p>
+                <h2 id="future-hunts-heading">Future Hunts</h2>
+              </div>
+              <span class="hunt-state-badge">Starts soon</span>
+            </div>
+            <ul
+              data-testid="player-future-hunt-list"
+              aria-label="Future Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p
+              class="player-hunt-empty"
+              data-testid="future-hunts-empty"
+              hidden
+            >
+              No upcoming Hunts.
+            </p>
           </section>
-          <section class="player-hunt-category" aria-labelledby="past-hunts-heading">
-            <div class="player-hunt-category-heading"><div><p class="eyebrow">YOUR HISTORY</p><h2 id="past-hunts-heading">Past Hunts</h2></div><span class="hunt-state-badge">Hunt Ended</span></div>
-            <ul data-testid="player-past-hunt-list" aria-label="Past Hunts" class="player-hunt-list"></ul>
-            <p class="player-hunt-empty" data-testid="past-hunts-empty" hidden>No past Hunts yet.</p>
+          <section
+            class="player-hunt-category"
+            aria-labelledby="past-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">YOUR HISTORY</p>
+                <h2 id="past-hunts-heading">Past Hunts</h2>
+              </div>
+              <span class="hunt-state-badge">Hunt Ended</span>
+            </div>
+            <ul
+              data-testid="player-past-hunt-list"
+              aria-label="Past Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p class="player-hunt-empty" data-testid="past-hunts-empty" hidden>
+              No past Hunts yet.
+            </p>
           </section>
         </div>
-        <section data-testid="player-hunt-details" class="player-hunt-details" aria-labelledby="player-hunt-name" hidden>
-          <div class="hunt-details-dialog-heading"><p class="eyebrow">HUNT OVERVIEW</p><button type="button" class="dialog-close-button" data-testid="close-player-hunt-details" aria-label="Close hunt details">×</button></div>
-          <p class="details-status" data-testid="player-hunt-lookup-status" role="status" aria-live="polite"></p>
-          <h2 id="player-hunt-name" data-testid="player-hunt-name">Your adventure</h2>
-          <p class="details-description" data-testid="player-hunt-description"></p>
-          <div class="details-actions"><button type="button" class="action" data-testid="back-to-hunts">Back to Hunts</button></div>
-          <section class="details-overview" aria-labelledby="player-hunt-overview-heading">
-            <div class="details-section-heading"><p class="eyebrow">THE BIG PICTURE</p><h3 id="player-hunt-overview-heading">Hunt overview</h3></div>
+        <section
+          data-testid="player-hunt-details"
+          class="player-hunt-details"
+          aria-labelledby="player-hunt-name"
+          hidden
+        >
+          <div class="hunt-details-dialog-heading">
+            <p class="eyebrow">HUNT OVERVIEW</p>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-player-hunt-details"
+              aria-label="Close hunt details"
+            >
+              ×
+            </button>
+          </div>
+          <p
+            class="details-status"
+            data-testid="player-hunt-lookup-status"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <h2 id="player-hunt-name" data-testid="player-hunt-name">
+            Your adventure
+          </h2>
+          <p
+            class="details-description"
+            data-testid="player-hunt-description"
+          ></p>
+          <div class="details-actions">
+            <button type="button" class="action" data-testid="back-to-hunts">
+              Back to Hunts
+            </button>
+          </div>
+          <section
+            class="details-overview"
+            aria-labelledby="player-hunt-overview-heading"
+          >
+            <div class="details-section-heading">
+              <p class="eyebrow">THE BIG PICTURE</p>
+              <h3 id="player-hunt-overview-heading">Hunt overview</h3>
+            </div>
             <dl class="hunt-facts" data-testid="player-hunt-facts"></dl>
           </section>
           <section class="details-tasks" aria-labelledby="player-tasks-heading">
-            <div class="details-section-heading"><p class="eyebrow">THE ADVENTURE</p><h3 id="player-tasks-heading">Hunt tasks</h3></div>
-            <ol data-testid="player-task-list" aria-label="Hunt tasks" class="hunt-detail-task-list"></ol>
-            <p class="details-muted" data-testid="player-hunt-no-tasks" hidden>This Hunt has no tasks yet.</p>
+            <div class="details-section-heading">
+              <p class="eyebrow">THE ADVENTURE</p>
+              <h3 id="player-tasks-heading">Hunt tasks</h3>
+            </div>
+            <ol
+              data-testid="player-task-list"
+              aria-label="Hunt tasks"
+              class="hunt-detail-task-list"
+            ></ol>
+            <p class="details-muted" data-testid="player-hunt-no-tasks" hidden>
+              This Hunt has no tasks yet.
+            </p>
           </section>
         </section>
-        <section data-testid="player-hunt-lookup" class="player-hunt-lookup" aria-labelledby="hunt-lookup-heading" hidden>
+        <section
+          data-testid="player-hunt-lookup"
+          class="player-hunt-lookup"
+          aria-labelledby="hunt-lookup-heading"
+          hidden
+        >
           <h2 id="hunt-lookup-heading">Join a Hunt</h2>
           <form data-testid="player-hunt-form">
             <label for="player-hunt-id">Access code</label>
-            <input id="player-hunt-id" name="accessCode" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" class="hunt-access-code" required />
+            <input
+              id="player-hunt-id"
+              name="accessCode"
+              maxlength="8"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              class="hunt-access-code"
+              required
+            />
             <button type="submit">Join Hunt</button>
           </form>
         </section>

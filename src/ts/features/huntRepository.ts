@@ -168,9 +168,11 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     typeof candidate.description !== "string" ||
     typeof candidate.beginsAt !== "string" ||
     !Number.isFinite(Date.parse(candidate.beginsAt)) ||
-    !(candidate.endsAt === null ||
+    !(
+      candidate.endsAt === null ||
       (typeof candidate.endsAt === "string" &&
-        Number.isFinite(Date.parse(candidate.endsAt)))) ||
+        Number.isFinite(Date.parse(candidate.endsAt)))
+    ) ||
     (candidate.status !== "draft" &&
       candidate.status !== "published" &&
       candidate.status !== "archived") ||

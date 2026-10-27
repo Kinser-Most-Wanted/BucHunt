@@ -770,10 +770,7 @@ export function mountDisplayTasks(
       const presentation = huntStatusPresentation(hunt, now);
       huntStatus.textContent = presentation.message;
       huntStatus.dataset.status = presentation.tone;
-      addFact(
-        "Status",
-        presentation.label,
-      );
+      addFact("Status", presentation.label);
       addFact("Starts", formattedTime(hunt.beginsAt));
       addFact(
         "Ends",

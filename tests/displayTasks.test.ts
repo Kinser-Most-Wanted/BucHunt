@@ -280,7 +280,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     name: "Show Task Location",
   });
   await mapToggle.click();
-  const taskMap = page.getByTitle("Task location map");
+  const taskMap = answerTask.locator('iframe[title="Task location map"]');
   await expect(taskMap).toBeVisible();
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();

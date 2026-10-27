@@ -465,6 +465,7 @@ export function mountDisplayTasks(
       .get("accessCode")
       ?.trim()
       .toUpperCase() ?? "";
+  let sharedLinkJoinPending = false;
 
   const requestDisplayName = (signedIn: PlayerIdentity): void => {
     pendingIdentity = signedIn;
@@ -502,7 +503,10 @@ export function mountDisplayTasks(
     pendingIdentity = null;
     providerStatus.hidden = true;
     if (sharedCode) {
-      window.setTimeout(() => huntForm?.requestSubmit(), 0);
+      window.setTimeout(() => {
+        sharedLinkJoinPending = true;
+        huntForm?.requestSubmit();
+      }, 0);
     } else {
       void loadHunts(signedIn, name);
     }
@@ -781,6 +785,8 @@ export function mountDisplayTasks(
     });
     huntForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const isSharedLinkJoin = sharedLinkJoinPending;
+      sharedLinkJoinPending = false;
       const identity = storedIdentity();
       if (!identity) {
         huntStatus.textContent = "Sign in with Google first.";
@@ -802,7 +808,7 @@ export function mountDisplayTasks(
           if (result.code === "unauthorized") void preparePlayerSignIn();
           return;
         }
-        if (sharedCode && accessCode === sharedCode) {
+        if (isSharedLinkJoin) {
           await loadHunts(
             identity,
             storedDisplayName(identity.accountId) ?? identity.email,
@@ -851,7 +857,10 @@ export function mountDisplayTasks(
       previousIdentity &&
       storedDisplayName(previousIdentity.accountId)
     ) {
-      window.setTimeout(() => huntForm.requestSubmit(), 0);
+      window.setTimeout(() => {
+        sharedLinkJoinPending = true;
+        huntForm.requestSubmit();
+      }, 0);
     } else if (requestedHunt && previousIdentity) {
       void loadHunt(requestedHunt);
     }
@@ -872,4 +881,3 @@ export function mountDisplayTasks(
       .finally(() => window.location.assign("./index.html"));
   });
 }
-

@@ -318,7 +318,9 @@ test(
       .getByLabel("Description", { exact: true })
       .fill("A collaborative hunt");
     await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
-    await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Create hunt", exact: true })
+      .click();
     await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
     const id = await page.locator('#define-task [name="huntId"]').inputValue();
     await page.getByTestId("close-hunt-details").click();
@@ -387,11 +389,16 @@ test(
       );
       expect(
         (
-          await contributor.request.post(`/api/admin/hunts/${id}/contributors`, {
-            data: {
-              creatorId: await visitor.getByTestId("creator-id").textContent(),
+          await contributor.request.post(
+            `/api/admin/hunts/${id}/contributors`,
+            {
+              data: {
+                creatorId: await visitor
+                  .getByTestId("creator-id")
+                  .textContent(),
+              },
             },
-          })
+          )
         ).status(),
       ).toBe(403);
       await page

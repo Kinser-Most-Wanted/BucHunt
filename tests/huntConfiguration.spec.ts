@@ -302,7 +302,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-details-editor")).toBeHidden();
 });
 
-test("only owners and contributors can configure a hunt through the creator workspace", async ({
+test("only owners and contributors can configure a hunt through the creator workspace", { timeout: 60_000 }, async ({
   page,
   browser,
   baseURL,

@@ -442,7 +442,7 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
   await expect(page.getByTestId("player-account")).toContainText("Baja");
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "no saved hunts yet",
+    "Your dashboard is ready",
   );
   await expect(page).toHaveURL(/\/player\.html$/);
 });

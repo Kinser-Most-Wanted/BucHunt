@@ -298,6 +298,15 @@
             <ul data-testid="my-hunts" aria-label="My hunts"></ul>
           </div>
           <div data-testid="hunt-details-overview">
+            <div class="hunt-overview-lead">
+              <p data-testid="hunt-owner" class="hunt-owner">
+                Owner · Creator information unavailable
+              </p>
+              <p class="hunt-access-code">
+                Access code
+                <strong data-testid="hunt-access-code">Not set</strong>
+              </p>
+            </div>
             <p
               class="details-status"
               data-testid="hunt-detail-status"
@@ -321,11 +330,6 @@
               >
                 Back to my hunts
               </button>
-              <output
-                id="hunt-detail-id"
-                data-testid="hunt-detail-id"
-                hidden
-              ></output>
               <button
                 type="button"
                 class="action details-edit-link"
@@ -339,15 +343,22 @@
               >
                 Join Hunt
               </a>
-              <button
-                type="button"
-                class="action hunt-id-toggle"
-                data-testid="hunt-id-toggle"
-                aria-expanded="false"
-                aria-controls="hunt-detail-id"
-              >
-                Reveal hunt ID
-              </button>
+              <div class="hunt-id-control">
+                <button
+                  type="button"
+                  class="action hunt-id-toggle"
+                  data-testid="hunt-id-toggle"
+                  aria-expanded="false"
+                  aria-controls="hunt-detail-id"
+                >
+                  Reveal hunt ID
+                </button>
+                <output
+                  id="hunt-detail-id"
+                  data-testid="hunt-detail-id"
+                  hidden
+                ></output>
+              </div>
             </div>
             <section class="details-tasks" aria-labelledby="tasks-heading">
               <div class="details-section-heading">
@@ -366,15 +377,6 @@
               class="details-overview"
               aria-labelledby="overview-heading"
             >
-              <div class="hunt-overview-lead">
-                <p data-testid="hunt-owner" class="hunt-owner">
-                  Owner · Creator information unavailable
-                </p>
-                <p class="hunt-access-code">
-                  Access code
-                  <strong data-testid="hunt-access-code">Not set</strong>
-                </p>
-              </div>
               <div class="details-section-heading">
                 <p class="eyebrow">THE BIG PICTURE</p>
                 <h3 id="overview-heading">Hunt overview</h3>

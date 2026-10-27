@@ -248,6 +248,10 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-owner")).toContainText("Owner ·");
   await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("contributors-panel")).toBeVisible();
+  await expect(page.getByTestId("contributors-panel")).toHaveJSProperty(
+    "open",
+    false,
+  );
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("hunt-edit-title")).toHaveText(
@@ -284,9 +288,25 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-detail-name")).toHaveText(
     "Sprint verification",
   );
+  const overviewTopOrder = await page
+    .getByTestId("hunt-details-overview")
+    .evaluate((overview) => {
+      const children = Array.from(overview.children);
+      return [
+        children.indexOf(overview.querySelector(".hunt-overview-lead")!),
+        children.indexOf(overview.querySelector(".details-status")!),
+      ];
+    });
+  expect(overviewTopOrder[0]).toBeLessThan(overviewTopOrder[1]);
   await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
+  const idControl = page.locator(".hunt-id-control");
+  await expect(
+    page
+      .getByTestId("hunt-id-toggle")
+      .locator("xpath=following-sibling::output"),
+  ).toBeHidden();
   await page.getByTestId("hunt-id-toggle").click();
-  await expect(page.getByTestId("hunt-detail-id")).toHaveText(id);
+  await expect(idControl.getByTestId("hunt-detail-id")).toHaveText(id);
   await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(
     "href",

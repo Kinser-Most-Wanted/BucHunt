@@ -76,7 +76,13 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
         completed: true,
         location: { latitude: 36.304, longitude: -82.368 },
       },
-      { id: "task-2", displayLabel: "Library Steps", completed: false },
+      {
+        id: "task-2",
+        displayLabel: "Library Steps",
+        description: "Look for the carved stone marker.",
+        completed: false,
+        location: { latitude: 36.305, longitude: -82.367 },
+      },
     ],
   };
   const futureHunt = {
@@ -242,20 +248,44 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-task-list")).not.toContainText(
     "36.304000, -82.368000",
   );
-  const mapToggle = page.getByRole("button", {
+  const answerTask = page
+    .getByTestId("player-task")
+    .filter({ hasText: "Library Steps" });
+  await expect(
+    answerTask.getByRole("heading", { name: "Library Steps" }),
+  ).toBeVisible();
+  await expect(answerTask).toContainText("Look for the carved stone marker.");
+  const playerIntro = page.locator(".player-hunt-intro");
+  await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText(
+    "Campus Hunt",
+  );
+  await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
+    "Find the campus landmarks.",
+  );
+  const taskLayout = await answerTask.evaluate((task) => {
+    const location = task.querySelector(".task-location")!;
+    const answer = task.querySelector(".task-answer-form")!;
+    return Array.from(task.children).indexOf(location) <
+      Array.from(task.children).indexOf(answer);
+  });
+  expect(taskLayout).toBe(true);
+  await expect(answerTask.getByLabel("Answer for Library Steps")).toHaveCSS(
+    "min-height",
+    "60px",
+  );
+  await expect(
+    answerTask.getByRole("button", { name: "Submit answer" }),
+  ).toBeVisible();
+  const mapToggle = answerTask.getByRole("button", {
     name: "Show Task Location",
   });
   await mapToggle.click();
   const taskMap = page.getByTitle("Task location map");
   await expect(taskMap).toBeVisible();
-  await expect(page.getByLabel("Answer for Library Steps")).toHaveCSS(
-    "min-height",
-    "56px",
-  );
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");
-  expect(marker?.split(",").map(Number)).toEqual([36.304, -82.368]);
+  expect(marker?.split(",").map(Number)).toEqual([36.305, -82.367]);
   await page.getByRole("button", { name: "Hide Task Location" }).click();
   await expect(taskMap).toBeHidden();
   await expect(page.getByTestId("player-task-list")).toContainText("Completed");

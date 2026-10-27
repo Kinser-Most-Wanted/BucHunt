@@ -133,7 +133,7 @@ export function mountCreateHunt(
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
     panel.hidden = false;
-    panel.open = hunt.role === "owner";
+    panel.open = false;
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";

@@ -399,7 +399,8 @@ export function mountDefineTask(
       return;
     }
     if (button.dataset.taskAction !== "delete") return;
-    if (!window.confirm(`Delete “${task.displayLabel}” from this hunt?`)) return;
+    if (!window.confirm(`Delete “${task.displayLabel}” from this hunt?`))
+      return;
 
     const huntId = huntInput?.value.trim() ?? "";
     if (!huntId) {
@@ -443,7 +444,8 @@ export function mountDefineTask(
       field<HTMLTextAreaElement>(form, "description")?.value.trim() ?? "";
     const requiredAnswer =
       field<HTMLInputElement>(form, "requiredAnswer")?.value.trim() ?? "";
-    const latitudeValue = field<HTMLInputElement>(form, "latitude")?.value ?? "";
+    const latitudeValue =
+      field<HTMLInputElement>(form, "latitude")?.value ?? "";
     const longitudeValue =
       field<HTMLInputElement>(form, "longitude")?.value ?? "";
     const orderValue = orderInput?.value ?? "";
@@ -536,3 +538,4 @@ export function mountDefineTask(
     }
   });
 }
+

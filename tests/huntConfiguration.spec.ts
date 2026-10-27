@@ -240,9 +240,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
       overview.querySelector(".details-tasks"),
       overview.querySelector(".details-overview"),
       overview.querySelector('[data-testid="contributors-panel"]'),
-    ].map((element) =>
-      Array.from(overview.children).indexOf(element!),
-    );
+    ].map((element) => Array.from(overview.children).indexOf(element!));
   });
   expect(popupOrder[0]).toBeLessThan(popupOrder[1]);
   expect(popupOrder[1]).toBeLessThan(popupOrder[2]);

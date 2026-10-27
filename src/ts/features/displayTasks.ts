@@ -617,6 +617,11 @@ export function mountDisplayTasks(
   const huntTasks = root.querySelector<HTMLOListElement>(
     '[data-testid="player-task-list"]',
   );
+  const huntTasksSection = huntTasks?.closest<HTMLElement>(".details-tasks");
+  const huntOverviewSection = huntFacts?.closest<HTMLElement>(".details-overview");
+  if (huntTasksSection && huntOverviewSection) {
+    huntTasksSection.after(huntOverviewSection);
+  }
   const huntNoTasks = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-no-tasks"]',
   );
@@ -730,6 +735,8 @@ export function mountDisplayTasks(
         const item = document.createElement("li");
         item.className = "hunt-detail-task";
         item.dataset.testid = "player-task";
+        const heading = document.createElement("div");
+        heading.className = "hunt-detail-task-heading";
         const label = document.createElement("h4");
         label.textContent = task.displayLabel;
         const state = document.createElement("p");
@@ -737,14 +744,15 @@ export function mountDisplayTasks(
           ? "task-completion completed"
           : "task-completion";
         state.textContent = task.completed ? "Completed" : "Incomplete";
-        item.append(label, state);
+        heading.append(label, state);
+        const location = taskLocationElement(task.location);
+        if (location) heading.append(location);
+        item.append(heading);
         if (task.description) {
           const description = document.createElement("p");
           description.textContent = task.description;
           item.append(description);
         }
-        const location = taskLocationElement(task.location);
-        if (location) item.append(location);
         if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
           answerForm.className = "task-answer-form";
@@ -752,6 +760,7 @@ export function mountDisplayTasks(
           answerLabel.className = "task-answer-label";
           answerLabel.textContent = `Answer for ${task.displayLabel}`;
           const answer = document.createElement("input");
+          answer.type = "text";
           answer.className = "task-answer-input";
           answer.required = true;
           answerLabel.append(answer);

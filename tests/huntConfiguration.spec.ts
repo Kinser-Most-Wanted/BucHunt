@@ -457,10 +457,7 @@ test("only owners and contributors can configure a hunt through the creator work
         })
       ).status(),
     ).toBe(403);
-    await page
-      .getByTestId("contributors-panel")
-      .locator("summary")
-      .click();
+    await page.getByTestId("contributors-panel").locator("summary").click();
     await page
       .getByRole("button", { name: "Remove contributor", exact: true })
       .click();

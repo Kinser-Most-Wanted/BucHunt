@@ -232,13 +232,17 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     .click();
   await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
   const popupOrder = await page.evaluate(() => {
-    const overview = document.querySelector('[data-testid="hunt-details-overview"]')!;
+    const overview = document.querySelector(
+      '[data-testid="hunt-details-overview"]',
+    )!;
     return [
       overview.querySelector(".details-actions"),
       overview.querySelector(".details-tasks"),
       overview.querySelector(".details-overview"),
       overview.querySelector('[data-testid="contributors-panel"]'),
-    ].map((element) => Array.from(overview.children).indexOf(element!));
+    ].map((element) =>
+      Array.from(overview.children).indexOf(element!),
+    );
   });
   expect(popupOrder[0]).toBeLessThan(popupOrder[1]);
   expect(popupOrder[1]).toBeLessThan(popupOrder[2]);
@@ -285,7 +289,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
   await page.getByTestId("hunt-id-toggle").click();
   await expect(page.getByTestId("hunt-detail-id")).toHaveText(id);
-  await expect(page.getByTestId("hunt-facts")).toContainText("Access code");
+  await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(
     "href",
     /accessCode=[A-F0-9]{8}$/,

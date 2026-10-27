@@ -387,7 +387,10 @@
               hidden
             >
               <summary>Contributors</summary>
-              <section class="details-creators" aria-labelledby="creators-heading">
+              <section
+                class="details-creators"
+                aria-labelledby="creators-heading"
+              >
                 <div class="details-section-heading">
                   <p class="eyebrow">THE TEAM</p>
                   <h3 id="creators-heading">People with access</h3>
@@ -406,12 +409,9 @@
                   tasks.
                 </p>
                 <form data-testid="contributor-form">
-                  <label for="contributor-id">Contributor creator ID</label
-                  ><input id="contributor-id" name="creatorId" required /><button
-                    type="submit"
-                  >
-                    Add contributor
-                  </button>
+                  <label for="contributor-id">Contributor creator ID</label>
+                  <input id="contributor-id" name="creatorId" required />
+                  <button type="submit">Add contributor</button>
                 </form>
                 <p role="status" data-testid="contributor-status"></p>
                 <ul

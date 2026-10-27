@@ -430,7 +430,10 @@ test("only owners and contributors can configure a hunt through the creator work
         })
       ).status(),
     ).toBe(403);
-    await member.getByTestId("close-hunt-details").click();
+    await member.getByTestId("back-to-hunt-details").click();
+    await expect(member.getByTestId("hunt-details-overview")).toBeVisible();
+    await member.getByTestId("back-to-manage-hunts").click();
+    await expect(member.getByTestId("manage-hunts-view")).toBeVisible();
     await member.getByTestId("refresh-my-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",

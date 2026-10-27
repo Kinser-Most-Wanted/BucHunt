@@ -284,13 +284,14 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .getByLabel("Answer for Library Steps")
     .evaluate((input) => input.getBoundingClientRect().width);
   expect(answerBarWidth).toBeGreaterThan(300);
-  const locationButtonBounds = await answerTask
-    .getByRole("button", { name: "Show Task Location" })
-    .boundingBox();
-  const taskBounds = await answerTask.boundingBox();
-  expect(locationButtonBounds).not.toBeNull();
-  expect(taskBounds).not.toBeNull();
-  expect(locationButtonBounds!.right).toBeGreaterThan(taskBounds!.right - 220);
+  const taskHeading = answerTask.locator(".hunt-detail-task-heading");
+  const locationPanel = taskHeading.locator(".task-location");
+  await expect(taskHeading).toHaveCSS("display", "grid");
+  await expect(locationPanel).toHaveCSS("grid-column-start", "2");
+  await expect(locationPanel).toHaveCSS("grid-row-start", "1");
+  await expect(
+    answerTask.getByRole("button", { name: "Show Task Location" }),
+  ).toBeVisible();
   const sectionOrder = await page
     .getByTestId("player-hunt-details")
     .evaluate((dialog) =>

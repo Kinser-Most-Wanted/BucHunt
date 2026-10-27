@@ -398,4 +398,3 @@ test("only owners and contributors can configure a hunt through the creator work
     await stranger.close();
   }
 });
-

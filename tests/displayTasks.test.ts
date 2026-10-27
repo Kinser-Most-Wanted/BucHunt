@@ -316,14 +316,23 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const taskMap = answerTask.locator('iframe[title="Task location map"]');
   await expect(taskMap).toBeVisible();
   const detailsDialog = page.getByTestId("player-hunt-details");
-  await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(
-    "position",
-    "sticky",
-  );
+  const closeButton = page.getByTestId("close-player-hunt-details");
+  await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toBeHidden();
+  await expect(closeButton).toHaveCSS("position", "absolute");
+  expect(
+    await closeButton.evaluate((button) =>
+      Boolean(button.closest(".player-hunt-intro")),
+    ),
+  ).toBe(true);
+  await expect(detailsDialog).toHaveCSS("overscroll-behavior", "contain");
+  await expect(detailsDialog).toHaveCSS("scrollbar-width", "none");
+  await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });
-  await expect(page.getByTestId("close-player-hunt-details")).toBeInViewport();
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBeGreaterThan(0);
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");

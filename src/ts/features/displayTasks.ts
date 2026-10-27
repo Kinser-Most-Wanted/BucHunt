@@ -381,7 +381,10 @@ export function mountDisplayTasks(
       .querySelectorAll<HTMLElement>("[data-hunt-countdown]")
       .forEach((element) => {
         const hunt = byId.get(element.dataset.huntCountdown ?? "");
-        if (hunt) element.textContent = countdownText(hunt, now);
+        if (hunt) {
+          const text = countdownText(hunt, now);
+          if (element.textContent !== text) element.textContent = text;
+        }
       });
   };
 
@@ -645,6 +648,10 @@ export function mountDisplayTasks(
     const intro = document.createElement("div");
     intro.className = "player-hunt-intro";
     huntName.before(intro);
+    const closeButton = huntDetails.querySelector<HTMLButtonElement>(
+      '[data-testid="close-player-hunt-details"]',
+    );
+    if (closeButton) intro.append(closeButton);
     intro.append(huntName, huntDescription);
 
     let huntRequest = 0;
@@ -661,7 +668,10 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       selectedHuntId = huntId;
-      if (!huntDetails.open) huntDetails.showModal();
+      if (!huntDetails.open) {
+        huntDetails.showModal();
+        document.body.classList.add("player-hunt-modal-open");
+      }
       huntTasks.replaceChildren();
       huntFacts.replaceChildren();
       huntNoTasks.hidden = true;
@@ -887,8 +897,12 @@ export function mountDisplayTasks(
     });
     huntDetails.addEventListener("close", () => {
       selectedHuntId = null;
+      document.body.classList.remove("player-hunt-modal-open");
+      renderCategories();
     });
-    const timer = window.setInterval(() => renderCategories(), 1000);
+    const timer = window.setInterval(() => {
+      if (!huntDetails.open) renderCategories();
+    }, 1000);
     window.addEventListener("pagehide", () => window.clearInterval(timer), {
       once: true,
     });

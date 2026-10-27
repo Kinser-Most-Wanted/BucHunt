@@ -2213,6 +2213,9 @@ body[data-page="player"] .hunt-access-code {
   margin: auto;
   padding: clamp(1rem, 3vw, 2rem);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.2rem;
   background:
@@ -2221,29 +2224,27 @@ body[data-page="player"] .hunt-access-code {
   box-shadow: 0 32px 100px rgb(0 0 0 / 55%);
   color: #f4f5f9;
 }
+.player-hunt-details::-webkit-scrollbar {
+  display: none;
+}
+body[data-page="player"].player-hunt-modal-open {
+  overflow: hidden;
+}
 .player-hunt-details::backdrop {
   background: rgb(6 9 14 / 76%);
-  backdrop-filter: blur(8px);
 }
 .player-hunt-details .hunt-details-dialog-heading {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  display: flex;
-  justify-content: flex-end;
-  height: 0;
-  margin: calc(-1 * clamp(1rem, 3vw, 2rem));
-  padding: 0;
-  overflow: visible;
-  background: transparent;
+  display: none;
 }
 .player-hunt-details .hunt-details-dialog-heading > .eyebrow {
   display: none;
 }
 .player-hunt-details .dialog-close-button {
-  position: relative;
-  flex: 0 0 auto;
-  transform: translate(-0.25rem, 0.25rem);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  transform: none;
   border-color: rgb(255 255 255 / 28%);
   background: #17406f;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
@@ -2882,6 +2883,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt-details .player-hunt-intro > h2 {
   max-width: 28ch;
+  padding-right: 3.5rem;
   color: #fff;
   font-size: clamp(2rem, 4.5vw, 3rem);
   font-weight: 800;

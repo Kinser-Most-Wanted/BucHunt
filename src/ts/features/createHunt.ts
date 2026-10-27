@@ -78,10 +78,10 @@ export function mountCreateHunt(
   function showManagerView(): void {
     if (overviewView) overviewView.hidden = true;
     if (editorView) editorView.hidden = true;
-    managerView.hidden = false;
+    managerView!.hidden = false;
     if (mode) mode.textContent = "YOUR ADVENTURES";
-    manageDialog.setAttribute("aria-labelledby", "manage-hunts-title");
-    if (!manageDialog.open) manageDialog.showModal();
+    manageDialog!.setAttribute("aria-labelledby", "manage-hunts-title");
+    if (!manageDialog!.open) manageDialog!.showModal();
     void refresh();
   }
 

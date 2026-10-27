@@ -64,8 +64,8 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   const hunt = {
     id: "hunt-1",
-    name: "Campus Hunt",
-    description: "Find the campus landmarks.",
+    name: "test",
+    description: "test",
     beginsAt: "2020-01-01T00:00:00.000Z",
     endsAt: "2099-01-01T00:00:00.000Z",
     status: "published",
@@ -195,7 +195,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Campus Hunt",
+    "test",
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Time remaining",
@@ -238,12 +238,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await page.getByLabel("Access code").fill("abcd1234");
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();
-  await expect(page.getByTestId("player-hunt-name")).toHaveText("Campus Hunt");
+  await expect(page.getByTestId("player-hunt-name")).toHaveText("test");
   await expect(page.getByTestId("player-task-status")).toContainText(
     "4 saved Hunts",
   );
   await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Campus Hunt",
+    "test",
   );
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Old Fountain",
@@ -260,10 +260,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(answerTask).toContainText("Look for the carved stone marker.");
   const playerIntro = page.locator(".player-hunt-intro");
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText(
-    "Campus Hunt",
+    "test",
   );
   await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
-    "Find the campus landmarks.",
+    "test",
   );
   const taskLayout = await answerTask.evaluate((task) => {
     const location = task.querySelector(".task-location")!;
@@ -277,6 +277,31 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(answerTask.getByLabel("Answer for Library Steps")).toHaveCSS(
     "min-height",
     "60px",
+  );
+  const answerBarWidth = await answerTask
+    .getByLabel("Answer for Library Steps")
+    .evaluate((input) => input.getBoundingClientRect().width);
+  expect(answerBarWidth).toBeGreaterThan(300);
+  const locationButtonBounds = await answerTask
+    .getByRole("button", { name: "Show Task Location" })
+    .boundingBox();
+  const taskBounds = await answerTask.boundingBox();
+  expect(locationButtonBounds).not.toBeNull();
+  expect(taskBounds).not.toBeNull();
+  expect(locationButtonBounds!.right).toBeGreaterThan(taskBounds!.right - 220);
+  const sectionOrder = await page
+    .getByTestId("player-hunt-details")
+    .evaluate((dialog) =>
+      Array.from(dialog.querySelectorAll(":scope > section")).map((section) =>
+        section.classList.contains("details-tasks")
+          ? "tasks"
+          : section.classList.contains("details-overview")
+            ? "overview"
+            : "other",
+      ),
+    );
+  expect(sectionOrder.indexOf("tasks")).toBeLessThan(
+    sectionOrder.indexOf("overview"),
   );
   await expect(
     answerTask.getByRole("button", { name: "Submit answer" }),

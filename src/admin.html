@@ -154,20 +154,63 @@
           </p>
         </div>
         <section
-          class="access-panel manage-hunts-panel"
-          aria-labelledby="my-hunts-heading"
+          class="access-panel admin-hunt-actions"
+          aria-label="Hunt actions"
         >
-          <div class="manage-hunts-heading">
+          <button
+            type="button"
+            class="create-hunt-launcher"
+            data-testid="open-create-hunt"
+          >
+            <span class="create-hunt-launcher-icon" aria-hidden="true">+</span>
+            <span>
+              <strong>Create a Hunt</strong>
+              <small>Start a new campus adventure</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            class="refresh-button manage-hunts-launcher"
+            data-testid="open-manage-hunts"
+          >
+            Manage Hunts
+          </button>
+        </section>
+        <details class="more-options" data-testid="creator-profile-details">
+          <summary>Creator ID and sharing</summary>
+          <p class="field-help">
+            This browser-based ID identifies hunt ownership and contributors.
+          </p>
+          <p>
+            Your creator ID:
+            <code data-testid="creator-id" style="overflow-wrap: anywhere"
+              >Starting your profile…</code
+            >
+          </p>
+          <button type="button" data-testid="copy-creator-id">
+            Copy creator ID
+          </button>
+          <p class="field-help">
+            Share your creator ID with a hunt owner if you want to contribute.
+          </p>
+        </details>
+        <dialog
+          class="hunt-details-dialog create-hunt-dialog"
+          data-testid="create-hunt-dialog"
+          aria-labelledby="create-hunt-dialog-title"
+        >
+          <div class="hunt-details-dialog-heading">
             <div>
-              <p class="eyebrow">YOUR ADVENTURES</p>
-              <h2 id="my-hunts-heading">My hunts</h2>
+              <p class="eyebrow">START A NEW ADVENTURE</p>
+              <h2 id="create-hunt-dialog-title">Create a Hunt</h2>
             </div>
             <button
               type="button"
-              class="refresh-button"
-              data-testid="refresh-my-hunts"
+              class="dialog-close-button"
+              data-testid="close-create-hunt"
+              aria-label="Close create hunt"
             >
-              ↻ Refresh
+              ×
             </button>
           </div>
           <section
@@ -217,62 +260,17 @@
             <p role="status" data-testid="hunt-status">
               Enter hunt details to begin.
             </p>
-            <a data-testid="hunt-player-link" hidden
-              >Open this hunt in player view</a
-            >
           </section>
-          <p class="section-copy">
-            Select a hunt to continue editing its tasks or manage its
-            contributors.
-          </p>
-          <p role="status" data-testid="creator-status"></p>
-          <ul data-testid="my-hunts" aria-label="My hunts"></ul>
-        </section>
-
-        <details class="more-options" data-testid="contributors-panel" hidden>
-          <summary>Contributors</summary>
-          <p>
-            As the owner, you can let another creator manage this hunt's tasks.
-          </p>
-          <form data-testid="contributor-form">
-            <label for="contributor-id">Contributor creator ID</label
-            ><input id="contributor-id" name="creatorId" required /><button
-              type="submit"
-            >
-              Add contributor
-            </button>
-          </form>
-          <p role="status" data-testid="contributor-status"></p>
-          <ul
-            data-testid="contributor-list"
-            aria-label="Hunt contributors"
-          ></ul>
-        </details>
-        <details class="more-options" data-testid="creator-profile-details">
-          <summary>Creator ID and sharing</summary>
-          <p class="field-help">
-            This browser-based ID identifies hunt ownership and contributors.
-          </p>
-          <p>
-            Your creator ID:
-            <code data-testid="creator-id" style="overflow-wrap: anywhere"
-              >Starting your profile…</code
-            >
-          </p>
-          <button type="button" data-testid="copy-creator-id">
-            Copy creator ID
-          </button>
-          <p class="field-help">
-            Share your creator ID with a hunt owner if you want to contribute.
-          </p>
-        </details>
+        </dialog>
         <dialog
           class="hunt-details-dialog"
           data-testid="hunt-details-dialog"
-          aria-labelledby="hunt-details-title"
+          aria-labelledby="manage-hunts-title"
         >
           <div class="hunt-details-dialog-heading">
-            <p class="eyebrow" data-testid="hunt-dialog-mode">HUNT OVERVIEW</p>
+            <p class="eyebrow" data-testid="hunt-dialog-mode">
+              YOUR ADVENTURES
+            </p>
             <button
               type="button"
               class="dialog-close-button"
@@ -281,6 +279,23 @@
             >
               ×
             </button>
+          </div>
+          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
+            <div class="hunt-manager-heading">
+              <div>
+                <p class="eyebrow">YOUR ADVENTURES</p>
+                <h2 id="manage-hunts-title">Manage hunts</h2>
+              </div>
+              <button
+                type="button"
+                class="refresh-button"
+                data-testid="refresh-my-hunts"
+              >
+                ↻ Refresh
+              </button>
+            </div>
+            <p role="status" data-testid="creator-status"></p>
+            <ul data-testid="my-hunts" aria-label="My hunts"></ul>
           </div>
           <div data-testid="hunt-details-overview">
             <p
@@ -299,6 +314,13 @@
               data-testid="hunt-detail-description"
             ></p>
             <div class="details-actions">
+              <button
+                type="button"
+                class="action"
+                data-testid="back-to-manage-hunts"
+              >
+                Back to my hunts
+              </button>
               <button
                 type="button"
                 class="hunt-id-toggle"
@@ -366,6 +388,30 @@
                 This hunt has no tasks yet. Add its first task in Hunt Studio.
               </p>
             </section>
+            <details
+              class="more-options"
+              data-testid="contributors-panel"
+              hidden
+            >
+              <summary>Contributors</summary>
+              <p>
+                As the owner, you can let another creator manage this hunt's
+                tasks.
+              </p>
+              <form data-testid="contributor-form">
+                <label for="contributor-id">Contributor creator ID</label
+                ><input id="contributor-id" name="creatorId" required /><button
+                  type="submit"
+                >
+                  Add contributor
+                </button>
+              </form>
+              <p role="status" data-testid="contributor-status"></p>
+              <ul
+                data-testid="contributor-list"
+                aria-label="Hunt contributors"
+              ></ul>
+            </details>
             <p
               class="details-error"
               data-testid="hunt-detail-error"
@@ -380,7 +426,7 @@
             aria-labelledby="hunt-edit-title"
             hidden
           >
-            <div class="details-actions">
+            <div class="hunt-editor-toolbar">
               <button
                 type="button"
                 class="action"
@@ -388,6 +434,15 @@
               >
                 Back to hunt overview
               </button>
+              <label for="edit-hunt-selector">
+                Switch hunt
+                <select
+                  data-testid="edit-hunt-selector"
+                  id="edit-hunt-selector"
+                >
+                  <option value="">Select a hunt</option>
+                </select>
+              </label>
             </div>
             <section
               id="define-task"
@@ -398,7 +453,7 @@
                 <span class="step-number" aria-hidden="true">02</span>
                 <div>
                   <p class="eyebrow">TASK DETAILS</p>
-                  <h2 id="hunt-edit-title">Edit hunt tasks</h2>
+                  <h2 id="hunt-edit-title" data-testid="hunt-edit-title">Editing hunt</h2>
                 </div>
               </div>
               <p class="section-copy">
@@ -407,19 +462,13 @@
               <form data-testid="task-form">
                 <fieldset>
                   <legend>What participants will discover</legend>
-                  <label for="task-hunt-id">Hunt ID</label>
                   <input
                     id="task-hunt-id"
                     name="huntId"
+                    type="hidden"
                     autocomplete="off"
-                    required
-                    aria-describedby="hunt-id-help"
                     readonly
-                    placeholder="Select a hunt from My hunts"
                   />
-                  <span id="hunt-id-help" class="field-help">
-                    Automatically set when you create or select a hunt.
-                  </span>
                   <div class="field-grid">
                     <div>
                       <label for="task-label">Display label</label>

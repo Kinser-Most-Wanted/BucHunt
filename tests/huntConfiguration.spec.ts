@@ -207,13 +207,11 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page.goto("/admin.html");
   await expect(page.getByTestId("admin-workspace")).toBeVisible();
   await expect(page.getByTestId("load-admin-hunt")).toHaveCount(0);
-  const creationTop = await page
-    .getByTestId("create-hunt")
-    .evaluate((element) => element.getBoundingClientRect().top);
-  const huntsTop = await page
-    .getByTestId("my-hunts")
-    .evaluate((element) => element.getBoundingClientRect().top);
-  expect(creationTop).toBeLessThan(huntsTop);
+  await expect(page.getByTestId("open-create-hunt")).toBeVisible();
+  await expect(page.getByTestId("open-manage-hunts")).toBeVisible();
+  await expect(page.getByTestId("my-hunts")).toBeHidden();
+  await page.getByTestId("open-create-hunt").click();
+  await expect(page.getByTestId("create-hunt-dialog")).toBeVisible();
   await page
     .getByLabel("Hunt name", { exact: true })
     .fill("Sprint verification");
@@ -223,7 +221,24 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("create-hunt-dialog")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Sprint verification (owner)",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  await page.getByRole("button", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
+  await expect(page.getByTestId("hunt-edit-title")).toHaveText(
+    "Editing Sprint verification",
+  );
+  await expect(page.getByTestId("edit-hunt-selector")).toHaveValue(
+    /^[a-f0-9-]{36}$/,
+  );
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
   expect(id).toMatch(/^[a-f0-9-]{36}$/);
   await page
@@ -244,6 +259,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     "was saved and appears",
   );
   await page.reload();
+  await page.getByTestId("open-manage-hunts").click();
   await page
     .getByRole("button", { name: "Sprint verification (owner)", exact: true })
     .click();
@@ -310,11 +326,11 @@ test("only owners and contributors can configure a hunt through the creator work
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
-  console.log("creator-flow: owner page ready");
   await expect(page.getByTestId("creator-id")).toHaveText(
     /^browser:[a-f0-9]{64}$/,
   );
   await expect(page.getByLabel("Administrator API token")).toHaveCount(0);
+  await page.getByTestId("open-create-hunt").click();
   await page.getByLabel("Hunt name", { exact: true }).fill("Shared hunt");
   await page
     .getByLabel("Description", { exact: true })
@@ -322,9 +338,12 @@ test("only owners and contributors can configure a hunt through the creator work
   await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Shared hunt (owner)", exact: true })
+    .click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
-  await page.getByTestId("close-hunt-details").click();
-  console.log("creator-flow: owner hunt created");
   const contributor = await browser.newContext({ baseURL });
   const stranger = await browser.newContext({ baseURL });
   try {
@@ -335,6 +354,7 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,
     );
+    await member.getByTestId("open-manage-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",
     );

@@ -1269,8 +1269,7 @@ body[data-page="admin"] #admin-workspace[hidden] {
 }
 body[data-page="admin"] #admin-workspace > .page-heading,
 body[data-page="admin"] #admin-workspace > .notice,
-body[data-page="admin"] #admin-workspace > .manage-hunts-panel,
-body[data-page="admin"] #admin-workspace > [data-testid="contributors-panel"],
+body[data-page="admin"] #admin-workspace > .admin-hunt-actions,
 body[data-page="admin"]
   #admin-workspace
   > [data-testid="creator-profile-details"] {
@@ -2439,4 +2438,125 @@ body[data-page="admin"] .hunt-details-editor #define-task .section-heading h2 {
 }
 body[data-page="admin"] .hunt-details-editor .task-location-map {
   min-height: 18rem;
+}
+
+/* Hunt Studio action cards and modal workflows */
+body[data-page="admin"] #admin-workspace > .admin-hunt-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 1rem;
+}
+body[data-page="admin"] .create-hunt-launcher {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 5rem;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgb(255 199 44 / 35%);
+  border-radius: 0.9rem;
+  background: linear-gradient(125deg, #ffc72c, #ffe27b);
+  color: #082346;
+  text-align: left;
+  box-shadow: 0 12px 28px rgb(255 199 44 / 14%);
+}
+body[data-page="admin"] .create-hunt-launcher > span:last-child {
+  display: grid;
+  gap: 0.2rem;
+}
+body[data-page="admin"] .create-hunt-launcher strong {
+  font-size: 1.05rem;
+}
+body[data-page="admin"] .create-hunt-launcher small {
+  color: #29496c;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+body[data-page="admin"] .create-hunt-launcher-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(4 30 66 / 10%);
+  font-size: 1.7rem;
+  line-height: 1;
+}
+body[data-page="admin"] .manage-hunts-launcher {
+  align-self: center;
+  min-height: 3.2rem;
+  padding-inline: 1.25rem;
+  border-radius: 0.7rem;
+}
+body[data-page="admin"] .create-hunt-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+}
+body[data-page="admin"] .hunt-details-dialog-heading > div {
+  min-width: 0;
+}
+body[data-page="admin"] .hunt-details-dialog-heading h2 {
+  margin: 0.2rem 0 0;
+  color: #f7f7fa;
+  font-size: clamp(1.35rem, 3vw, 1.85rem);
+  letter-spacing: -0.04em;
+}
+body[data-page="admin"] .hunt-manager-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.25rem 0 1rem;
+}
+body[data-page="admin"] .hunt-manager-heading h2 {
+  margin: 0.15rem 0 0;
+  color: #f7f7fa;
+}
+body[data-page="admin"] .hunt-manager-heading .refresh-button {
+  margin: 0;
+  white-space: nowrap;
+}
+body[data-page="admin"] .hunt-manager-view > [data-testid="creator-status"] {
+  color: #aab3c1;
+}
+body[data-page="admin"] .hunt-editor-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 1fr);
+  align-items: end;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+body[data-page="admin"] .hunt-editor-toolbar > button {
+  margin: 0;
+  white-space: nowrap;
+}
+body[data-page="admin"] .hunt-editor-toolbar > label {
+  margin: 0;
+  color: #cbd1dc;
+}
+body[data-page="admin"] .hunt-editor-toolbar select {
+  margin-top: 0.3rem;
+}
+body[data-page="admin"] .hunt-details-dialog .hunt-editor-panel {
+  padding: 1.1rem;
+}
+body[data-page="admin"]
+  .hunt-details-dialog
+  .hunt-editor-panel
+  > .section-heading {
+  margin-bottom: 0.5rem;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] #admin-workspace > .admin-hunt-actions {
+    flex-direction: column;
+  }
+  body[data-page="admin"] .manage-hunts-launcher {
+    align-self: stretch;
+  }
+  body[data-page="admin"] .hunt-editor-toolbar {
+    grid-template-columns: 1fr;
+  }
 }

@@ -128,7 +128,13 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   );
   await expect(page.locator("#admin-access")).toBeHidden();
   await expect(page.locator("#admin-workspace")).toBeVisible();
+  await expect(page.getByTestId("hunt-form")).toBeHidden();
+  await page.getByTestId("open-create-hunt").click();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await page.getByTestId("close-create-hunt").click();
+  await page.getByTestId("open-manage-hunts").click();
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  await page.getByTestId("close-hunt-details").click();
   await expect(page.getByTestId("admin-account-menu")).toBeVisible();
   await expect(page.getByTestId("admin-display-name")).toContainText("(Admin)");
   await page.getByTestId("admin-account").click();

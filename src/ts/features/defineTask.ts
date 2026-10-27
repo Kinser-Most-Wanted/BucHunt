@@ -358,10 +358,24 @@ export function mountDefineTask(
     status.textContent = "Hunt selected. Add or update its tasks below.";
   });
 
-  root.addEventListener("load-hunt-tasks", async () => {
+  root.addEventListener("load-hunt-tasks", async (event) => {
+    const preloaded = (
+      event as CustomEvent<{ tasks?: TaskDefinition[]; huntName?: string }>
+    ).detail;
     const id = huntInput?.value.trim() ?? "";
     if (!id) {
       status.textContent = "Choose a hunt from My hunts first.";
+      return;
+    }
+    if (preloaded?.tasks) {
+      if (editingTaskId) resetEditor(id);
+      showTasks(preloaded.tasks);
+      if (orderInput)
+        orderInput.value = String(
+          Math.max(0, ...preloaded.tasks.map((task) => task.order)) + 1,
+        );
+      status.textContent = `${preloaded.tasks.length} tasks loaded for ${preloaded.huntName ?? "this hunt"}.`;
+      window.dispatchEvent(new Event("resize"));
       return;
     }
     try {

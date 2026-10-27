@@ -10,6 +10,7 @@ const dialog = document.querySelector<HTMLDialogElement>(
 );
 const repository = createHuntRepository();
 let activeRequest = 0;
+let activeHunt: HuntDefinition | undefined;
 
 function addFact(list: HTMLElement, label: string, value: string): void {
   const item = document.createElement("div");
@@ -56,8 +57,13 @@ function renderTask(task: TaskDefinition): HTMLLIElement {
   return item;
 }
 
-function setDetailView(editing: boolean): void {
+type DialogView = "manage" | "overview" | "editing";
+
+function setDialogView(view: DialogView): void {
   if (!dialog) return;
+  const manager = dialog.querySelector<HTMLElement>(
+    '[data-testid="manage-hunts-view"]',
+  );
   const overview = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-details-overview"]',
   );
@@ -67,17 +73,32 @@ function setDetailView(editing: boolean): void {
   const mode = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-dialog-mode"]',
   );
-  if (overview) overview.hidden = editing;
-  if (editor) editor.hidden = !editing;
-  if (mode) mode.textContent = editing ? "EDIT HUNT TASKS" : "HUNT OVERVIEW";
-  dialog.setAttribute(
-    "aria-labelledby",
-    editing ? "hunt-edit-title" : "hunt-details-title",
-  );
-  if (editing) window.dispatchEvent(new Event("resize"));
+  if (manager) manager.hidden = view !== "manage";
+  if (overview) overview.hidden = view !== "overview";
+  if (editor) editor.hidden = view !== "editing";
+  if (mode)
+    mode.textContent =
+      view === "manage"
+        ? "YOUR ADVENTURES"
+        : view === "editing"
+          ? "EDIT HUNT TASKS"
+          : "HUNT OVERVIEW";
+  const heading =
+    view === "manage"
+      ? "manage-hunts-title"
+      : view === "editing"
+        ? "hunt-edit-title"
+        : "hunt-details-title";
+  dialog.setAttribute("aria-labelledby", heading);
+  if (view === "editing") window.dispatchEvent(new Event("resize"));
+}
+
+function setDetailView(editing: boolean): void {
+  setDialogView(editing ? "editing" : "overview");
 }
 
 function resetDialog(): void {
+  activeHunt = undefined;
   setDetailView(false);
   const facts = dialog?.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',
@@ -120,6 +141,7 @@ function resetDialog(): void {
 
 function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   if (!dialog) return;
+  activeHunt = hunt;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-name"]',
   )!.textContent = hunt.name;
@@ -220,7 +242,9 @@ dialog
     if (!huntId) return;
     setDetailView(true);
     document.dispatchEvent(
-      new CustomEvent("hunt-details-edit", { detail: { huntId } }),
+      new CustomEvent("hunt-details-edit", {
+        detail: { huntId, tasks: activeHunt?.tasks },
+      }),
     );
   });
 dialog
@@ -237,6 +261,7 @@ export async function openHuntDetails(
   if (!dialog) return;
   const requestId = ++activeRequest;
   resetDialog();
+  setDialogView("overview");
   dialog.dataset.huntId = huntId;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-name"]',

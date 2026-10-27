@@ -146,7 +146,7 @@ function renderHunts(
     const open = document.createElement("button");
     open.type = "button";
     open.dataset.huntId = hunt.id;
-    open.textContent = "View Hunt";
+    open.textContent = "Open Hunt";
     item.append(header, description, countdown, progress, open);
     list.append(item);
   }

@@ -122,7 +122,12 @@ function countdownText(hunt: PlayerHunt, now: number): string {
   return `Time remaining ${durationText(Date.parse(hunt.endsAt) - now)}`;
 }
 
-type HuntStatusTone = "active" | "soon" | "ended";
+type HuntStatusTone =
+  | "active"
+  | "soon"
+  | "upcoming"
+  | "needs-tasks"
+  | "ended";
 
 interface HuntStatusPresentation {
   tone: HuntStatusTone;
@@ -144,7 +149,7 @@ function huntStatusPresentation(
   }
   if (phase === "future") {
     return {
-      tone: "soon",
+      tone: "upcoming",
       label: "Future Hunt",
       message:
         "This Hunt has not started yet. You can review its details here.",
@@ -152,7 +157,7 @@ function huntStatusPresentation(
   }
   if (!hunt.tasks.length) {
     return {
-      tone: "soon",
+      tone: "needs-tasks",
       label: "Needs tasks",
       message: "This Hunt has no tasks yet.",
     };

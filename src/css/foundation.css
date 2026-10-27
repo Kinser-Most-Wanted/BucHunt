@@ -2154,6 +2154,12 @@ body[data-page="player"] .hunt-access-code {
   background: rgb(93 220 163 / 10%);
   color: #7ee3b2;
 }
+.hunt-state-badge[data-status="upcoming"],
+.hunt-state-badge[data-status="needs-tasks"] {
+  border-color: rgb(112 178 255 / 34%);
+  background: rgb(112 178 255 / 11%);
+  color: #8bbcff;
+}
 .hunt-state-badge[data-status="soon"] {
   border-color: rgb(255 199 44 / 32%);
   background: rgb(255 199 44 / 10%);
@@ -2166,6 +2172,10 @@ body[data-page="player"] .hunt-access-code {
 }
 .player-hunt[data-hunt-status="active"] {
   border-left: 3px solid rgb(93 220 163 / 72%);
+}
+.player-hunt[data-hunt-status="upcoming"],
+.player-hunt[data-hunt-status="needs-tasks"] {
+  border-left: 3px solid rgb(112 178 255 / 72%);
 }
 .player-hunt[data-hunt-status="soon"] {
   border-left: 3px solid rgb(255 199 44 / 72%);
@@ -2963,6 +2973,12 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   background: rgb(255 199 44 / 11%);
   color: #ffd45c;
 }
+.player-hunt-details .details-status[data-status="upcoming"],
+.player-hunt-details .details-status[data-status="needs-tasks"] {
+  border-color: rgb(112 178 255 / 34%);
+  background: rgb(112 178 255 / 11%);
+  color: #8bbcff;
+}
 .player-hunt-details .details-status[data-status="ended"] {
   border-color: rgb(255 129 121 / 34%);
   background: rgb(255 129 121 / 11%);
@@ -2976,6 +2992,12 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 .player-hunt-details .task-countdown[data-status="soon"] {
   color: #ffd45c;
 }
+.player-hunt-details .hunt-fact dd[data-status="upcoming"],
+.player-hunt-details .hunt-fact dd[data-status="needs-tasks"],
+.player-hunt-details .task-countdown[data-status="upcoming"],
+.player-hunt-details .task-countdown[data-status="needs-tasks"] {
+  color: #8bbcff;
+}
 .player-hunt-details .hunt-fact dd[data-status="ended"],
 .player-hunt-details .task-countdown[data-status="ended"] {
   color: #ff9289;
@@ -2985,6 +3007,10 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt .player-hunt-countdown[data-status="soon"] {
   color: #ffd45c;
+}
+.player-hunt .player-hunt-countdown[data-status="upcoming"],
+.player-hunt .player-hunt-countdown[data-status="needs-tasks"] {
+  color: #8bbcff;
 }
 .player-hunt .player-hunt-countdown[data-status="ended"] {
   color: #ff9289;

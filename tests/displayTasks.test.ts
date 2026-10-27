@@ -242,7 +242,11 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .locator('[data-hunt-id="hunt-future"]');
   await expect(futureCard.locator(".hunt-state-badge")).toHaveAttribute(
     "data-status",
-    "soon",
+    "upcoming",
+  );
+  await expect(futureCard.locator(".hunt-state-badge")).toHaveCSS(
+    "color",
+    "rgb(139, 188, 255)",
   );
   const pastCard = page
     .getByTestId("player-past-hunt-list")
@@ -256,6 +260,14 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .locator('[data-hunt-id="hunt-empty"]');
   await expect(tasklessCard.locator(".hunt-state-badge")).toHaveText(
     "Needs tasks",
+  );
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "needs-tasks",
+  );
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveCSS(
+    "color",
+    "rgb(139, 188, 255)",
   );
   await expect(page.getByTestId("player-future-hunt-list")).toContainText(
     "Starts in",

@@ -733,7 +733,7 @@ test("account browser answers tasks and restores progress in another browser", a
           input.name,
         );
         await page
-          .getByRole("button", { name: "Open Hunt", exact: true })
+          .getByRole("button", { name: `Open ${input.name}`, exact: true })
           .click();
       }
       await expect(page.getByTestId("player-task").first()).toContainText(
@@ -744,7 +744,7 @@ test("account browser answers tasks and restores progress in another browser", a
       );
       await page.reload();
       await page
-        .getByRole("button", { name: "Open Hunt", exact: true })
+        .getByRole("button", { name: `Open ${input.name}`, exact: true })
         .click();
       await expect(page.getByTestId("player-task").first()).toContainText(
         "Completed",

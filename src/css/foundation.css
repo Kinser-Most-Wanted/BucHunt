@@ -1996,17 +1996,19 @@ body[data-page="admin"] dialog.hunt-details-dialog {
   margin: auto;
   padding: clamp(1rem, 3vw, 2rem);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.2rem;
   background:
     radial-gradient(ellipse at 92% 5%, rgb(255 199 44 / 8%), transparent 25rem),
     linear-gradient(145deg, #10294a, #0b203d);
-  box-shadow: 0 32px 100px rgb(0 0 0 / 55%);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 45%);
   color: #f4f5f9;
 }
 body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
   background: rgb(6 9 14 / 76%);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(3px);
 }
 .hunt-details-dialog-heading {
   display: flex;
@@ -2223,6 +2225,23 @@ body[data-page="player"] .hunt-access-code {
   background: rgb(6 9 14 / 76%);
   backdrop-filter: blur(8px);
 }
+.player-hunt-details .hunt-details-dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: calc(-1 * clamp(1rem, 3vw, 2rem)) calc(-1 * clamp(1rem, 3vw, 2rem))
+    1rem;
+  padding: 0.65rem clamp(1rem, 3vw, 2rem);
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  background: linear-gradient(145deg, #10294a, #0b203d);
+}
+.player-hunt-details .dialog-close-button {
+  flex: 0 0 auto;
+}
 .player-hunt-details .hunt-details-dialog-heading .eyebrow,
 .player-hunt-details .details-section-heading .eyebrow {
   color: #ffc72c;
@@ -2247,9 +2266,15 @@ body[data-page="player"] .hunt-access-code {
   border-left: 4px solid #ffc72c;
   border-radius: 1rem;
   background:
-    radial-gradient(ellipse at 100% 0%, rgb(255 199 44 / 14%), transparent 22rem),
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgb(255 199 44 / 14%),
+      transparent 22rem
+    ),
     linear-gradient(125deg, rgb(21 52 93 / 92%), rgb(13 37 67 / 92%));
-  box-shadow: inset 0 1px rgb(255 255 255 / 6%), 0 14px 38px rgb(0 0 0 / 18%);
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 6%),
+    0 14px 38px rgb(0 0 0 / 18%);
 }
 .player-hunt-details .player-hunt-intro > h2 {
   max-width: 30ch;
@@ -2711,7 +2736,6 @@ body[data-page="admin"]
   }
 }
 
-
 /* Admin hunt overview: keep the modal sections in a clear, breathable rhythm. */
 body[data-page="admin"] dialog.hunt-details-dialog .details-actions {
   display: flex;
@@ -2773,7 +2797,10 @@ body[data-page="admin"] .hunt-access-code strong {
 body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin-top: 1.35rem;
 }
-body[data-page="admin"] dialog.hunt-details-dialog .details-contributors > section {
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-contributors
+  > section {
   margin: 0.25rem 0 1rem;
   padding: 0;
   border: 0;
@@ -2793,7 +2820,6 @@ body[data-page="admin"] .contributor-management > p:first-child {
   }
 }
 
-
 /* Keep the revealed hunt ID attached to its control in the admin action row. */
 body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control {
   display: grid;
@@ -2802,7 +2828,10 @@ body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control {
   min-width: min(100%, 13rem);
   margin-left: auto;
 }
-body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control .hunt-id-toggle {
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .hunt-id-control
+  .hunt-id-toggle {
   order: initial;
   width: 100%;
   margin: 0;
@@ -2835,7 +2864,11 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   border-left: 0.35rem solid #ffc72c;
   border-radius: 1.1rem;
   background:
-    radial-gradient(ellipse at 100% 0%, rgb(255 199 44 / 13%), transparent 24rem),
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgb(255 199 44 / 13%),
+      transparent 24rem
+    ),
     linear-gradient(135deg, #173b68, #0c2545 68%);
   box-shadow:
     inset 0 1px rgb(255 255 255 / 7%),
@@ -2890,7 +2923,11 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   border-color: rgb(255 255 255 / 10%);
   border-radius: 1rem;
   background:
-    radial-gradient(ellipse at 100% 0%, rgb(100 181 246 / 5%), transparent 24rem),
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgb(100 181 246 / 5%),
+      transparent 24rem
+    ),
     rgb(255 255 255 / 3%);
 }
 .player-hunt-details .details-overview {
@@ -2920,8 +2957,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   padding: clamp(1rem, 2.5vw, 1.4rem);
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 0.95rem;
-  background:
-    linear-gradient(145deg, rgb(21 52 93 / 58%), rgb(8 27 49 / 74%));
+  background: linear-gradient(145deg, rgb(21 52 93 / 58%), rgb(8 27 49 / 74%));
   box-shadow: 0 12px 30px rgb(0 0 0 / 14%);
 }
 .player-hunt-details .hunt-detail-task > h4 {

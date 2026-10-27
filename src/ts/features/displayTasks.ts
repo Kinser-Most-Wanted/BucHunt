@@ -166,6 +166,7 @@ function renderHunts(
           : "Active";
     header.append(heading, badge);
     const description = document.createElement("p");
+    description.className = "player-hunt-description";
     description.textContent = hunt.description;
     const countdown = document.createElement("p");
     countdown.className = "player-hunt-countdown";
@@ -382,6 +383,40 @@ export function mountDisplayTasks(
         const hunt = byId.get(element.dataset.huntCountdown ?? "");
         if (hunt) element.textContent = countdownText(hunt, now);
       });
+  };
+
+  const updateDisplayedHunt = (hunt: PlayerHunt): void => {
+    const index = displayedHunts.findIndex((item) => item.id === hunt.id);
+    if (index < 0) return;
+    const previousHunt = displayedHunts[index];
+    displayedHunts[index] = hunt;
+    const now = Date.now();
+    if (huntPhase(previousHunt, now) !== huntPhase(hunt, now)) {
+      renderCategories(true);
+      return;
+    }
+    const card = Array.from(
+      root.querySelectorAll<HTMLElement>(".player-hunt[data-hunt-id]"),
+    ).find((item) => item.dataset.huntId === hunt.id);
+    if (!card) return;
+    card.setAttribute("aria-label", `Open ${hunt.name}`);
+    const name = card.querySelector<HTMLElement>(
+      ".player-hunt-card-heading h3",
+    );
+    if (name) name.textContent = hunt.name;
+    const description = card.querySelector<HTMLElement>(
+      ".player-hunt-description",
+    );
+    if (description) description.textContent = hunt.description;
+    const countdown = card.querySelector<HTMLElement>("[data-hunt-countdown]");
+    if (countdown) countdown.textContent = countdownText(hunt, now);
+    const completed = hunt.tasks.filter((task) => task.completed).length;
+    const progress = card.querySelector<HTMLElement>(".player-hunt-progress");
+    if (progress) {
+      progress.textContent = hunt.tasks.length
+        ? `${completed} of ${hunt.tasks.length} tasks completed`
+        : "No tasks added yet";
+    }
   };
 
   const loadHunts = async (
@@ -637,13 +672,10 @@ export function mountDisplayTasks(
         if (result.code === "unauthorized") void preparePlayerSignIn();
         return;
       }
-      const hunt = result.value;
-      huntId = hunt.id;
-      await loadHunts(
-        identity,
-        storedDisplayName(identity.accountId) ?? identity.email,
-      );
       if (requestId !== huntRequest) return;
+      const hunt = result.value;
+      updateDisplayedHunt(hunt);
+      huntId = hunt.id;
       const now = Date.now();
       const phase = huntPhase(hunt, now);
       const completed = hunt.tasks.filter((task) => task.completed).length;

@@ -113,6 +113,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     tasks: [],
   };
   const savedHunts = [hunt, futureHunt, pastHunt, tasklessHunt];
+  let huntListRequests = 0;
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",
@@ -128,6 +129,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       return;
     }
     if (path.endsWith("/hunts")) {
+      huntListRequests += 1;
       await route.fulfill({ json: { ok: true, value: savedHunts } });
       return;
     }
@@ -216,6 +218,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   await expect(page.getByTestId("player-hunt-details")).toBeVisible();
   await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
+  expect(huntListRequests).toBe(1);
   await page.getByTestId("back-to-hunts").click();
   await page
     .getByTestId("player-future-hunt-list")
@@ -265,8 +268,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const taskLayout = await answerTask.evaluate((task) => {
     const location = task.querySelector(".task-location")!;
     const answer = task.querySelector(".task-answer-form")!;
-    return Array.from(task.children).indexOf(location) <
-      Array.from(task.children).indexOf(answer);
+    return (
+      Array.from(task.children).indexOf(location) <
+      Array.from(task.children).indexOf(answer)
+    );
   });
   expect(taskLayout).toBe(true);
   await expect(answerTask.getByLabel("Answer for Library Steps")).toHaveCSS(
@@ -282,6 +287,15 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await mapToggle.click();
   const taskMap = answerTask.locator('iframe[title="Task location map"]');
   await expect(taskMap).toBeVisible();
+  const detailsDialog = page.getByTestId("player-hunt-details");
+  await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(
+    "position",
+    "sticky",
+  );
+  await detailsDialog.evaluate((dialog) => {
+    dialog.scrollTop = dialog.scrollHeight;
+  });
+  await expect(page.getByTestId("close-player-hunt-details")).toBeInViewport();
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");

@@ -104,8 +104,8 @@ export function mountCreateHunt(
     }
     if (loadTasks)
       document
-        .querySelector<HTMLButtonElement>('[data-testid="load-admin-hunt"]')
-        ?.click();
+        .getElementById("define-task")
+        ?.dispatchEvent(new Event("load-hunt-tasks"));
     if (hunt.role === "owner") void renderContributors();
   }
   document.addEventListener("hunt-details-edit", (event: Event) => {
@@ -113,10 +113,6 @@ export function mountCreateHunt(
     const hunt = availableHunts.find((item) => item.id === huntId);
     if (!hunt) return;
     select(hunt, true);
-    document.getElementById("define-task")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
   });
   async function refresh(): Promise<void> {
     const session = await getCreatorSession();
@@ -134,7 +130,7 @@ export function mountCreateHunt(
     list.replaceChildren();
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
-      : "No hunts yet. Create your first hunt below.";
+      : "No hunts yet. Create one to get started.";
     for (const hunt of result.value) {
       const item = document.createElement("li");
       const button = document.createElement("button");
@@ -249,6 +245,10 @@ export function mountCreateHunt(
       );
       form.reset();
       await refresh();
+      await openHuntDetails(result.value.id, "owner");
+      document
+        .querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
+        ?.click();
     } catch {
       status.textContent =
         "Hunt could not be saved. Check the dates and try again.";

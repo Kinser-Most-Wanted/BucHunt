@@ -398,7 +398,7 @@ export function mountDisplayTasks(
     renderCategories(true);
     status.textContent = result.value.length
       ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
-      : "You have no saved hunts yet. Join one with its access code below.";
+      : "Your dashboard is ready. Join a hunt above to get started.";
   };
 
   const preparePlayerSignIn = async (): Promise<void> => {

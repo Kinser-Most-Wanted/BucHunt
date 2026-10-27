@@ -2410,3 +2410,33 @@ body[data-page="player"] .player-hunt-join-controls button svg {
     width: 100%;
   }
 }
+
+/* Keep Hunt Studio creation and task editing in the hunt workflow. */
+body[data-page="admin"] .manage-hunts-panel #create-hunt {
+  margin: 1.1rem 0 1.4rem;
+}
+body[data-page="admin"] .manage-hunts-panel #create-hunt .section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+body[data-page="admin"] .manage-hunts-panel #create-hunt .section-heading h2 {
+  margin: 0;
+  color: #f5f6f8;
+}
+body[data-page="admin"] .manage-hunts-panel #create-hunt .section-copy {
+  margin-top: 0.4rem;
+}
+body[data-page="admin"] .hunt-details-editor > .details-actions {
+  justify-content: flex-start;
+  margin-bottom: 0.75rem;
+}
+body[data-page="admin"] .hunt-details-editor #define-task {
+  margin-top: 0;
+}
+body[data-page="admin"] .hunt-details-editor #define-task .section-heading h2 {
+  color: #f5f6f8;
+}
+body[data-page="admin"] .hunt-details-editor .task-location-map {
+  min-height: 18rem;
+}

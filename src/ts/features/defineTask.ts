@@ -355,35 +355,33 @@ export function mountDefineTask(
     if (editingTaskId) resetEditor();
     showIssues(root, []);
     if (orderInput) orderInput.value = "1";
-    status.textContent =
-      "Hunt selection updated. Add a task or load its saved tasks.";
+    status.textContent = "Hunt selected. Add or update its tasks below.";
   });
 
-  root
-    .querySelector('[data-testid="load-admin-hunt"]')
-    ?.addEventListener("click", async () => {
-      const id = huntInput?.value.trim() ?? "";
-      if (!id) {
-        status.textContent = "Choose a hunt from My hunts first.";
+  root.addEventListener("load-hunt-tasks", async () => {
+    const id = huntInput?.value.trim() ?? "";
+    if (!id) {
+      status.textContent = "Choose a hunt from My hunts first.";
+      return;
+    }
+    try {
+      const result = await repository.getAdminHunt(id);
+      if (!result.ok) {
+        showIssues(root, [result.message]);
         return;
       }
-      try {
-        const result = await repository.getAdminHunt(id);
-        if (!result.ok) {
-          showIssues(root, [result.message]);
-          return;
-        }
-        if (editingTaskId) resetEditor(id);
-        showTasks(result.value.tasks);
-        if (orderInput)
-          orderInput.value = String(
-            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
-          );
-        status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
-      } catch {
-        status.textContent = "The hunt service could not be reached.";
-      }
-    });
+      if (editingTaskId) resetEditor(id);
+      showTasks(result.value.tasks);
+      if (orderInput)
+        orderInput.value = String(
+          Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+        );
+      status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
+      window.dispatchEvent(new Event("resize"));
+    } catch {
+      status.textContent = "The hunt service could not be reached.";
+    }
+  });
 
   taskList.addEventListener("click", async (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>(

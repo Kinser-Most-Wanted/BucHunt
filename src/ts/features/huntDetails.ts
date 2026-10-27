@@ -1,5 +1,9 @@
 import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
-import { createHuntRepository, getCreatorSession, request } from "./huntRepository.js";
+import {
+  createHuntRepository,
+  getCreatorSession,
+  request,
+} from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
@@ -52,9 +56,35 @@ function renderTask(task: TaskDefinition): HTMLLIElement {
   return item;
 }
 
+function setDetailView(editing: boolean): void {
+  if (!dialog) return;
+  const overview = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-overview"]',
+  );
+  const editor = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-editor"]',
+  );
+  const mode = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-dialog-mode"]',
+  );
+  if (overview) overview.hidden = editing;
+  if (editor) editor.hidden = !editing;
+  if (mode) mode.textContent = editing ? "EDIT HUNT TASKS" : "HUNT OVERVIEW";
+  dialog.setAttribute(
+    "aria-labelledby",
+    editing ? "hunt-edit-title" : "hunt-details-title",
+  );
+  if (editing) window.dispatchEvent(new Event("resize"));
+}
+
 function resetDialog(): void {
-  const facts = dialog?.querySelector<HTMLElement>('[data-testid="hunt-facts"]');
-  const creators = dialog?.querySelector<HTMLElement>('[data-testid="hunt-creators"]');
+  setDetailView(false);
+  const facts = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-facts"]',
+  );
+  const creators = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-creators"]',
+  );
   const tasks = dialog?.querySelector<HTMLOListElement>(
     '[data-testid="hunt-detail-tasks"]',
   );
@@ -90,8 +120,9 @@ function resetDialog(): void {
 
 function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   if (!dialog) return;
-  dialog.querySelector<HTMLElement>('[data-testid="hunt-detail-name"]')!.textContent =
-    hunt.name;
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-name"]',
+  )!.textContent = hunt.name;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-description"]',
   )!.textContent = hunt.description || "A BucHunt adventure.";
@@ -125,11 +156,7 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   addFact(facts, "Ends", formatDate(hunt.endsAt));
   addFact(facts, "Created", formatDate(hunt.createdAt));
   addFact(facts, "Last updated", formatDate(hunt.updatedAt));
-  addFact(
-    facts,
-    "Access code",
-    hunt.accessCode ? hunt.accessCode : "Not set",
-  );
+  addFact(facts, "Access code", hunt.accessCode ? hunt.accessCode : "Not set");
 
   const creators = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-creators"]',
@@ -179,22 +206,26 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   emptyTasks.hidden = hunt.tasks.length !== 0;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-status"]',
-  )!.textContent = `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
+  )!.textContent =
+    `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
 }
 
-dialog?.querySelector<HTMLButtonElement>(
-  '[data-testid="close-hunt-details"]',
-)?.addEventListener("click", () => dialog.close());
-dialog?.querySelector<HTMLButtonElement>(
-  '[data-testid="edit-hunt-link"]',
-)?.addEventListener("click", () => {
-  const huntId = dialog.dataset.huntId;
-  if (!huntId) return;
-  dialog.close();
-  document.dispatchEvent(
-    new CustomEvent("hunt-details-edit", { detail: { huntId } }),
-  );
-});
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="close-hunt-details"]')
+  ?.addEventListener("click", () => dialog.close());
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
+  ?.addEventListener("click", () => {
+    const huntId = dialog.dataset.huntId;
+    if (!huntId) return;
+    setDetailView(true);
+    document.dispatchEvent(
+      new CustomEvent("hunt-details-edit", { detail: { huntId } }),
+    );
+  });
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="back-to-hunt-details"]')
+  ?.addEventListener("click", () => setDetailView(false));
 dialog?.addEventListener("click", (event) => {
   if (event.target === dialog) dialog.close();
 });

@@ -205,6 +205,15 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     }),
   );
   await page.goto("/admin.html");
+  await expect(page.getByTestId("admin-workspace")).toBeVisible();
+  await expect(page.getByTestId("load-admin-hunt")).toHaveCount(0);
+  const creationTop = await page
+    .getByTestId("create-hunt")
+    .evaluate((element) => element.getBoundingClientRect().top);
+  const huntsTop = await page
+    .getByTestId("my-hunts")
+    .evaluate((element) => element.getBoundingClientRect().top);
+  expect(creationTop).toBeLessThan(huntsTop);
   await page
     .getByLabel("Hunt name", { exact: true })
     .fill("Sprint verification");
@@ -214,6 +223,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
   expect(id).toMatch(/^[a-f0-9-]{36}$/);
   await page
@@ -253,7 +263,9 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     "Find the fountain",
   );
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
-  await expect(page.getByTestId("hunt-details-dialog")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("hunt-details-overview")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
@@ -285,6 +297,9 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("defined-task-list")).not.toContainText(
     "The Blue Fountain",
   );
+  await page.getByTestId("back-to-hunt-details").click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  await expect(page.getByTestId("hunt-details-editor")).toBeHidden();
 });
 
 test("only owners and contributors can configure a hunt through the creator workspace", async ({
@@ -307,6 +322,7 @@ test("only owners and contributors can configure a hunt through the creator work
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
+  await page.getByTestId("close-hunt-details").click();
   const contributor = await browser.newContext({ baseURL });
   const stranger = await browser.newContext({ baseURL });
   try {
@@ -353,7 +369,9 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
     await member.getByRole("button", { name: "Edit hunt tasks" }).click();
-    await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
+    await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
+    await expect(member.getByTestId("hunt-details-editor")).toBeVisible();
     await expect(member).toHaveURL(/admin\.html$/);
     await expect(member.getByTestId("contributors-panel")).toBeHidden();
     await member

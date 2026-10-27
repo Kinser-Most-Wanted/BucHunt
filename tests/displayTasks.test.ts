@@ -1,5 +1,37 @@
 import { expect, test } from "@playwright/test";
 
+test("empty player dashboard points players to the join card above", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-empty",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.google-account-empty", "Baja");
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  await page.route("**/api/player/account/**", (route) =>
+    route.fulfill({ json: { ok: true, value: [] } }),
+  );
+  await page.goto("/player.html");
+  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.getByTestId("player-task-status")).toHaveText(
+    "Your dashboard is ready. Join a hunt above to get started.",
+  );
+});
+
 test("Google sign-in lets a player open and revisit saved progress", async ({
   page,
 }) => {
@@ -111,7 +143,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "Signed in as Baja (Player)",
   );
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
-  await expect(page.locator('body[data-page="player"] > header')).toHaveCSS("position", "sticky");
+  await expect(page.locator('body[data-page="player"] > header')).toHaveCSS(
+    "position",
+    "sticky",
+  );
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
   await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
@@ -151,21 +186,44 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "",
   );
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
-  await expect(page.getByTestId("player-hunt-list")).toContainText("Campus Hunt");
-  await expect(page.getByTestId("player-hunt-list")).toContainText("Time remaining");
-  await expect(page.getByTestId("player-future-hunt-list")).toContainText("Future Hunt");
-  await expect(page.getByTestId("player-past-hunt-list")).toContainText("Hunt Ended");
-  await expect(page.getByTestId("player-future-hunt-list")).toContainText("Starts in");
-  await page.getByTestId("player-hunt-list").locator('[data-hunt-id="hunt-empty"]').click();
-  await expect(page.getByTestId("player-hunt-name")).toHaveText("Taskless Hunt");
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Campus Hunt",
+  );
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Time remaining",
+  );
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText(
+    "Future Hunt",
+  );
+  await expect(page.getByTestId("player-past-hunt-list")).toContainText(
+    "Hunt Ended",
+  );
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText(
+    "Starts in",
+  );
+  await page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-empty"]')
+    .click();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText(
+    "Taskless Hunt",
+  );
   await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
   await page.getByTestId("back-to-hunts").click();
-  await page.getByTestId("player-future-hunt-list").locator('[data-hunt-id="hunt-future"]').click();
+  await page
+    .getByTestId("player-future-hunt-list")
+    .locator('[data-hunt-id="hunt-future"]')
+    .click();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("Future Hunt");
   await expect(page.getByTestId("player-task-list")).toBeEmpty();
   await page.getByTestId("back-to-hunts").click();
-  await page.getByTestId("player-past-hunt-list").locator('[data-hunt-id="hunt-past"]').click();
-  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText("Hunt Ended");
+  await page
+    .getByTestId("player-past-hunt-list")
+    .locator('[data-hunt-id="hunt-past"]')
+    .click();
+  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
+    "Hunt Ended",
+  );
   await page.getByTestId("back-to-hunts").click();
   await page.getByLabel("Access code").fill("abcd1234");
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
@@ -174,8 +232,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-task-status")).toContainText(
     "4 saved Hunts",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText("Campus Hunt");
-  await expect(page.getByTestId("player-task-list")).toContainText("Old Fountain");
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Campus Hunt",
+  );
+  await expect(page.getByTestId("player-task-list")).toContainText(
+    "Old Fountain",
+  );
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Location: 36.304000, -82.368000",
   );

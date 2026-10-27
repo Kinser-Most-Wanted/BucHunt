@@ -142,6 +142,13 @@ function resetDialog(): void {
 function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   if (!dialog) return;
   activeHunt = hunt;
+  const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
+    '[data-testid="contributors-panel"]',
+  );
+  if (contributorsPanel) {
+    contributorsPanel.hidden = false;
+    contributorsPanel.open = false;
+  }
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-name"]',
   )!.textContent = hunt.name;

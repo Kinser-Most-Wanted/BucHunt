@@ -2710,3 +2710,85 @@ body[data-page="admin"]
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Admin hunt overview: keep the modal sections in a clear, breathable rhythm. */
+body[data-page="admin"] dialog.hunt-details-dialog .details-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
+  order: 5;
+  margin-left: auto;
+  border-color: rgb(255 255 255 / 10%);
+  background: #15345d;
+  color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-tasks {
+  margin-bottom: 1.35rem;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-overview {
+  margin-top: 0;
+}
+body[data-page="admin"] .hunt-overview-lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(255 199 44 / 18%);
+  border-radius: 0.7rem;
+  background: rgb(255 199 44 / 5%);
+}
+body[data-page="admin"] .hunt-overview-lead p {
+  margin: 0;
+}
+body[data-page="admin"] .hunt-owner {
+  color: #d7dfec;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+body[data-page="admin"] .hunt-access-code {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #9eb4ce;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+body[data-page="admin"] .hunt-access-code strong {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgb(255 199 44 / 34%);
+  border-radius: 999px;
+  background: rgb(255 199 44 / 12%);
+  color: #ffd45c;
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
+  margin-top: 1.35rem;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-contributors > section {
+  margin: 0.25rem 0 1rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+body[data-page="admin"] .contributor-management {
+  padding-top: 0.9rem;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+}
+body[data-page="admin"] .contributor-management > p:first-child {
+  color: #aab3c1;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
+    order: 5;
+    margin-left: 0;
+  }
+}

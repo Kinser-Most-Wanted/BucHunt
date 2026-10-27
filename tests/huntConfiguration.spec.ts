@@ -231,6 +231,21 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     })
     .click();
   await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  const popupOrder = await page.evaluate(() => {
+    const overview = document.querySelector('[data-testid="hunt-details-overview"]')!;
+    return [
+      overview.querySelector(".details-actions"),
+      overview.querySelector(".details-tasks"),
+      overview.querySelector(".details-overview"),
+      overview.querySelector('[data-testid="contributors-panel"]'),
+    ].map((element) => Array.from(overview.children).indexOf(element!));
+  });
+  expect(popupOrder[0]).toBeLessThan(popupOrder[1]);
+  expect(popupOrder[1]).toBeLessThan(popupOrder[2]);
+  expect(popupOrder[2]).toBeLessThan(popupOrder[3]);
+  await expect(page.getByTestId("hunt-owner")).toContainText("Owner ·");
+  await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
+  await expect(page.getByTestId("contributors-panel")).toBeVisible();
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("hunt-edit-title")).toHaveText(
@@ -389,7 +404,8 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
-    await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
+    await expect(member.getByTestId("hunt-owner")).toContainText("Owner ·");
+    await expect(member.getByTestId("hunt-creators")).not.toContainText("Owner");
     await member.getByRole("button", { name: "Edit hunt tasks" }).click();
     await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
     await expect(member.getByTestId("hunt-details-overview")).toBeHidden();

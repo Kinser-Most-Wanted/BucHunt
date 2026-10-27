@@ -321,15 +321,6 @@
               >
                 Back to my hunts
               </button>
-              <button
-                type="button"
-                class="hunt-id-toggle"
-                data-testid="hunt-id-toggle"
-                aria-expanded="false"
-                aria-controls="hunt-detail-id"
-              >
-                Reveal hunt ID
-              </button>
               <output
                 id="hunt-detail-id"
                 data-testid="hunt-detail-id"
@@ -348,33 +339,16 @@
               >
                 Join Hunt
               </a>
+              <button
+                type="button"
+                class="action hunt-id-toggle"
+                data-testid="hunt-id-toggle"
+                aria-expanded="false"
+                aria-controls="hunt-detail-id"
+              >
+                Reveal hunt ID
+              </button>
             </div>
-            <section
-              class="details-overview"
-              aria-labelledby="overview-heading"
-            >
-              <div class="details-section-heading">
-                <p class="eyebrow">THE BIG PICTURE</p>
-                <h3 id="overview-heading">Hunt overview</h3>
-              </div>
-              <dl class="hunt-facts" data-testid="hunt-facts"></dl>
-            </section>
-            <section
-              class="details-creators"
-              aria-labelledby="creators-heading"
-            >
-              <div class="details-section-heading">
-                <p class="eyebrow">THE TEAM</p>
-                <h3 id="creators-heading">Hunt creators</h3>
-              </div>
-              <ul data-testid="hunt-creators" class="creator-list"></ul>
-              <p
-                data-testid="contributors-load-status"
-                class="details-muted"
-                role="status"
-                aria-live="polite"
-              ></p>
-            </section>
             <section class="details-tasks" aria-labelledby="tasks-heading">
               <div class="details-section-heading">
                 <p class="eyebrow">THE ADVENTURE</p>
@@ -388,29 +362,63 @@
                 This hunt has no tasks yet. Add its first task in Hunt Studio.
               </p>
             </section>
+            <section
+              class="details-overview"
+              aria-labelledby="overview-heading"
+            >
+              <div class="hunt-overview-lead">
+                <p data-testid="hunt-owner" class="hunt-owner">
+                  Owner · Creator information unavailable
+                </p>
+                <p class="hunt-access-code">
+                  Access code
+                  <strong data-testid="hunt-access-code">Not set</strong>
+                </p>
+              </div>
+              <div class="details-section-heading">
+                <p class="eyebrow">THE BIG PICTURE</p>
+                <h3 id="overview-heading">Hunt overview</h3>
+              </div>
+              <dl class="hunt-facts" data-testid="hunt-facts"></dl>
+            </section>
             <details
-              class="more-options"
+              class="more-options details-contributors"
               data-testid="contributors-panel"
               hidden
             >
               <summary>Contributors</summary>
-              <p>
-                As the owner, you can let another creator manage this hunt's
-                tasks.
-              </p>
-              <form data-testid="contributor-form">
-                <label for="contributor-id">Contributor creator ID</label
-                ><input id="contributor-id" name="creatorId" required /><button
-                  type="submit"
-                >
-                  Add contributor
-                </button>
-              </form>
-              <p role="status" data-testid="contributor-status"></p>
-              <ul
-                data-testid="contributor-list"
-                aria-label="Hunt contributors"
-              ></ul>
+              <section class="details-creators" aria-labelledby="creators-heading">
+                <div class="details-section-heading">
+                  <p class="eyebrow">THE TEAM</p>
+                  <h3 id="creators-heading">People with access</h3>
+                </div>
+                <ul data-testid="hunt-creators" class="creator-list"></ul>
+                <p
+                  data-testid="contributors-load-status"
+                  class="details-muted"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </section>
+              <div class="contributor-management">
+                <p>
+                  As the owner, you can let another creator manage this hunt's
+                  tasks.
+                </p>
+                <form data-testid="contributor-form">
+                  <label for="contributor-id">Contributor creator ID</label
+                  ><input id="contributor-id" name="creatorId" required /><button
+                    type="submit"
+                  >
+                    Add contributor
+                  </button>
+                </form>
+                <p role="status" data-testid="contributor-status"></p>
+                <ul
+                  data-testid="contributor-list"
+                  aria-label="Hunt contributors"
+                ></ul>
+              </div>
             </details>
             <p
               class="details-error"

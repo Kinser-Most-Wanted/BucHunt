@@ -178,15 +178,18 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   addFact(facts, "Ends", formatDate(hunt.endsAt));
   addFact(facts, "Created", formatDate(hunt.createdAt));
   addFact(facts, "Last updated", formatDate(hunt.updatedAt));
-  addFact(facts, "Access code", hunt.accessCode ? hunt.accessCode : "Not set");
+  const accessCode = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-access-code"]',
+  )!;
+  accessCode.textContent = hunt.accessCode || "Not set";
+  const ownerLabel = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-owner"]',
+  )!;
+  ownerLabel.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
 
   const creators = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-creators"]',
   )!;
-  const owner = document.createElement("li");
-  owner.className = "creator-chip creator-owner";
-  owner.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
-  creators.append(owner);
   const contributorsStatus = dialog.querySelector<HTMLElement>(
     '[data-testid="contributors-load-status"]',
   )!;

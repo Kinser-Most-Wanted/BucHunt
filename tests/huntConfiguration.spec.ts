@@ -264,7 +264,9 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   );
   await expect(page.locator('[name="latitude"]')).toHaveValue("36.302");
   await expect(page.locator('[name="longitude"]')).toHaveValue("-82.369");
-  await page.getByLabel("Display label", { exact: true }).fill("The Blue Fountain");
+  await page
+    .getByLabel("Display label", { exact: true })
+    .fill("The Blue Fountain");
   await page.getByLabel("Clue and instructions").fill("Read the new plaque");
   await page.getByLabel("Required answer", { exact: true }).fill("Campus bell");
   await page.getByRole("button", { name: "Save task changes" }).click();
@@ -396,3 +398,4 @@ test("only owners and contributors can configure a hunt through the creator work
     await stranger.close();
   }
 });
+

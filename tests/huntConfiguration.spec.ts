@@ -302,149 +302,128 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-details-editor")).toBeHidden();
 });
 
-test(
-  "only owners and contributors can configure a hunt through the creator workspace",
-  { timeout: 60_000 },
-  async ({ page, browser, baseURL }) => {
-    test.setTimeout(60_000);
-    await installMapMock(page.context());
-    await installAdminSession(page);
-    await page.goto("/admin.html");
-    console.log("creator-flow: owner page ready");
-    await expect(page.getByTestId("creator-id")).toHaveText(
+test("only owners and contributors can configure a hunt through the creator workspace", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.goto("/admin.html");
+  console.log("creator-flow: owner page ready");
+  await expect(page.getByTestId("creator-id")).toHaveText(
+    /^browser:[a-f0-9]{64}$/,
+  );
+  await expect(page.getByLabel("Administrator API token")).toHaveCount(0);
+  await page.getByLabel("Hunt name", { exact: true }).fill("Shared hunt");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill("A collaborative hunt");
+  await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
+  await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+  await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  const id = await page.locator('#define-task [name="huntId"]').inputValue();
+  await page.getByTestId("close-hunt-details").click();
+  console.log("creator-flow: owner hunt created");
+  const contributor = await browser.newContext({ baseURL });
+  const stranger = await browser.newContext({ baseURL });
+  try {
+    const member = await contributor.newPage();
+    await installMapMock(contributor);
+    await installAdminSession(member);
+    await member.goto("/admin.html");
+    await expect(member.getByTestId("creator-id")).toHaveText(
       /^browser:[a-f0-9]{64}$/,
     );
-    await expect(page.getByLabel("Administrator API token")).toHaveCount(0);
-    await page.getByLabel("Hunt name", { exact: true }).fill("Shared hunt");
+    await expect(member.getByTestId("my-hunts")).not.toContainText(
+      "Shared hunt",
+    );
+    expect(
+      (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
+    ).toBe(403);
+    const visitor = await stranger.newPage();
+    await installAdminSession(visitor);
+    await visitor.goto("/admin.html");
+    await expect(visitor.getByTestId("creator-id")).toHaveText(
+      /^browser:[a-f0-9]{64}$/,
+    );
+    expect(
+      (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
+    ).toBe(403);
+    const memberId = (await member.getByTestId("creator-id").textContent())!;
+    await page.getByLabel("Contributor creator ID").fill(memberId);
     await page
-      .getByLabel("Description", { exact: true })
-      .fill("A collaborative hunt");
-    await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
-    await page
-      .getByRole("button", { name: "Create hunt", exact: true })
+      .getByRole("button", { name: "Add contributor", exact: true })
       .click();
-    await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
-    const id = await page.locator('#define-task [name="huntId"]').inputValue();
-    await page.getByTestId("close-hunt-details").click();
-    console.log("creator-flow: owner hunt created");
-    const contributor = await browser.newContext({ baseURL });
-    const stranger = await browser.newContext({ baseURL });
-    try {
-      const member = await contributor.newPage();
-      await installMapMock(contributor);
-      await installAdminSession(member);
-      await member.goto("/admin.html");
-      await expect(member.getByTestId("creator-id")).toHaveText(
-        /^browser:[a-f0-9]{64}$/,
-      );
-      await expect(member.getByTestId("my-hunts")).not.toContainText(
-        "Shared hunt",
-      );
-      console.log("creator-flow: member confirmed removal");
-      console.log("creator-flow: contributor page ready");
-      expect(
-        (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
-      ).toBe(403);
-      const visitor = await stranger.newPage();
-      await installAdminSession(visitor);
-      await visitor.goto("/admin.html");
-      await expect(visitor.getByTestId("creator-id")).toHaveText(
-        /^browser:[a-f0-9]{64}$/,
-      );
-      console.log("creator-flow: visitor page ready");
-      expect(
-        (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
-      ).toBe(403);
-      const memberId = (await member.getByTestId("creator-id").textContent())!;
-      await page.getByLabel("Contributor creator ID").fill(memberId);
-      await page
-        .getByRole("button", { name: "Add contributor", exact: true })
-        .click();
-      await expect(page.getByTestId("contributor-status")).toContainText(
-        "Contributor added",
-      );
-      console.log("creator-flow: contributor added");
-      await member.getByTestId("refresh-my-hunts").click();
-      await member
-        .getByRole("button", { name: "Shared hunt (contributor)", exact: true })
-        .click();
-      await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
-      await expect(member.getByTestId("hunt-detail-name")).toHaveText(
-        "Shared hunt",
-      );
-      await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
-      await member.getByTestId("hunt-id-toggle").click();
-      await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
-      await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
-      await member.getByRole("button", { name: "Edit hunt tasks" }).click();
-      await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
-      await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
-      await expect(member.getByTestId("hunt-details-editor")).toBeVisible();
-      console.log("creator-flow: editor opened");
-      await expect(member).toHaveURL(/admin\.html$/);
-      await expect(member.getByTestId("contributors-panel")).toBeHidden();
-      await member
-        .getByLabel("Display label", { exact: true })
-        .fill("Collaborator task");
-      await member.getByLabel("Clue and instructions").fill("Look nearby");
-      await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
-      await clickMap(member, 36, -82);
-      await expect(member.locator('[name="latitude"]')).toHaveValue("36");
-      await expect(member.locator('[name="longitude"]')).toHaveValue("-82");
-      await member.getByRole("button", { name: "Add task to hunt" }).click();
-      await expect(member.getByTestId("task-status")).toContainText(
-        "was saved and appears",
-      );
-      console.log("creator-flow: contributor task saved");
-      console.log("creator-flow: checking forbidden contributor update");
-      expect(
-        (
-          await contributor.request.post(
-            `/api/admin/hunts/${id}/contributors`,
-            {
-              data: {
-                creatorId: await visitor
-                  .getByTestId("creator-id")
-                  .textContent(),
-              },
-            },
-          )
-        ).status(),
-      ).toBe(403);
-      console.log("creator-flow: forbidden update checked");
-      await page
-        .getByRole("button", { name: "Remove contributor", exact: true })
-        .click();
-      await expect(page.getByTestId("contributor-status")).toHaveText(
-        "Contributor removed.",
-      );
-      console.log("creator-flow: owner removed contributor");
-      console.log("creator-flow: checking removed contributor access");
-      expect(
-        (
-          await contributor.request.get(`/api/admin/hunts/${id}`, {
-            timeout: 5000,
-          })
-        ).status(),
-      ).toBe(403);
-      console.log("creator-flow: removed contributor denied");
-      await member.getByTestId("refresh-my-hunts").click();
-      await expect(member.getByTestId("my-hunts")).not.toContainText(
-        "Shared hunt",
-      );
-      console.log("creator-flow: member no longer sees hunt");
-      console.log("creator-flow: checking stranger access");
-      expect(
-        (
-          await stranger.request.get(`/api/admin/hunts/${id}`, {
-            timeout: 5000,
-          })
-        ).status(),
-      ).toBe(403);
-      console.log("creator-flow: stranger denied");
-    } finally {
-      await contributor.close();
-      await stranger.close();
-    }
-  },
-);
+    await expect(page.getByTestId("contributor-status")).toContainText(
+      "Contributor added",
+    );
+    await member.getByTestId("refresh-my-hunts").click();
+    await member
+      .getByRole("button", { name: "Shared hunt (contributor)", exact: true })
+      .click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
+    await expect(member.getByTestId("hunt-detail-name")).toHaveText(
+      "Shared hunt",
+    );
+    await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
+    await member.getByTestId("hunt-id-toggle").click();
+    await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
+    await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
+    await member.getByRole("button", { name: "Edit hunt tasks" }).click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
+    await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
+    await expect(member.getByTestId("hunt-details-editor")).toBeVisible();
+    await expect(member).toHaveURL(/admin\.html$/);
+    await expect(member.getByTestId("contributors-panel")).toBeHidden();
+    await member
+      .getByLabel("Display label", { exact: true })
+      .fill("Collaborator task");
+    await member.getByLabel("Clue and instructions").fill("Look nearby");
+    await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
+    await clickMap(member, 36, -82);
+    await expect(member.locator('[name="latitude"]')).toHaveValue("36");
+    await expect(member.locator('[name="longitude"]')).toHaveValue("-82");
+    await member.getByRole("button", { name: "Add task to hunt" }).click();
+    await expect(member.getByTestId("task-status")).toContainText(
+      "was saved and appears",
+    );
+    expect(
+      (
+        await contributor.request.post(`/api/admin/hunts/${id}/contributors`, {
+          data: {
+            creatorId: await visitor.getByTestId("creator-id").textContent(),
+          },
+        })
+      ).status(),
+    ).toBe(403);
+    await page
+      .getByRole("button", { name: "Remove contributor", exact: true })
+      .click();
+    await expect(page.getByTestId("contributor-status")).toHaveText(
+      "Contributor removed.",
+    );
+    expect(
+      (
+        await contributor.request.get(`/api/admin/hunts/${id}`, {
+          timeout: 5000,
+        })
+      ).status(),
+    ).toBe(403);
+    await member.getByTestId("close-hunt-details").click();
+    await member.getByTestId("refresh-my-hunts").click();
+    await expect(member.getByTestId("my-hunts")).not.toContainText(
+      "Shared hunt",
+    );
+    expect(
+      (
+        await stranger.request.get(`/api/admin/hunts/${id}`, {
+          timeout: 5000,
+        })
+      ).status(),
+    ).toBe(403);
+  } finally {
+    await contributor.close();
+    await stranger.close();
+  }
+});

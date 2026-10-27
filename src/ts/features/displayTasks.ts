@@ -55,9 +55,6 @@ function taskLocationElement(
   const longitude = location.longitude;
   const details = document.createElement("div");
   details.className = "task-location";
-  const caption = document.createElement("p");
-  caption.className = "task-location-caption";
-  caption.textContent = "Task location";
   const mapToggle = document.createElement("button");
   mapToggle.type = "button";
   mapToggle.className = "task-location-toggle";
@@ -89,7 +86,7 @@ function taskLocationElement(
       map.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bounds}&layer=mapnik&marker=${latitude}%2C${longitude}`;
     }
   });
-  details.append(caption, mapToggle, map);
+  details.append(mapToggle, map);
   return details;
 }
 
@@ -306,6 +303,11 @@ export function mountDisplayTasks(
   )
     return;
 
+  const intro = document.createElement("div");
+  intro.className = "player-hunt-intro";
+  huntName.before(intro);
+  intro.append(huntName, huntDescription);
+
   const googleButtonHost = root.querySelector<HTMLElement>(
     '[data-testid="google-sign-in-host"]',
   );
@@ -463,6 +465,11 @@ export function mountDisplayTasks(
     }
   };
   let pendingIdentity: PlayerIdentity | null = null;
+  const sharedCode =
+    new URLSearchParams(location.search)
+      .get("accessCode")
+      ?.trim()
+      .toUpperCase() ?? "";
 
   const requestDisplayName = (signedIn: PlayerIdentity): void => {
     pendingIdentity = signedIn;
@@ -499,7 +506,11 @@ export function mountDisplayTasks(
     }
     pendingIdentity = null;
     providerStatus.hidden = true;
-    void loadHunts(signedIn, name);
+    if (sharedCode) {
+      window.setTimeout(() => huntForm?.requestSubmit(), 0);
+    } else {
+      void loadHunts(signedIn, name);
+    }
   });
 
   const toggleSensitiveValue = (
@@ -791,7 +802,15 @@ export function mountDisplayTasks(
           if (result.code === "unauthorized") void preparePlayerSignIn();
           return;
         }
-        await loadHunt(result.value.huntId);
+        if (sharedCode && accessCode === sharedCode) {
+          await loadHunts(
+            identity,
+            storedDisplayName(identity.accountId) ?? identity.email,
+          );
+          huntStatus.textContent = "You joined the Hunt. It is now in your list.";
+        } else {
+          await loadHunt(result.value.huntId);
+        }
       } catch {
         huntStatus.textContent = "The Hunt service could not be reached.";
       } finally {
@@ -824,10 +843,17 @@ export function mountDisplayTasks(
     window.addEventListener("pagehide", () => window.clearInterval(timer), {
       once: true,
     });
-    const sharedCode = new URLSearchParams(location.search).get("accessCode");
-    if (sharedCode) huntInput.value = sharedCode.toUpperCase();
+    if (sharedCode) huntInput.value = sharedCode;
     const requestedHunt = new URLSearchParams(location.search).get("huntId");
-    if (requestedHunt && previousIdentity) void loadHunt(requestedHunt);
+    if (
+      sharedCode &&
+      previousIdentity &&
+      storedDisplayName(previousIdentity.accountId)
+    ) {
+      window.setTimeout(() => huntForm.requestSubmit(), 0);
+    } else if (requestedHunt && previousIdentity) {
+      void loadHunt(requestedHunt);
+    }
   }
 
   signOut.addEventListener("click", () => {

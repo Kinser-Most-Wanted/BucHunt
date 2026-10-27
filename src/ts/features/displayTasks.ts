@@ -49,21 +49,42 @@ async function currentAccountRole(): Promise<"administrator" | "user" | null> {
 
 function taskLocationElement(
   location: PlayerHunt["tasks"][number]["location"],
-): HTMLParagraphElement | null {
+  label: string,
+): HTMLDivElement | null {
   if (!location) return null;
-  const latitude = location.latitude.toFixed(6);
-  const longitude = location.longitude.toFixed(6);
-  const details = document.createElement("p");
+  const latitude = location.latitude;
+  const longitude = location.longitude;
+  const details = document.createElement("div");
   details.className = "task-location";
-  details.append(
-    document.createTextNode(`Location: ${latitude}, ${longitude} \u00b7 `),
-  );
-  const mapLink = document.createElement("a");
-  mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
-  mapLink.target = "_blank";
-  mapLink.rel = "noopener noreferrer";
-  mapLink.textContent = "Open map";
-  details.append(mapLink);
+  const mapToggle = document.createElement("button");
+  mapToggle.type = "button";
+  mapToggle.textContent = `Show map for ${label}`;
+  mapToggle.setAttribute("aria-expanded", "false");
+  const map = document.createElement("iframe");
+  map.className = "task-location-map";
+  map.title = `Map for ${label}`;
+  map.loading = "lazy";
+  map.referrerPolicy = "no-referrer";
+  map.hidden = true;
+  mapToggle.addEventListener("click", () => {
+    const showing = map.hidden;
+    map.hidden = !showing;
+    mapToggle.setAttribute("aria-expanded", String(showing));
+    mapToggle.textContent = `${showing ? "Hide" : "Show"} map for ${label}`;
+    if (showing && !map.src) {
+      const padding = 0.005;
+      const bounds = [
+        longitude - padding,
+        latitude - padding,
+        longitude + padding,
+        latitude + padding,
+      ]
+        .map((value) => value.toFixed(6))
+        .join("%2C");
+      map.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bounds}&layer=mapnik&marker=${latitude}%2C${longitude}`;
+    }
+  });
+  details.append(mapToggle, map);
   return details;
 }
 
@@ -143,11 +164,11 @@ function renderHunts(
     progress.textContent = hunt.tasks.length
       ? `${completed} of ${hunt.tasks.length} tasks completed`
       : "No tasks added yet";
-    const open = document.createElement("button");
-    open.type = "button";
-    open.dataset.huntId = hunt.id;
-    open.textContent = "Open Hunt";
-    item.append(header, description, countdown, progress, open);
+    item.dataset.huntId = hunt.id;
+    item.tabIndex = 0;
+    item.setAttribute("role", "button");
+    item.setAttribute("aria-label", `Open ${hunt.name}`);
+    item.append(header, description, countdown, progress);
     list.append(item);
   }
 }
@@ -187,7 +208,7 @@ export function mountDisplayTasks(
   const pastEmpty = root.querySelector<HTMLElement>(
     '[data-testid="past-hunts-empty"]',
   );
-  const huntDetails = root.querySelector<HTMLElement>(
+  const huntDetails = root.querySelector<HTMLDialogElement>(
     '[data-testid="player-hunt-details"]',
   );
   const googleSignIn = root.querySelector<HTMLButtonElement>(
@@ -302,7 +323,7 @@ export function mountDisplayTasks(
     nameForm.hidden = true;
     categories.hidden = true;
     huntLookup.hidden = true;
-    huntDetails.hidden = true;
+    if (huntDetails.open) huntDetails.close();
     heading.textContent = "Sign in to see active Hunts";
     list.replaceChildren();
     futureList.replaceChildren();
@@ -437,7 +458,7 @@ export function mountDisplayTasks(
     nameForm.hidden = false;
     categories.hidden = true;
     huntLookup.hidden = true;
-    huntDetails.hidden = true;
+    if (huntDetails.open) huntDetails.close();
     signOut.hidden = false;
     nameInput.value = "";
     nameInput.focus();
@@ -568,7 +589,7 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       selectedHuntId = huntId;
-      huntDetails.hidden = false;
+      if (!huntDetails.open) huntDetails.showModal();
       huntTasks.replaceChildren();
       huntFacts.replaceChildren();
       huntNoTasks.hidden = true;
@@ -653,7 +674,7 @@ export function mountDisplayTasks(
           description.textContent = task.description;
           item.append(description);
         }
-        const location = taskLocationElement(task.location);
+        const location = taskLocationElement(task.location, task.displayLabel);
         if (location) item.append(location);
         if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
@@ -705,7 +726,7 @@ export function mountDisplayTasks(
     };
     const closeDetails = (): void => {
       selectedHuntId = null;
-      huntDetails.hidden = true;
+      if (huntDetails.open) huntDetails.close();
     };
     closeHuntDetails.forEach((button) =>
       button.addEventListener("click", closeDetails),
@@ -747,11 +768,27 @@ export function mountDisplayTasks(
         if (button) button.disabled = false;
       }
     });
-    categories.addEventListener("click", (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-        "button[data-hunt-id]",
+    const openHuntFromCard = (target: EventTarget | null): void => {
+      const card = (target as HTMLElement | null)?.closest<HTMLElement>(
+        ".player-hunt[data-hunt-id]",
       );
-      if (button) void loadHunt(button.dataset.huntId ?? "");
+      if (card) void loadHunt(card.dataset.huntId ?? "");
+    };
+    categories.addEventListener("click", (event) => {
+      openHuntFromCard(event.target);
+    });
+    categories.addEventListener("keydown", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest(".player-hunt[data-hunt-id]") &&
+        (event.key === "Enter" || event.key === " ")
+      ) {
+        event.preventDefault();
+        openHuntFromCard(event.target);
+      }
+    });
+    huntDetails.addEventListener("close", () => {
+      selectedHuntId = null;
     });
     const timer = window.setInterval(() => renderCategories(), 1000);
     window.addEventListener("pagehide", () => window.clearInterval(timer), {

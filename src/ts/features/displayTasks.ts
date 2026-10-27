@@ -618,7 +618,8 @@ export function mountDisplayTasks(
     '[data-testid="player-task-list"]',
   );
   const huntTasksSection = huntTasks?.closest<HTMLElement>(".details-tasks");
-  const huntOverviewSection = huntFacts?.closest<HTMLElement>(".details-overview");
+  const huntOverviewSection =
+    huntFacts?.closest<HTMLElement>(".details-overview");
   if (huntTasksSection && huntOverviewSection) {
     huntTasksSection.after(huntOverviewSection);
   }
@@ -922,3 +923,4 @@ export function mountDisplayTasks(
       .finally(() => window.location.assign("./index.html"));
   });
 }
+

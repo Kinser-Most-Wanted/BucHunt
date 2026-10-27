@@ -407,7 +407,9 @@ test("only owners and contributors can configure a hunt through the creator work
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-owner")).toContainText("Owner ·");
-    await expect(member.getByTestId("hunt-creators")).not.toContainText("Owner");
+    await expect(member.getByTestId("hunt-creators")).not.toContainText(
+      "Owner",
+    );
     await member.getByRole("button", { name: "Edit hunt tasks" }).click();
     await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
     await expect(member.getByTestId("hunt-details-overview")).toBeHidden();

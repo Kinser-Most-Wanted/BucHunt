@@ -651,8 +651,7 @@ export function mountDisplayTasks(
     const closeButton = huntDetails.querySelector<HTMLButtonElement>(
       '[data-testid="close-player-hunt-details"]',
     );
-    if (closeButton) intro.append(closeButton);
-    intro.append(huntName, huntDescription);
+    intro.append(huntName, huntDescription, huntStatus);
 
     let huntRequest = 0;
     const addFact = (labelText: string, valueText: string): void => {

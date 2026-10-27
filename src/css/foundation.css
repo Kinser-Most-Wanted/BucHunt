@@ -2234,17 +2234,24 @@ body[data-page="player"].player-hunt-modal-open {
   background: rgb(6 9 14 / 76%);
 }
 .player-hunt-details .hunt-details-dialog-heading {
-  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  margin: calc(-1 * clamp(1rem, 3vw, 2rem));
+  padding: 0;
+  overflow: visible;
+  background: transparent;
 }
 .player-hunt-details .hunt-details-dialog-heading > .eyebrow {
   display: none;
 }
 .player-hunt-details .dialog-close-button {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 2;
-  transform: none;
+  position: relative;
+  flex: 0 0 auto;
+  transform: translate(-0.25rem, 0.25rem);
   border-color: rgb(255 255 255 / 28%);
   background: #17406f;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
@@ -2883,7 +2890,8 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 }
 .player-hunt-details .player-hunt-intro > h2 {
   max-width: 28ch;
-  padding-right: 3.5rem;
+  padding-top: 2rem;
+  padding-right: 0;
   color: #fff;
   font-size: clamp(2rem, 4.5vw, 3rem);
   font-weight: 800;
@@ -2913,6 +2921,13 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   background: rgb(255 199 44 / 7%);
   color: #ffda72;
   font-weight: 700;
+}
+.player-hunt-details .player-hunt-intro > .details-status {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  max-width: calc(100% - 2rem);
+  margin: 0;
 }
 .player-hunt-details > .details-actions {
   margin: -0.35rem 0 1.25rem;

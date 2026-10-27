@@ -408,6 +408,7 @@ test("only owners and contributors can configure a hunt through the creator work
       (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
     ).toBe(403);
     const memberId = (await member.getByTestId("creator-id").textContent())!;
+    await page.getByTestId("contributors-panel").locator("summary").click();
     await page.getByLabel("Contributor creator ID").fill(memberId);
     await page
       .getByRole("button", { name: "Add contributor", exact: true })
@@ -457,7 +458,6 @@ test("only owners and contributors can configure a hunt through the creator work
         })
       ).status(),
     ).toBe(403);
-    await page.getByTestId("contributors-panel").locator("summary").click();
     await page
       .getByRole("button", { name: "Remove contributor", exact: true })
       .click();

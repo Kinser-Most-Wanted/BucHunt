@@ -73,7 +73,9 @@ function taskLocationElement(
     const showing = map.hidden;
     map.hidden = !showing;
     mapToggle.setAttribute("aria-expanded", String(showing));
-    mapToggle.textContent = showing ? "Hide Task Location" : "Show Task Location";
+    mapToggle.textContent = showing
+      ? "Hide Task Location"
+      : "Show Task Location";
     if (showing && !map.src) {
       const padding = 0.005;
       const bounds = [
@@ -136,7 +138,9 @@ function contentLength(
   mediumLimit: number,
 ): "short" | "medium" | "long" {
   const length = value.trim().length;
-  return length <= shortLimit ? "short" : length <= mediumLimit ? "medium" : "long";
+  if (length <= shortLimit) return "short";
+  if (length <= mediumLimit) return "medium";
+  return "long";
 }
 
 function renderHunts(

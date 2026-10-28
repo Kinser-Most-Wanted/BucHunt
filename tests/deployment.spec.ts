@@ -26,6 +26,46 @@ test("landing page keeps player navigation behind sign-in", async ({
   await expect(page.getByRole("navigation")).toHaveCount(0);
 });
 
+test("admin workspace waits for Hunt Studio controls to load", async ({
+  page,
+}) => {
+  let releaseBootstrap!: () => void;
+  const bootstrapReady = new Promise<void>((resolve) => {
+    releaseBootstrap = resolve;
+  });
+  const administrator = {
+    subject: "google-subject-admin",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+
+  await page.route("**/js/foundation/bootstrap.js", async (route) => {
+    await bootstrapReady;
+    await route.continue();
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: administrator } }),
+  );
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: { administrator, capabilities: ["administrative.access"] },
+    }),
+  );
+
+  await page.goto("/admin.html", { waitUntil: "commit" });
+  await page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/admin/capabilities",
+  );
+  await expect(page.getByTestId("admin-workspace")).toBeHidden();
+
+  releaseBootstrap();
+  await expect(page.getByTestId("admin-workspace")).toBeVisible();
+  await page.getByTestId("open-create-hunt").click();
+  await expect(page.getByTestId("hunt-form")).toBeVisible();
+});
+
 test("shared Google sign-in checks the server admin role", async ({ page }) => {
   let authenticated = false;
   const administrator = {

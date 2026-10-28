@@ -223,6 +223,7 @@ function mountLocationPicker(
       once: true,
     });
   }
+  document.addEventListener("hunt-details-edit", () => void initializeMap());
 
   const searchButton =
     searchControls.querySelector<HTMLButtonElement>("button");

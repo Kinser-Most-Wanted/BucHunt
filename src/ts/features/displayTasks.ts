@@ -615,10 +615,7 @@ export function mountDisplayTasks(
     pendingIdentity = null;
     providerStatus.hidden = true;
     if (sharedCode) {
-      window.setTimeout(() => {
-        sharedLinkJoinPending = true;
-        huntForm?.requestSubmit();
-      }, 0);
+      window.setTimeout(submitSharedLinkJoin, 0);
     } else {
       void loadHunts(signedIn, name);
     }
@@ -682,6 +679,16 @@ export function mountDisplayTasks(
     '[data-testid="player-hunt-form"]',
   );
   const huntInput = root.querySelector<HTMLInputElement>('[name="accessCode"]');
+  const submitSharedLinkJoin = (): void => {
+    sharedLinkJoinPending = true;
+    if (autoJoin) {
+      huntForm?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    } else {
+      huntForm?.requestSubmit();
+    }
+  };
   const huntName = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-name"]',
   );
@@ -1051,10 +1058,7 @@ export function mountDisplayTasks(
       previousIdentity &&
       storedDisplayName(previousIdentity.accountId)
     ) {
-      window.setTimeout(() => {
-        sharedLinkJoinPending = true;
-        huntForm.requestSubmit();
-      }, 0);
+      window.setTimeout(submitSharedLinkJoin, 0);
     } else if (requestedHunt && previousIdentity) {
       void loadHunt(requestedHunt);
     }

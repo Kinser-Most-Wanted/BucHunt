@@ -184,6 +184,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     }
     if (path.endsWith("/answer")) {
       await route.fulfill({
+        status: 400,
         json: {
           ok: false,
           code: "incorrect_answer",

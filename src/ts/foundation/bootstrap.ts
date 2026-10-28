@@ -12,3 +12,6 @@ if (defineTask) mountDefineTask(defineTask, services.repository);
 if (displayTasks)
   mountDisplayTasks(displayTasks, services.repository);
 
+// Admin Studio waits for its controls before exposing the workspace.
+document.documentElement.dataset.buchuntFeaturesReady = "true";
+document.dispatchEvent(new Event("buchunt:features-ready"));

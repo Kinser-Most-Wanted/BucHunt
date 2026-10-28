@@ -88,10 +88,10 @@ export function mountCreateHunt(
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
     const id = selected.id;
-    const creators = manageDialog.querySelector<HTMLElement>(
+    const creators = manageDialog!.querySelector<HTMLElement>(
       '[data-testid="hunt-creators"]',
     );
-    const contributorsStatus = manageDialog.querySelector<HTMLElement>(
+    const contributorsStatus = manageDialog!.querySelector<HTMLElement>(
       '[data-testid="contributors-load-status"]',
     );
     if (contributorsStatus)

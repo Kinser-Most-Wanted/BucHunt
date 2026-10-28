@@ -341,6 +341,11 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   await expect(answerTask).toContainText("Look for the carved stone marker.");
   const playerIntro = page.locator(".player-hunt-intro");
+  const introBounds = await playerIntro.evaluate((intro) => ({
+    panelTop: intro.getBoundingClientRect().top,
+    dialogTop: intro.closest("dialog")!.getBoundingClientRect().top,
+  }));
+  expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText(
     "test",
   );

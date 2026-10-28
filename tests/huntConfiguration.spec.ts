@@ -291,10 +291,21 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   );
   await page.reload();
   await page.getByTestId("open-manage-hunts").click();
+  let contributorRequests = 0;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname.endsWith("/contributors")) {
+      contributorRequests += 1;
+    }
+  });
   await page
     .getByRole("button", { name: "Sprint verification (owner)", exact: true })
     .click();
   await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("contributors-load-status")).toHaveText(
+    "No contributors have been added yet.",
+  );
+  expect(contributorRequests).toBe(1);
   await expect(page.getByTestId("hunt-detail-name")).toHaveText(
     "Sprint verification",
   );

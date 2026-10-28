@@ -1,9 +1,5 @@
 import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
-import {
-  createHuntRepository,
-  getCreatorSession,
-  request,
-} from "./huntRepository.js";
+import { createHuntRepository } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
@@ -195,32 +191,10 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   )!;
   ownerLabel.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
 
-  const creators = dialog.querySelector<HTMLElement>(
-    '[data-testid="hunt-creators"]',
-  )!;
   const contributorsStatus = dialog.querySelector<HTMLElement>(
     '[data-testid="contributors-load-status"]',
   )!;
-  if (role === "owner") {
-    void request<string[]>(
-      `/api/admin/hunts/${encodeURIComponent(hunt.id)}/contributors`,
-    ).then((result) => {
-      if (!dialog.open || dialog.dataset.huntId !== hunt.id) return;
-      if (!result.ok) {
-        contributorsStatus.textContent = result.message;
-        return;
-      }
-      for (const creatorId of result.value) {
-        const contributor = document.createElement("li");
-        contributor.className = "creator-chip";
-        contributor.textContent = `Contributor · ${creatorId}`;
-        creators.append(contributor);
-      }
-      contributorsStatus.textContent = result.value.length
-        ? ""
-        : "No contributors have been added yet.";
-    });
-  } else {
+  if (role !== "owner") {
     contributorsStatus.textContent =
       "Contributor details are visible to the hunt owner.";
   }
@@ -282,8 +256,6 @@ export async function openHuntDetails(
   )!.textContent = "Loading hunt details…";
   if (!dialog.open) dialog.showModal();
   try {
-    const creator = await getCreatorSession();
-    if (!creator.ok) throw new Error(creator.message);
     const result = await repository.getAdminHunt(huntId);
     if (requestId !== activeRequest || !dialog.open) return;
     if (!result.ok) throw new Error(result.message);

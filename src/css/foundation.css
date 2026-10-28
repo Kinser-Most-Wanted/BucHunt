@@ -3237,9 +3237,9 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   color: #65758a;
 }
 .player-hunt-details .task-answer-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  display: grid;
+  grid-template-rows: minmax(2.9rem, auto) 1.45em;
+  justify-items: end;
   gap: 0.7rem;
 }
 .player-hunt-details .task-answer-submit {
@@ -3261,9 +3261,14 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   transform: none;
 }
 .player-hunt-details .task-answer-message {
-  flex: 1 1 auto;
+  grid-row: 2;
+  width: 100%;
+  overflow: hidden;
   color: #ffc8bd;
   line-height: 1.45;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (max-width: 38rem) {
   .player-hunt-details .hunt-detail-task-heading {

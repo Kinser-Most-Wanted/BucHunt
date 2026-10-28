@@ -88,15 +88,25 @@ export function mountCreateHunt(
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
     const id = selected.id;
+    const creators = manageDialog.querySelector<HTMLElement>(
+      '[data-testid="hunt-creators"]',
+    );
+    const contributorsStatus = manageDialog.querySelector<HTMLElement>(
+      '[data-testid="contributors-load-status"]',
+    );
+    if (contributorsStatus)
+      contributorsStatus.textContent = "Loading contributors…";
     const result = await request<string[]>(
-      `/api/admin/hunts/${id}/contributors`,
+      `/api/admin/hunts/${encodeURIComponent(id)}/contributors`,
     );
     if (selected?.id !== id) return;
     if (!result.ok) {
       memberStatus.textContent = result.message;
+      if (contributorsStatus) contributorsStatus.textContent = result.message;
       return;
     }
     memberList.replaceChildren();
+    creators?.replaceChildren();
     for (const creatorId of result.value) {
       const item = document.createElement("li");
       const label = document.createElement("span");
@@ -122,9 +132,18 @@ export function mountCreateHunt(
       });
       item.append(label, remove);
       memberList.append(item);
+      const chip = document.createElement("li");
+      chip.className = "creator-chip";
+      chip.textContent = `Contributor · ${creatorId}`;
+      creators?.append(chip);
+    }
+    if (contributorsStatus) {
+      contributorsStatus.textContent = result.value.length
+        ? ""
+        : "No contributors have been added yet.";
     }
   }
-  function select(hunt: HuntSummary, loadTasks: boolean): void {
+  function select(hunt: HuntSummary, loadContributors = true): void {
     selected = hunt;
     taskHunt.value = hunt.id;
     editTitle.textContent = "Editing " + hunt.name;
@@ -137,11 +156,7 @@ export function mountCreateHunt(
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
-    if (loadTasks)
-      document
-        .getElementById("define-task")
-        ?.dispatchEvent(new Event("load-hunt-tasks"));
-    if (hunt.role === "owner") void renderContributors();
+    if (loadContributors && hunt.role === "owner") void renderContributors();
   }
   document.addEventListener("hunt-details-edit", (event: Event) => {
     const detail = (
@@ -183,7 +198,7 @@ export function mountCreateHunt(
       role.textContent = `(${hunt.role})`;
       button.append(role);
       button.addEventListener("click", () => {
-        select(hunt, false);
+        select(hunt);
         void openHuntDetails(hunt.id, hunt.role);
       });
       item.append(button);
@@ -196,7 +211,7 @@ export function mountCreateHunt(
       );
       querySelectionApplied = true;
       if (requestedHunt) {
-        select(requestedHunt, true);
+        select(requestedHunt);
         void openHuntDetails(requestedHunt.id, requestedHunt.role).then(() => {
           document
             .querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')

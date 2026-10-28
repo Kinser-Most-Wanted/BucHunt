@@ -182,6 +182,16 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       await route.fulfill({ json: { ok: true, value: savedHunts } });
       return;
     }
+    if (path.endsWith("/answer")) {
+      await route.fulfill({
+        json: {
+          ok: false,
+          code: "incorrect_answer",
+          message: "Incorrect answer. Try again.",
+        },
+      });
+      return;
+    }
     const huntId = path.split("/").at(-1);
     const detail = savedHunts.find((item) => item.id === huntId) ?? hunt;
     await route.fulfill({
@@ -421,9 +431,24 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   expect(sectionOrder.indexOf("tasks")).toBeLessThan(
     sectionOrder.indexOf("overview"),
   );
-  await expect(
-    answerTask.getByRole("button", { name: "Submit answer" }),
-  ).toBeVisible();
+  const submitAnswer = answerTask.getByRole("button", {
+    name: "Submit answer",
+  });
+  await expect(submitAnswer).toBeVisible();
+  const buttonPositionBeforeFeedback = await submitAnswer.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    return { left: bounds.left, top: bounds.top, right: bounds.right };
+  });
+  await answerTask.getByLabel("Answer for Library Steps").fill("wrong");
+  await submitAnswer.click();
+  await expect(answerTask.getByRole("status")).toContainText(
+    "Incorrect answer. Try again.",
+  );
+  const buttonPositionAfterFeedback = await submitAnswer.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    return { left: bounds.left, top: bounds.top, right: bounds.right };
+  });
+  expect(buttonPositionAfterFeedback).toEqual(buttonPositionBeforeFeedback);
   const mapToggle = answerTask.getByRole("button", {
     name: "Show Task Location",
   });

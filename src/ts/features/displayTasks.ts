@@ -734,6 +734,7 @@ export function mountDisplayTasks(
       const requestId = ++huntRequest;
       selectedHuntId = huntId;
       if (!huntDetails.open) {
+        huntDetails.scrollTop = 0;
         huntDetails.showModal();
         document.body.classList.add("player-hunt-modal-open");
       }

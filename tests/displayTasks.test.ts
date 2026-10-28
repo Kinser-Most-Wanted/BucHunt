@@ -315,6 +315,23 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-task-list")).not.toContainText(
     "36.304000, -82.368000",
   );
+  const detailsDialog = page.getByTestId("player-hunt-details");
+  await detailsDialog.evaluate((dialog) => {
+    dialog.scrollTop = dialog.scrollHeight;
+  });
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBeGreaterThan(0);
+  await page.getByTestId("close-player-hunt-details").click();
+  await expect(detailsDialog).not.toBeVisible();
+  await page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-1"]')
+    .click();
+  await expect(detailsDialog).toBeVisible();
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBe(0);
   const answerTask = page
     .getByTestId("player-task")
     .filter({ hasText: "Library Steps" });

@@ -1,5 +1,80 @@
 import { expect, test } from "@playwright/test";
 
+test("empty player dashboard points players to the join card above", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-empty",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.google-account-empty", "Baja");
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  await page.route("**/api/player/account/**", (route) =>
+    route.fulfill({ json: { ok: true, value: [] } }),
+  );
+  await page.goto("/player.html");
+  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.getByTestId("player-task-status")).toHaveText(
+    "Your dashboard is ready. Join a hunt above to get started.",
+  );
+});
+
+test("admin join links do not fill the access-code form", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-auto-join",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem(
+      "buchunt.player-profile.google-account-auto-join",
+      "Baja",
+    );
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  let joins = 0;
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/join")) {
+      joins += 1;
+      expect(route.request().postDataJSON()).toEqual({
+        accessCode: "ABCD1234",
+      });
+      await route.fulfill({ json: { ok: true, value: { huntId: "hunt-1" } } });
+      return;
+    }
+    await route.fulfill({ json: { ok: true, value: [] } });
+  });
+
+  await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
+  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.locator('[name="accessCode"]')).toHaveValue("");
+  await expect.poll(() => joins).toBe(1);
+  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+});
+
 test("Google sign-in lets a player open and revisit saved progress", async ({
   page,
 }) => {
@@ -21,13 +96,22 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       }),
     );
   });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
   await page.route("**/api/auth/logout", (route) =>
     route.fulfill({ json: { signedOut: true } }),
   );
   const hunt = {
     id: "hunt-1",
-    name: "Campus Hunt",
-    description: "Find the campus landmarks.",
+    name: "test",
+    description: "test",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: "2099-01-01T00:00:00.000Z",
+    status: "published",
     tasks: [
       {
         id: "task-1",
@@ -35,9 +119,50 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
         completed: true,
         location: { latitude: 36.304, longitude: -82.368 },
       },
-      { id: "task-2", displayLabel: "Library Steps", completed: false },
+      {
+        id: "task-2",
+        displayLabel: "Library Steps",
+        description: "Look for the carved stone marker.",
+        completed: false,
+        location: { latitude: 36.305, longitude: -82.367 },
+      },
     ],
   };
+  const futureHunt = {
+    id: "hunt-future",
+    name: "Future Hunt",
+    description: "Coming soon.",
+    beginsAt: "2099-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  const pastHunt = {
+    id: "hunt-past",
+    name: "Past Hunt",
+    description: "A finished adventure.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: "2021-01-01T00:00:00.000Z",
+    status: "published",
+    tasks: [],
+  };
+  const tasklessHunt = {
+    id: "hunt-empty",
+    name: "Taskless Hunt",
+    description: "Join before tasks are ready.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  const endingSoonHunt = {
+    ...hunt,
+    id: "hunt-ending-soon",
+    name: "Ending Soon Hunt",
+    endsAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+  };
+  const savedHunts = [hunt, endingSoonHunt, futureHunt, pastHunt, tasklessHunt];
+  let huntListRequests = 0;
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",
@@ -53,28 +178,26 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       return;
     }
     if (path.endsWith("/hunts")) {
-      await route.fulfill({ json: { ok: true, value: [hunt] } });
+      huntListRequests += 1;
+      await route.fulfill({ json: { ok: true, value: savedHunts } });
       return;
     }
+    if (path.endsWith("/answer")) {
+      await route.fulfill({
+        status: 400,
+        json: {
+          ok: false,
+          code: "incorrect_answer",
+          message: "Incorrect answer. Try again.",
+        },
+      });
+      return;
+    }
+    const huntId = path.split("/").at(-1);
+    const detail = savedHunts.find((item) => item.id === huntId) ?? hunt;
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        value: {
-          id: "hunt-1",
-          name: "Campus Hunt",
-          description: "Find the campus landmarks.",
-          tasks: [
-            {
-              id: "task-1",
-              displayLabel: "Old Fountain",
-              completed: true,
-              location: { latitude: 36.304, longitude: -82.368 },
-            },
-            { id: "task-2", displayLabel: "Library Steps", completed: false },
-          ],
-        },
-      }),
+      body: JSON.stringify({ ok: true, value: detail }),
     });
   });
 
@@ -88,6 +211,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "Signed in as Baja (Player)",
   );
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.locator('body[data-page="player"] > header')).toHaveCSS(
+    "position",
+    "sticky",
+  );
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
   await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
@@ -127,36 +254,278 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "",
   );
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
+  await expect(page.getByTestId("player-hunt-list")).toContainText("test");
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Time remaining",
+  );
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText(
+    "Future Hunt",
+  );
+  await expect(page.getByTestId("player-past-hunt-list")).toContainText(
+    "Hunt Ended",
+  );
+  const activeCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-1"]');
+  await expect(activeCard).toHaveAttribute("data-hunt-status", "active");
+  await expect(activeCard.locator(".hunt-state-badge")).toHaveText("Active");
+  await expect(activeCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "active",
+  );
+  const endingSoonCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-ending-soon"]');
+  await expect(endingSoonCard.locator(".hunt-state-badge")).toHaveText(
+    "Ending soon",
+  );
+  await expect(endingSoonCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "soon",
+  );
+  const futureCard = page
+    .getByTestId("player-future-hunt-list")
+    .locator('[data-hunt-id="hunt-future"]');
+  await expect(futureCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "upcoming",
+  );
+  await expect(futureCard.locator(".hunt-state-badge")).toHaveCSS(
+    "color",
+    "rgb(139, 188, 255)",
+  );
+  const pastCard = page
+    .getByTestId("player-past-hunt-list")
+    .locator('[data-hunt-id="hunt-past"]');
+  await expect(pastCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "ended",
+  );
+  const tasklessCard = page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-empty"]');
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveText(
+    "Needs tasks",
+  );
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveAttribute(
+    "data-status",
+    "needs-tasks",
+  );
+  await expect(tasklessCard.locator(".hunt-state-badge")).toHaveCSS(
+    "color",
+    "rgb(139, 188, 255)",
+  );
+  await expect(page.getByTestId("player-future-hunt-list")).toContainText(
+    "Starts in",
+  );
+  await page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-empty"]')
+    .click();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText(
+    "Taskless Hunt",
+  );
+  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
+  await expect(page.getByTestId("back-to-hunts")).toHaveCount(0);
+  await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
+  expect(huntListRequests).toBe(1);
+  await page.getByTestId("close-player-hunt-details").click();
+  await page
+    .getByTestId("player-future-hunt-list")
+    .locator('[data-hunt-id="hunt-future"]')
+    .click();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText("Future Hunt");
+  await expect(page.getByTestId("player-task-list")).toBeEmpty();
+  await page.getByTestId("close-player-hunt-details").click();
+  await page
+    .getByTestId("player-past-hunt-list")
+    .locator('[data-hunt-id="hunt-past"]')
+    .click();
+  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
+    "Hunt Ended",
+  );
+  await page.getByTestId("close-player-hunt-details").click();
+  await page.getByLabel("Access code").fill("abcd1234");
+  await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();
-  await expect(page.getByTestId("player-hunt-name")).toHaveText("Campus Hunt");
+  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText("test");
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "1 saved Hunt",
+    "5 saved Hunts",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Campus Hunt",
-  );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
+  await expect(page.getByTestId("player-hunt-list")).toContainText("test");
+  await expect(page.getByTestId("player-task-list")).toContainText(
     "Old Fountain",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Location: 36.304000, -82.368000",
+  await expect(page.getByTestId("player-task-list")).not.toContainText(
+    "36.304000, -82.368000",
   );
+  const detailsDialog = page.getByTestId("player-hunt-details");
+  await detailsDialog.evaluate((dialog) => {
+    dialog.scrollTop = dialog.scrollHeight;
+  });
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBeGreaterThan(0);
+  await page.getByTestId("close-player-hunt-details").click();
+  await expect(detailsDialog).not.toBeVisible();
+  await page
+    .getByTestId("player-hunt-list")
+    .locator('[data-hunt-id="hunt-1"]')
+    .click();
+  await expect(detailsDialog).toBeVisible();
+  expect(await detailsDialog.evaluate((dialog) => dialog.scrollTop)).toBe(0);
+  const answerTask = page
+    .getByTestId("player-task")
+    .filter({ hasText: "Library Steps" });
+  await expect(answerTask).toBeVisible();
+  await expect(answerTask.locator(".hunt-detail-task-heading")).toContainText(
+    "Library Steps",
+  );
+  await expect(answerTask).toContainText("Look for the carved stone marker.");
+  const playerIntro = page.locator(".player-hunt-intro");
+  const introBounds = await playerIntro.evaluate((intro) => ({
+    panelTop: intro.getBoundingClientRect().top,
+    dialogTop: intro.closest("dialog")!.getBoundingClientRect().top,
+  }));
+  expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
+  await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText("test");
+  await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
+    "test",
+  );
+  const taskLayout = await answerTask.evaluate((task) => {
+    const location = task.querySelector(".task-location")!;
+    const answer = task.querySelector(".task-answer-form")!;
+    return (
+      Array.from(task.children).indexOf(location) <
+      Array.from(task.children).indexOf(answer)
+    );
+  });
+  expect(taskLayout).toBe(true);
+  await expect(answerTask.getByLabel("Answer for Library Steps")).toHaveCSS(
+    "min-height",
+    "60px",
+  );
+  const answerBarWidth = await answerTask
+    .getByLabel("Answer for Library Steps")
+    .evaluate((input) => input.getBoundingClientRect().width);
+  expect(answerBarWidth).toBeGreaterThan(300);
+  const taskHeading = answerTask.locator(".hunt-detail-task-heading");
+  const locationPanel = taskHeading.locator(".task-location");
+  await expect(taskHeading).toHaveCSS("display", "grid");
+  await expect(locationPanel).toHaveCSS("grid-column-start", "2");
+  await expect(locationPanel).toHaveCSS("grid-row-start", "1");
   await expect(
-    page
-      .getByTestId("player-hunt-list")
-      .getByRole("link", { name: "Open map" }),
-  ).toHaveAttribute(
-    "href",
-    "https://www.openstreetmap.org/?mlat=36.304000&mlon=-82.368000#map=18/36.304000/-82.368000",
+    answerTask.getByRole("button", { name: "Show Task Location" }),
+  ).toBeVisible();
+  const sectionOrder = await page
+    .getByTestId("player-hunt-details")
+    .evaluate((dialog) =>
+      Array.from(dialog.querySelectorAll(":scope > section")).map((section) =>
+        section.classList.contains("details-tasks")
+          ? "tasks"
+          : section.classList.contains("details-overview")
+            ? "overview"
+            : "other",
+      ),
+    );
+  expect(sectionOrder.indexOf("tasks")).toBeLessThan(
+    sectionOrder.indexOf("overview"),
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText("Completed");
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "Not completed",
+  const submitAnswer = answerTask.getByRole("button", {
+    name: "Submit answer",
+  });
+  await expect(submitAnswer).toBeVisible();
+  const buttonPositionBeforeFeedback = await submitAnswer.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    const actions = button.parentElement!.getBoundingClientRect();
+    return {
+      left: bounds.left - actions.left,
+      top: bounds.top - actions.top,
+      right: actions.right - bounds.right,
+    };
+  });
+  await answerTask.getByLabel("Answer for Library Steps").fill("wrong");
+  await submitAnswer.click();
+  await expect(answerTask.getByRole("status")).toContainText(
+    "Incorrect answer. Try again.",
   );
-  await expect(page.getByTestId("player-hunt-list")).not.toContainText(
+  const buttonPositionAfterFeedback = await submitAnswer.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    const actions = button.parentElement!.getBoundingClientRect();
+    return {
+      left: bounds.left - actions.left,
+      top: bounds.top - actions.top,
+      right: actions.right - bounds.right,
+    };
+  });
+  expect(buttonPositionAfterFeedback).toEqual(buttonPositionBeforeFeedback);
+  const mapToggle = answerTask.getByRole("button", {
+    name: "Show Task Location",
+  });
+  await mapToggle.click();
+  const taskMap = answerTask.locator('iframe[title="Task location map"]');
+  await expect(taskMap).toBeVisible();
+  const closeButton = page.getByTestId("close-player-hunt-details");
+  const huntStatus = page.getByTestId("player-hunt-lookup-status");
+  await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(
+    "position",
+    "sticky",
+  );
+  await expect(closeButton).toHaveCSS("position", "relative");
+  expect(
+    await closeButton.evaluate((button) =>
+      Boolean(button.closest(".player-hunt-intro")),
+    ),
+  ).toBe(false);
+  await expect(huntStatus).toHaveCSS("position", "absolute");
+  await expect(huntStatus).toHaveAttribute("data-status", "active");
+  expect(
+    await huntStatus.evaluate((status) =>
+      Boolean(status.closest(".player-hunt-intro")),
+    ),
+  ).toBe(true);
+  await expect(detailsDialog).toHaveCSS("overscroll-behavior", "contain");
+  await expect(detailsDialog).toHaveCSS("scrollbar-width", "none");
+  await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
+  await detailsDialog.evaluate((dialog) => {
+    dialog.scrollTop = dialog.scrollHeight;
+  });
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBeGreaterThan(0);
+  const closeButtonBounds = await closeButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const dialogRect = button.closest("dialog")!.getBoundingClientRect();
+    return {
+      insideLeft: buttonRect.left >= dialogRect.left,
+      insideRight: buttonRect.right <= dialogRect.right,
+      insideTop: buttonRect.top >= dialogRect.top,
+      insideBottom: buttonRect.bottom <= dialogRect.bottom,
+    };
+  });
+  expect(closeButtonBounds).toEqual({
+    insideLeft: true,
+    insideRight: true,
+    insideTop: true,
+    insideBottom: true,
+  });
+  await expect(closeButton).toBeInViewport();
+  const mapSource = await taskMap.getAttribute("src");
+  expect(mapSource).not.toBeNull();
+  const marker = new URL(mapSource!).searchParams.get("marker");
+  expect(marker?.split(",").map(Number)).toEqual([36.305, -82.367]);
+  await page.getByRole("button", { name: "Hide Task Location" }).click();
+  await expect(taskMap).toBeHidden();
+  await expect(page.getByTestId("player-task-list")).toContainText("Completed");
+  await expect(page.getByTestId("player-task-list")).toContainText(
+    "Incomplete",
+  );
+  await expect(page.getByTestId("player-task-list")).not.toContainText(
     "secret-answer",
   );
 
+  await page.getByTestId("close-player-hunt-details").click();
   await page.getByTestId("player-sign-out").click();
   await expect(page).toHaveURL(/\/index\.html$/);
 });
@@ -299,6 +668,12 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
       },
     }),
   );
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
   await page.route("**/api/admin/session", (route) =>
     route.fulfill({
       json: {
@@ -336,7 +711,95 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
   await expect(page.getByTestId("player-account")).toContainText("Baja");
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "no saved hunts yet",
+    "Your dashboard is ready",
   );
   await expect(page).toHaveURL(/\/player\.html$/);
+});
+
+test("multiple-choice selections submit immediately, retain rejected options, and recover from network errors", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "a@example.com",
+        accountId: "player-a",
+        idToken: "test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.player-a", "Player A");
+  });
+  const task = {
+    id: "task-choice",
+    huntId: "hunt-choice",
+    displayLabel: "Sign shape",
+    description: "What shape is the sign?",
+    taskType: "multiple-choice",
+    choices: ["Circle", "Octagon", "Square", "Triangle"],
+    incorrectChoices: [] as string[],
+    completed: false,
+  };
+  const hunt = {
+    id: "hunt-choice",
+    name: "Shape hunt",
+    description: "Find a sign",
+    beginsAt: "2026-10-15T10:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [task],
+  };
+  let fail = true;
+  const answers: string[] = [];
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: { role: "user" } } }),
+  );
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/answer")) {
+      const answer = route.request().postDataJSON().answer;
+      answers.push(answer);
+      if (fail) {
+        fail = false;
+        await route.abort();
+        return;
+      }
+      if (answer === "Square") task.completed = true;
+      else task.incorrectChoices.push(answer);
+      await route.fulfill({
+        json: { ok: true, value: { completed: task.completed } },
+      });
+    } else
+      await route.fulfill({
+        json: { ok: true, value: path.endsWith("/hunts") ? [hunt] : hunt },
+      });
+  });
+  await page.goto("/player.html?huntId=hunt-choice");
+  const item = page.getByTestId("player-task");
+  await expect(item.getByRole("button")).toHaveCount(4);
+  await item.getByRole("button", { name: "Circle", exact: true }).click();
+  await expect(item.getByRole("status")).toContainText("Try again.");
+  await expect(
+    item.getByRole("button", { name: "Circle", exact: true }),
+  ).toBeEnabled();
+  await item.getByRole("button", { name: "Circle", exact: true }).click();
+  await expect(
+    item.getByRole("button", { name: "Circle — Incorrect", exact: true }),
+  ).toBeDisabled();
+  await expect(item.getByRole("status")).toContainText("Incorrect answer");
+  await page.reload();
+  await expect(
+    item.getByRole("button", { name: "Circle — Incorrect", exact: true }),
+  ).toBeDisabled();
+  await item.getByRole("button", { name: "Square", exact: true }).click();
+  await expect(item).toContainText("Completed");
+  await expect(item.getByRole("button")).toHaveCount(0);
+  await expect(page.locator(".player-hunt .hunt-state-badge")).toHaveText(
+    "Hunt complete",
+  );
+  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
+    "Hunt complete",
+  );
+  expect(answers).toEqual(["Circle", "Circle", "Square"]);
 });

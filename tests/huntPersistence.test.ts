@@ -8,7 +8,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApplication } from "../src/ts/server/server.js";
-import { HuntStore, isHuntAvailable } from "../src/ts/server/huntStore.js";
+import {
+  HuntStore,
+  isHuntActive,
+  isHuntJoinable,
+} from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
 
 const input = {
@@ -43,12 +47,35 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
     );
     const restarted = new HuntStore(path);
     expect((await restarted.get(hunt.id)).tasks).toHaveLength(12);
+    const original = (await restarted.get(hunt.id)).tasks[0];
+    const updated = await store.updateTask(hunt.id, original.id, {
+      ...task,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
+    expect(updated.id).toBe(original.id);
+    expect(updated.displayLabel).toBe("Updated fountain");
+    expect(updated.requiredAnswer).toBe("New answer");
     const before = await readFile(path, "utf8");
+    await expect(
+      store.updateTask(hunt.id, original.id, {
+        ...task,
+        displayLabel: "Corrupted task",
+        requiredAnswer: "",
+      }),
+    ).rejects.toThrow("invalid");
     await expect(store.addTask(hunt.id, task)).rejects.toThrow("invalid");
     await expect(
       store.addTask(hunt.id, { ...task, requiredAnswer: "", order: 20 }),
     ).rejects.toThrow("invalid");
     expect(await readFile(path, "utf8")).toBe(before);
+    expect(await store.deleteTask(hunt.id, original.id)).toEqual({
+      deleted: true,
+    });
+    expect((await restarted.get(hunt.id)).tasks).toHaveLength(11);
+    await expect(store.deleteTask(hunt.id, original.id)).rejects.toThrow(
+      "Task not found.",
+    );
     const progressPath = join(directory, "player-progress.json");
     await new PlayerProgressStore(progressPath).complete(
       "player-a",
@@ -68,6 +95,85 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
       ),
     ).toEqual([]);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("multiple-choice answers persist rejected choices per account and complete only on the configured answer", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-multiple-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  const saved = await store.addTask(hunt.id, {
+    ...task,
+    taskType: "multiple-choice",
+    requiredAnswer: "Square",
+    choices: ["Square", "Circle", "Triangle", "Octagon"],
+  });
+  expect(
+    (await new HuntStore(join(directory, "hunts.json")).get(hunt.id)).tasks[0],
+  ).toEqual(saved);
+  let app = createApplication({
+    dataDirectory: directory,
+    verifyPlayerToken: async (token) => token,
+  });
+  const listen = async () => {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/player/account`;
+  };
+  let base = await listen();
+  const call = (path: string, value?: unknown, token = "player-a") =>
+    fetch(base + path, {
+      method: value === undefined ? "GET" : "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: value === undefined ? undefined : JSON.stringify(value),
+    });
+  const route = `/hunts/${hunt.id}`;
+  const answer = route + `/tasks/${saved.id}/answer`;
+  try {
+    expect((await call("/join", { accessCode: hunt.accessCode })).status).toBe(
+      200,
+    );
+    const displayed = (await (await call(route)).json()).value.tasks[0];
+    expect(displayed.choices).toEqual([
+      "Circle",
+      "Octagon",
+      "Square",
+      "Triangle",
+    ]);
+    expect(displayed).not.toHaveProperty("requiredAnswer");
+    expect((await call(answer, { answer: "not-a-choice" })).status).toBe(400);
+    expect(
+      (await (await call(answer, { answer: "Circle" })).json()).value.completed,
+    ).toBe(false);
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    app = createApplication({
+      dataDirectory: directory,
+      verifyPlayerToken: async (token) => token,
+    });
+    base = await listen();
+    expect((await (await call(route)).json()).value.tasks[0]).toMatchObject({
+      completed: false,
+      incorrectChoices: ["Circle"],
+    });
+    expect(
+      (await (await call(answer, { answer: "Circle" })).json()).value.completed,
+    ).toBe(false);
+    await call("/join", { accessCode: hunt.accessCode }, "player-b");
+    expect(
+      (await (await call(route, undefined, "player-b")).json()).value.tasks[0]
+        .incorrectChoices,
+    ).toEqual([]);
+    expect(
+      (await (await call(answer, { answer: "Square" })).json()).value.completed,
+    ).toBe(true);
+    expect((await (await call(route)).json()).value.tasks[0].completed).toBe(
+      true,
+    );
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -189,6 +295,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
       })
     ).json();
     expect(saved.ok).toBe(true);
+    const taskRoute = route + "/tasks/" + saved.value.id;
     for (const cookie of [
       stranger.cookie,
       collaborator.cookie,
@@ -203,6 +310,26 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
             method: "POST",
             headers: headers(cookie),
             body: JSON.stringify({ ...task, order: 2 }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await fetch(base + taskRoute, {
+            method: "PATCH",
+            headers: headers(cookie),
+            body: JSON.stringify({
+              ...task,
+              displayLabel: "Unauthorized edit",
+            }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await fetch(base + taskRoute, {
+            method: "DELETE",
+            headers: { ...headers(cookie), "Content-Type": "application/json" },
           })
         ).status,
       ).toBe(403);
@@ -246,15 +373,63 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         ).json()
       ).value,
     ).toEqual([{ id, name: input.name, role: "contributor" }]);
+    const contributedTask = await (
+      await fetch(base + route + "/tasks", {
+        method: "POST",
+        headers: headers(collaborator.cookie),
+        body: JSON.stringify({ ...task, order: 2 }),
+      })
+    ).json();
+    expect(contributedTask.ok).toBe(true);
+    const contributedTaskRoute = route + "/tasks/" + contributedTask.value.id;
+
+    const changedAnswer = await fetch(base + taskRoute, {
+      method: "PATCH",
+      headers: admin,
+      body: JSON.stringify({
+        ...task,
+        displayLabel: "Updated fountain",
+        requiredAnswer: "New answer",
+      }),
+    });
+    expect(changedAnswer.status).toBe(200);
+    expect((await changedAnswer.json()).value).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
+    const savedConfig = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    const rejectedEdit = await fetch(base + taskRoute, {
+      method: "PATCH",
+      headers: admin,
+      body: JSON.stringify({
+        ...task,
+        displayLabel: "Corrupted task",
+        requiredAnswer: "",
+      }),
+    });
+    expect(rejectedEdit.status).toBe(400);
     expect(
-      (
-        await fetch(base + route + "/tasks", {
-          method: "POST",
-          headers: headers(collaborator.cookie),
-          body: JSON.stringify({ ...task, order: 2 }),
-        })
-      ).status,
-    ).toBe(201);
+      (await (await fetch(base + route, { headers: admin })).json()).value,
+    ).toEqual(savedConfig.value);
+
+    const removed = await fetch(base + contributedTaskRoute, {
+      method: "DELETE",
+      headers: headers(collaborator.cookie),
+    });
+    expect(removed.status).toBe(200);
+    expect((await removed.json()).value).toEqual({ deleted: true });
+    const afterDelete = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    expect(afterDelete.value.tasks).toHaveLength(1);
+    expect(afterDelete.value.tasks[0]).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+    });
+
     expect(
       (
         await fetch(base + route + "/contributors", {
@@ -281,7 +456,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         await fetch(base + answerPath, {
           method: "POST",
           headers: headers(playerCookie),
-          body: '{"answer":"wrong"}',
+          body: '{"answer":"bucky"}',
         })
       ).status,
     ).toBe(400);
@@ -290,7 +465,7 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         await fetch(base + answerPath, {
           method: "POST",
           headers: headers(playerCookie),
-          body: '{"answer":"bucky"}',
+          body: '{"answer":"new answer"}',
         })
       ).status,
     ).toBe(200);
@@ -303,15 +478,21 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
     await stop();
     app = createApplication({ dataDirectory: directory });
     base = await start();
-    expect(
-      (
-        await (
-          await fetch(base + `/api/player/hunts/${id}`, {
-            headers: headers(playerCookie),
-          })
-        ).json()
-      ).value.tasks[0].completed,
-    ).toBe(true);
+    const restoredHunt = await (
+      await fetch(base + `/api/player/hunts/${id}`, {
+        headers: headers(playerCookie),
+      })
+    ).json();
+    expect(restoredHunt.value.tasks[0].completed).toBe(true);
+    const restoredConfig = await (
+      await fetch(base + route, { headers: admin })
+    ).json();
+    expect(restoredConfig.value.tasks).toHaveLength(1);
+    expect(restoredConfig.value.tasks[0]).toMatchObject({
+      id: saved.value.id,
+      displayLabel: "Updated fountain",
+      requiredAnswer: "New answer",
+    });
     expect(
       (await fetch(base + route, { headers: headers(collaborator.cookie) }))
         .status,
@@ -631,7 +812,7 @@ test("account browser answers tasks and restores progress in another browser", a
           input.name,
         );
         await page
-          .getByRole("button", { name: "Open Hunt", exact: true })
+          .getByRole("button", { name: `Open ${input.name}`, exact: true })
           .click();
       }
       await expect(page.getByTestId("player-task").first()).toContainText(
@@ -642,7 +823,7 @@ test("account browser answers tasks and restores progress in another browser", a
       );
       await page.reload();
       await page
-        .getByRole("button", { name: "Open Hunt", exact: true })
+        .getByRole("button", { name: `Open ${input.name}`, exact: true })
         .click();
       await expect(page.getByTestId("player-task").first()).toContainText(
         "Completed",
@@ -721,6 +902,15 @@ test("access code joins persist before answers and reject unavailable hunts and 
     "owner",
   );
   await store.addTask(hunt.id, task);
+  const expiring = await store.create(
+    {
+      ...input,
+      beginsAt: "2020-01-01T00:00:00Z",
+      endsAt: null,
+    },
+    "owner",
+  );
+  const expiringTask = await store.addTask(expiring.id, task);
   const empty = await store.create(
     { ...input, beginsAt: "2020-01-01T00:00:00Z" },
     "owner",
@@ -757,20 +947,16 @@ test("access code joins persist before answers and reject unavailable hunts and 
     });
   try {
     expect(hunt.accessCode).toMatch(/^[A-F0-9]{8}$/);
-    expect(new Set((await store.list()).map((h) => h.accessCode)).size).toBe(4);
+    expect(new Set((await store.list()).map((h) => h.accessCode)).size).toBe(5);
     expect((await joinHunt(hunt.accessCode, "forged-token")).status).toBe(401);
-    for (const code of [
-      "wrong",
-      hunt.id,
-      null,
-      empty.accessCode,
-      future.accessCode,
-      ended.accessCode,
-    ]) {
+    for (const code of ["wrong", hunt.id, null, ended.accessCode]) {
       const rejected = await joinHunt(code);
       expect(rejected.status).toBe(400);
       expect((await rejected.json()).message).toContain("Invalid access code");
     }
+    expect((await joinHunt(empty.accessCode)).status).toBe(200);
+    expect((await joinHunt(future.accessCode)).status).toBe(200);
+    expect((await joinHunt(expiring.accessCode)).status).toBe(200);
     expect((await fetch(base + `/api/player/hunts/${hunt.id}`)).status).toBe(
       403,
     );
@@ -790,20 +976,62 @@ test("access code joins persist before answers and reject unavailable hunts and 
       headers: { Authorization: "Bearer player-a-new-token" },
     });
     const saved = (await restored.json()).value;
-    expect(saved).toHaveLength(1);
-    expect(saved[0].tasks[0].completed).toBe(false);
+    expect(saved).toHaveLength(4);
+    const savedMain = saved.find((item) => item.id === hunt.id);
+    const savedEmpty = saved.find((item) => item.id === empty.id);
+    const savedFuture = saved.find((item) => item.id === future.id);
+    expect(savedMain?.tasks[0].completed).toBe(false);
+    expect(savedEmpty?.tasks).toEqual([]);
+    expect(savedEmpty).toMatchObject({
+      beginsAt: empty.beginsAt,
+      endsAt: null,
+      status: "draft",
+    });
+    expect(savedFuture?.beginsAt).toBe(future.beginsAt);
+    expect(saved.find((item) => item.id === expiring.id)).toMatchObject({
+      beginsAt: expiring.beginsAt,
+      endsAt: null,
+      status: "draft",
+    });
     expect(JSON.stringify(saved)).not.toContain(hunt.accessCode);
     const definition = await store.get(hunt.id);
     const begins = Date.parse(definition.beginsAt);
-    expect(isHuntAvailable(definition, begins)).toBe(true);
-    expect(isHuntAvailable(definition, begins - 1)).toBe(false);
+    expect(isHuntActive(definition, begins)).toBe(true);
+    expect(isHuntActive(definition, begins - 1)).toBe(false);
+    expect(isHuntJoinable(definition, begins - 1)).toBe(true);
     expect(
-      isHuntAvailable(
+      isHuntActive(
         { ...definition, endsAt: "2021-01-01T00:00:00Z" },
         Date.parse("2021-01-01T00:00:00Z"),
       ),
     ).toBe(false);
-    expect(isHuntAvailable({ ...definition, status: "archived" })).toBe(false);
+    expect(
+      isHuntJoinable(
+        { ...definition, endsAt: "2021-01-01T00:00:00Z" },
+        Date.parse("2021-01-01T00:00:00Z"),
+      ),
+    ).toBe(false);
+    expect(isHuntJoinable({ ...definition, status: "archived" })).toBe(false);
+    const huntsPath = join(directory, "hunts.json");
+    const storedHunts = JSON.parse(await readFile(huntsPath, "utf8"));
+    storedHunts.hunts.find(
+      (item: { id: string }) => item.id === expiring.id,
+    ).endsAt = new Date(Date.now() - 1000).toISOString();
+    await writeFile(huntsPath, JSON.stringify(storedHunts));
+    const answerResponse = await fetch(
+      base +
+        `/api/player/account/hunts/${expiring.id}/tasks/${expiringTask.id}/answer`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer player-a-new-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ answer: task.requiredAnswer }),
+      },
+    );
+    expect(answerResponse.status).toBe(400);
+    expect((await answerResponse.json()).message).toContain("Hunt Ended");
     const path = join(directory, "hunts.json");
     const legacy = JSON.parse(await readFile(path, "utf8"));
     legacy.hunts[0].accessCode = null;

@@ -13,7 +13,10 @@ export interface TaskLocation {
   latitude: number;
   longitude: number;
 }
+export type TaskType = "single-word-trivia" | "multiple-choice";
 export interface TaskInput {
+  taskType?: TaskType;
+  choices?: string[];
   displayLabel: string;
   description: string;
   requiredAnswer: string;
@@ -36,6 +39,9 @@ export interface TaskDefinition extends TaskInput {
   id: string;
 }
 export interface PlayerTask {
+  taskType?: TaskType;
+  choices?: string[];
+  incorrectChoices?: string[];
   description?: string;
   id: string;
   huntId: string;
@@ -47,6 +53,9 @@ export interface PlayerHunt {
   id: string;
   name: string;
   description: string;
+  beginsAt: string;
+  endsAt: string | null;
+  status: HuntStatus;
   tasks: PlayerTask[];
 }
 export interface PlayerIdentity {
@@ -88,4 +97,3 @@ export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
 }
-

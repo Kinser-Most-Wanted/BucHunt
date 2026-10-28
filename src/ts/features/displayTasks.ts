@@ -33,71 +33,229 @@ function storedIdentity(): PlayerIdentity | null {
   return null;
 }
 
-async function currentAccountRole(): Promise<"administrator" | "user"> {
+async function currentAccountRole(): Promise<"administrator" | "user" | null> {
   try {
-    const response = await fetch("/api/auth/session", {
+    const response = await fetch("/api/admin/capabilities", {
       credentials: "same-origin",
       cache: "no-store",
     });
-    if (!response.ok) return "user";
-    const payload = (await response.json()) as {
-      user?: { role?: unknown };
-    };
-    return payload.user?.role === "administrator" ? "administrator" : "user";
+    if (response.ok) return "administrator";
+    if (response.status === 403) return "user";
   } catch {
-    return "user";
+    // Do not mislabel an account when its administrator status is unavailable.
   }
+  return null;
 }
 
 function taskLocationElement(
   location: PlayerHunt["tasks"][number]["location"],
-): HTMLParagraphElement | null {
+): HTMLDivElement | null {
   if (!location) return null;
-  const latitude = location.latitude.toFixed(6);
-  const longitude = location.longitude.toFixed(6);
-  const details = document.createElement("p");
+  const latitude = location.latitude;
+  const longitude = location.longitude;
+  const details = document.createElement("div");
   details.className = "task-location";
-  details.append(
-    document.createTextNode(`Location: ${latitude}, ${longitude} \u00b7 `),
-  );
-  const mapLink = document.createElement("a");
-  mapLink.href = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
-  mapLink.target = "_blank";
-  mapLink.rel = "noopener noreferrer";
-  mapLink.textContent = "Open map";
-  details.append(mapLink);
+  const mapToggle = document.createElement("button");
+  mapToggle.type = "button";
+  mapToggle.className = "task-location-toggle";
+  mapToggle.textContent = "Show Task Location";
+  mapToggle.setAttribute("aria-expanded", "false");
+  const map = document.createElement("iframe");
+  map.className = "task-location-map";
+  map.title = "Task location map";
+  map.loading = "lazy";
+  map.referrerPolicy = "no-referrer";
+  map.hidden = true;
+  mapToggle.addEventListener("click", () => {
+    const showing = map.hidden;
+    map.hidden = !showing;
+    mapToggle.setAttribute("aria-expanded", String(showing));
+    mapToggle.textContent = showing
+      ? "Hide Task Location"
+      : "Show Task Location";
+    if (showing && !map.src) {
+      const padding = 0.005;
+      const bounds = [
+        longitude - padding,
+        latitude - padding,
+        longitude + padding,
+        latitude + padding,
+      ]
+        .map((value) => value.toFixed(6))
+        .join("%2C");
+      map.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bounds}&layer=mapnik&marker=${latitude}%2C${longitude}`;
+    }
+  });
+  details.append(mapToggle, map);
   return details;
 }
 
-function renderHunts(list: HTMLUListElement, hunts: PlayerHunt[]): void {
+type HuntPhase = "active" | "future" | "past";
+
+function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
+  if (
+    hunt.status === "archived" ||
+    (hunt.endsAt !== null && Date.parse(hunt.endsAt) <= now)
+  )
+    return "past";
+  return Date.parse(hunt.beginsAt) > now ? "future" : "active";
+}
+
+function durationText(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const clock = [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+  return days ? `${days}d ${clock}` : clock;
+}
+
+function countdownText(hunt: PlayerHunt, now: number): string {
+  const phase = huntPhase(hunt, now);
+  if (phase === "past") return "Hunt Ended";
+  if (phase === "future")
+    return `Starts in ${durationText(Date.parse(hunt.beginsAt) - now)}`;
+  if (hunt.endsAt === null) return "No end time set";
+  return `Time remaining ${durationText(Date.parse(hunt.endsAt) - now)}`;
+}
+
+type HuntStatusTone = "active" | "soon" | "upcoming" | "needs-tasks" | "ended";
+
+interface HuntStatusPresentation {
+  tone: HuntStatusTone;
+  label: string;
+  message: string;
+}
+
+function huntStatusPresentation(
+  hunt: PlayerHunt,
+  now: number,
+): HuntStatusPresentation {
+  const phase = huntPhase(hunt, now);
+  if (phase === "past") {
+    return {
+      tone: "ended",
+      label: "Hunt Ended",
+      message: "Hunt Ended. Your progress is still available to review.",
+    };
+  }
+  if (phase === "future") {
+    return {
+      tone: "upcoming",
+      label: "Future Hunt",
+      message:
+        "This Hunt has not started yet. You can review its details here.",
+    };
+  }
+  if (!hunt.tasks.length) {
+    return {
+      tone: "needs-tasks",
+      label: "Needs tasks",
+      message: "This Hunt has no tasks yet.",
+    };
+  }
+  if (
+    hunt.endsAt !== null &&
+    Date.parse(hunt.endsAt) - now <= 24 * 60 * 60 * 1000
+  ) {
+    return {
+      tone: "soon",
+      label: "Ending soon",
+      message: "Hunt in progress. This Hunt ends within 24 hours.",
+    };
+  }
+  return {
+    tone: "active",
+    label: "Active",
+    message: "Hunt in progress.",
+  };
+}
+
+function isHuntCompleted(hunt: PlayerHunt): boolean {
+  return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
+}
+
+function updateHuntCardStatus(
+  card: HTMLElement,
+  hunt: PlayerHunt,
+  now: number,
+): void {
+  const completed = isHuntCompleted(hunt);
+  const presentation = completed
+    ? { tone: "completed", label: "Hunt complete" }
+    : huntStatusPresentation(hunt, now);
+  card.dataset.huntStatus = presentation.tone;
+  const badge = card.querySelector<HTMLElement>(".hunt-state-badge");
+  if (badge) {
+    badge.className = `hunt-state-badge hunt-state-${presentation.tone}`;
+    badge.dataset.status = presentation.tone;
+    badge.textContent = presentation.label;
+  }
+  const countdown = card.querySelector<HTMLElement>("[data-hunt-countdown]");
+  if (countdown) countdown.dataset.status = presentation.tone;
+}
+
+function formattedTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function contentLength(
+  value: string,
+  shortLimit: number,
+  mediumLimit: number,
+): "short" | "medium" | "long" {
+  const length = value.trim().length;
+  if (length <= shortLimit) return "short";
+  if (length <= mediumLimit) return "medium";
+  return "long";
+}
+
+function renderHunts(
+  list: HTMLUListElement,
+  hunts: PlayerHunt[],
+  now: number,
+): void {
   list.replaceChildren();
-  for (const hunt of hunts) {
+  for (const hunt of [...hunts].sort(
+    (left, right) => Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
+  )) {
     const item = document.createElement("li");
     item.className = "player-hunt";
+    const header = document.createElement("div");
+    header.className = "player-hunt-card-heading";
     const heading = document.createElement("h3");
     heading.textContent = hunt.name;
+    const badge = document.createElement("span");
+    badge.className = "hunt-state-badge";
+    const presentation = huntStatusPresentation(hunt, now);
+    badge.dataset.status = presentation.tone;
+    badge.textContent = presentation.label;
+    header.append(heading, badge);
     const description = document.createElement("p");
+    description.className = "player-hunt-description";
     description.textContent = hunt.description;
-    const open = document.createElement("button");
-    open.type = "button";
-    open.dataset.huntId = hunt.id;
-    open.textContent = "Open Hunt";
-    const tasks = document.createElement("ul");
-    tasks.setAttribute("aria-label", `${hunt.name} tasks`);
-    for (const task of hunt.tasks) {
-      const taskItem = document.createElement("li");
-      const label = document.createElement("span");
-      label.textContent = task.displayLabel;
-      const completion = document.createElement("span");
-      completion.className = "task-completion";
-      completion.textContent = task.completed ? "Completed" : "Not completed";
-      taskItem.append(label);
-      const location = taskLocationElement(task.location);
-      if (location) taskItem.append(location);
-      taskItem.append(completion);
-      tasks.append(taskItem);
-    }
-    item.append(heading, description, open, tasks);
+    const countdown = document.createElement("p");
+    countdown.className = "player-hunt-countdown";
+    countdown.dataset.huntCountdown = hunt.id;
+    countdown.textContent = countdownText(hunt, now);
+    const completed = hunt.tasks.filter((task) => task.completed).length;
+    const progress = document.createElement("p");
+    progress.className = "player-hunt-progress";
+    progress.textContent = hunt.tasks.length
+      ? `${completed} of ${hunt.tasks.length} tasks completed`
+      : "No tasks added yet";
+    item.dataset.huntId = hunt.id;
+    updateHuntCardStatus(item, hunt, now);
+    item.tabIndex = 0;
+    item.setAttribute("role", "button");
+    item.setAttribute("aria-label", `Open ${hunt.name}`);
+    item.append(header, description, countdown, progress);
     list.append(item);
   }
 }
@@ -116,8 +274,29 @@ export function mountDisplayTasks(
   const providerStatus = root.querySelector<HTMLElement>(
     '[data-testid="player-provider-status"]',
   );
+  const categories = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-categories"]',
+  );
   const list = root.querySelector<HTMLUListElement>(
     '[data-testid="player-hunt-list"]',
+  );
+  const futureList = root.querySelector<HTMLUListElement>(
+    '[data-testid="player-future-hunt-list"]',
+  );
+  const pastList = root.querySelector<HTMLUListElement>(
+    '[data-testid="player-past-hunt-list"]',
+  );
+  const activeEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="active-hunts-empty"]',
+  );
+  const futureEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="future-hunts-empty"]',
+  );
+  const pastEmpty = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunts-empty"]',
+  );
+  const huntDetails = root.querySelector<HTMLDialogElement>(
+    '[data-testid="player-hunt-details"]',
   );
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
@@ -172,7 +351,14 @@ export function mountDisplayTasks(
     !heading ||
     !status ||
     !providerStatus ||
+    !categories ||
     !list ||
+    !futureList ||
+    !pastList ||
+    !activeEmpty ||
+    !futureEmpty ||
+    !pastEmpty ||
+    !huntDetails ||
     !googleSignIn ||
     !signOut ||
     !account ||
@@ -222,10 +408,94 @@ export function mountDisplayTasks(
     copyAccountId.hidden = true;
     accountIdToggle.setAttribute("aria-expanded", "false");
     nameForm.hidden = true;
+    categories.hidden = true;
     huntLookup.hidden = true;
+    if (huntDetails.open) huntDetails.close();
     heading.textContent = "Sign in to see active Hunts";
     list.replaceChildren();
+    futureList.replaceChildren();
+    pastList.replaceChildren();
     status.textContent = message;
+  };
+
+  let displayedHunts: PlayerHunt[] = [];
+  let categorySignature = "";
+  let selectedHuntId: string | null = null;
+  let reloadSelectedHunt: (() => void) | undefined;
+  const renderCategories = (force = false): void => {
+    const now = Date.now();
+    const groups: Record<HuntPhase, PlayerHunt[]> = {
+      active: [],
+      future: [],
+      past: [],
+    };
+    for (const hunt of displayedHunts) groups[huntPhase(hunt, now)].push(hunt);
+    const signature = (Object.keys(groups) as HuntPhase[])
+      .map(
+        (phase) => `${phase}:${groups[phase].map((hunt) => hunt.id).join(",")}`,
+      )
+      .join("|");
+    if (force || signature !== categorySignature) {
+      const changed = Boolean(
+        categorySignature && signature !== categorySignature,
+      );
+      categorySignature = signature;
+      renderHunts(list, groups.active, now);
+      renderHunts(futureList, groups.future, now);
+      renderHunts(pastList, groups.past, now);
+      activeEmpty.hidden = groups.active.length > 0;
+      futureEmpty.hidden = groups.future.length > 0;
+      pastEmpty.hidden = groups.past.length > 0;
+      if (!force && changed && selectedHuntId)
+        window.setTimeout(() => reloadSelectedHunt?.(), 0);
+    }
+    const byId = new Map(displayedHunts.map((hunt) => [hunt.id, hunt]));
+    root
+      .querySelectorAll<HTMLElement>("[data-hunt-countdown]")
+      .forEach((element) => {
+        const hunt = byId.get(element.dataset.huntCountdown ?? "");
+        if (hunt) {
+          const text = countdownText(hunt, now);
+          if (element.textContent !== text) element.textContent = text;
+          const card = element.closest<HTMLElement>(".player-hunt");
+          if (card) updateHuntCardStatus(card, hunt, now);
+        }
+      });
+  };
+
+  const updateDisplayedHunt = (hunt: PlayerHunt): void => {
+    const index = displayedHunts.findIndex((item) => item.id === hunt.id);
+    if (index < 0) return;
+    const previousHunt = displayedHunts[index];
+    displayedHunts[index] = hunt;
+    const now = Date.now();
+    if (huntPhase(previousHunt, now) !== huntPhase(hunt, now)) {
+      renderCategories(true);
+      return;
+    }
+    const card = Array.from(
+      root.querySelectorAll<HTMLElement>(".player-hunt[data-hunt-id]"),
+    ).find((item) => item.dataset.huntId === hunt.id);
+    if (!card) return;
+    updateHuntCardStatus(card, hunt, now);
+    card.setAttribute("aria-label", `Open ${hunt.name}`);
+    const name = card.querySelector<HTMLElement>(
+      ".player-hunt-card-heading h3",
+    );
+    if (name) name.textContent = hunt.name;
+    const description = card.querySelector<HTMLElement>(
+      ".player-hunt-description",
+    );
+    if (description) description.textContent = hunt.description;
+    const countdown = card.querySelector<HTMLElement>("[data-hunt-countdown]");
+    if (countdown) countdown.textContent = countdownText(hunt, now);
+    const completed = hunt.tasks.filter((task) => task.completed).length;
+    const progress = card.querySelector<HTMLElement>(".player-hunt-progress");
+    if (progress) {
+      progress.textContent = hunt.tasks.length
+        ? `${completed} of ${hunt.tasks.length} tasks completed`
+        : "No tasks added yet";
+    }
   };
 
   const loadHunts = async (
@@ -236,13 +506,17 @@ export function mountDisplayTasks(
     providerStatus.hidden = true;
     nameForm.hidden = true;
     heading.textContent = "Your Hunts";
+    categories.hidden = false;
+    huntLookup.hidden = false;
     signOut.hidden = false;
     account.hidden = false;
-    displayName.textContent = `${name} (Player)`;
+    displayName.textContent = `${name} (Checking access…)`;
     void currentAccountRole().then((role) => {
       if (account.hidden || storedIdentity()?.accountId !== signedIn.accountId)
         return;
-      displayName.textContent = `${name} (${role === "administrator" ? "Admin" : "Player"})`;
+      displayName.textContent = role
+        ? `${name} (${role === "administrator" ? "Admin" : "Player"})`
+        : name;
     });
     email.textContent = signedIn.email;
     emailDetails.hidden = false;
@@ -259,7 +533,8 @@ export function mountDisplayTasks(
     accountIdToggle.setAttribute("aria-expanded", "false");
     copyAccountId.hidden = true;
     list.replaceChildren();
-    huntLookup.hidden = false;
+    futureList.replaceChildren();
+    pastList.replaceChildren();
     status.textContent = "Loading your hunts...";
     const result = await repository.listActiveHunts(signedIn);
     if (!result.ok) {
@@ -267,10 +542,11 @@ export function mountDisplayTasks(
       if (result.code === "unauthorized") void preparePlayerSignIn();
       return;
     }
-    renderHunts(list, result.value);
+    displayedHunts = result.value;
+    renderCategories(true);
     status.textContent = result.value.length
       ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
-      : "You have no saved hunts yet. Join one with its access code below.";
+      : "Your dashboard is ready. Join a hunt above to get started.";
   };
 
   const preparePlayerSignIn = async (): Promise<void> => {
@@ -298,6 +574,10 @@ export function mountDisplayTasks(
     }
   };
   let pendingIdentity: PlayerIdentity | null = null;
+  const pageParams = new URLSearchParams(location.search);
+  const sharedCode = pageParams.get("accessCode")?.trim().toUpperCase() ?? "";
+  const autoJoin = pageParams.get("autoJoin") === "1";
+  let sharedLinkJoinPending = false;
 
   const requestDisplayName = (signedIn: PlayerIdentity): void => {
     pendingIdentity = signedIn;
@@ -307,7 +587,9 @@ export function mountDisplayTasks(
     accountIdDetails.hidden = true;
     heading.textContent = "Set up your player profile";
     nameForm.hidden = false;
+    categories.hidden = true;
     huntLookup.hidden = true;
+    if (huntDetails.open) huntDetails.close();
     signOut.hidden = false;
     nameInput.value = "";
     nameInput.focus();
@@ -332,7 +614,11 @@ export function mountDisplayTasks(
     }
     pendingIdentity = null;
     providerStatus.hidden = true;
-    void loadHunts(signedIn, name);
+    if (sharedCode) {
+      window.setTimeout(submitSharedLinkJoin, 0);
+    } else {
+      void loadHunts(signedIn, name);
+    }
   });
 
   const toggleSensitiveValue = (
@@ -393,21 +679,81 @@ export function mountDisplayTasks(
     '[data-testid="player-hunt-form"]',
   );
   const huntInput = root.querySelector<HTMLInputElement>('[name="accessCode"]');
+  const submitSharedLinkJoin = (): void => {
+    sharedLinkJoinPending = true;
+    if (autoJoin) {
+      huntForm?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    } else {
+      huntForm?.requestSubmit();
+    }
+  };
   const huntName = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-name"]',
   );
-  const huntTasks = root.querySelector<HTMLUListElement>(
+  const huntDescription = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-description"]',
+  );
+  const huntFacts = root.querySelector<HTMLDListElement>(
+    '[data-testid="player-hunt-facts"]',
+  );
+  const huntTasks = root.querySelector<HTMLOListElement>(
     '[data-testid="player-task-list"]',
+  );
+  const huntTasksSection = huntTasks?.closest<HTMLElement>(".details-tasks");
+  const huntOverviewSection =
+    huntFacts?.closest<HTMLElement>(".details-overview");
+  if (huntTasksSection && huntOverviewSection) {
+    huntTasksSection.after(huntOverviewSection);
+  }
+  const huntNoTasks = root.querySelector<HTMLElement>(
+    '[data-testid="player-hunt-no-tasks"]',
   );
   const huntStatus = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-lookup-status"]',
   );
-  if (huntForm && huntInput && huntName && huntTasks && huntStatus) {
+  const closeHuntDetails = root.querySelectorAll<HTMLButtonElement>(
+    '[data-testid="close-player-hunt-details"], [data-testid="back-to-hunts"]',
+  );
+  if (
+    huntForm &&
+    huntInput &&
+    huntName &&
+    huntDescription &&
+    huntFacts &&
+    huntTasks &&
+    huntNoTasks &&
+    huntStatus
+  ) {
+    const intro = document.createElement("div");
+    intro.className = "player-hunt-intro";
+    huntName.before(intro);
+    intro.append(huntName, huntDescription, huntStatus);
+
     let huntRequest = 0;
+    const addFact = (labelText: string, valueText: string): void => {
+      const fact = document.createElement("div");
+      fact.className = "hunt-fact";
+      const label = document.createElement("dt");
+      label.textContent = labelText;
+      const value = document.createElement("dd");
+      value.textContent = valueText;
+      fact.append(label, value);
+      huntFacts.append(fact);
+    };
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
+      selectedHuntId = huntId;
+      if (!huntDetails.open) {
+        huntDetails.scrollTop = 0;
+        huntDetails.showModal();
+        document.body.classList.add("player-hunt-modal-open");
+      }
       huntTasks.replaceChildren();
-      huntStatus.textContent = "Loading hunt...";
+      huntFacts.replaceChildren();
+      huntNoTasks.hidden = true;
+      huntStatus.textContent = "Loading Hunt details...";
       const identity = storedIdentity();
       if (!identity) {
         huntStatus.textContent = "Sign in with Google first.";
@@ -420,57 +766,185 @@ export function mountDisplayTasks(
         if (result.code === "unauthorized") void preparePlayerSignIn();
         return;
       }
-      huntId = result.value.id;
-      await loadHunts(
-        identity,
-        storedDisplayName(identity.accountId) ?? identity.email,
-      );
       if (requestId !== huntRequest) return;
-      huntName.textContent = result.value.name;
-      huntStatus.textContent = result.value.tasks.length
-        ? `${result.value.tasks.length} tasks loaded.`
-        : "This Hunt has no tasks yet.";
-      for (const task of result.value.tasks) {
+      const hunt = result.value;
+      updateDisplayedHunt(hunt);
+      huntId = hunt.id;
+      const now = Date.now();
+      const phase = huntPhase(hunt, now);
+      const completed = hunt.tasks.filter((task) => task.completed).length;
+      huntName.textContent = hunt.name;
+      huntName.dataset.contentLength = contentLength(hunt.name, 28, 56);
+      huntDescription.textContent = hunt.description;
+      huntDescription.dataset.contentLength = contentLength(
+        hunt.description,
+        120,
+        280,
+      );
+      const completedHunt = isHuntCompleted(hunt);
+      const presentation = huntStatusPresentation(hunt, now);
+      huntStatus.textContent = completedHunt
+        ? "Hunt complete! Every task is finished."
+        : presentation.message;
+      huntStatus.dataset.status = completedHunt
+        ? "completed"
+        : presentation.tone;
+      addFact("Status", completedHunt ? "Hunt completed" : presentation.label);
+      addFact("Starts", formattedTime(hunt.beginsAt));
+      addFact(
+        "Ends",
+        hunt.endsAt ? formattedTime(hunt.endsAt) : "No end time set",
+      );
+      const timeFact = document.createElement("div");
+      timeFact.className = "hunt-fact";
+      const timeLabel = document.createElement("dt");
+      timeLabel.textContent =
+        phase === "future" ? "Starts in" : "Time remaining";
+      const timeValue = document.createElement("dd");
+      timeValue.dataset.huntCountdown = hunt.id;
+      timeValue.dataset.status = presentation.tone;
+      timeValue.textContent = countdownText(hunt, now);
+      timeFact.append(timeLabel, timeValue);
+      huntFacts.append(timeFact);
+      addFact(
+        "Progress",
+        hunt.tasks.length
+          ? `${completed} of ${hunt.tasks.length} tasks completed`
+          : "No tasks added yet",
+      );
+      huntNoTasks.hidden = hunt.tasks.length > 0;
+      const canAnswer = phase === "active";
+      for (const task of hunt.tasks) {
         const item = document.createElement("li");
+        item.className = "hunt-detail-task";
         item.dataset.testid = "player-task";
-        const label = document.createElement("strong");
+        const heading = document.createElement("div");
+        heading.className = "hunt-detail-task-heading";
+        const label = document.createElement("h4");
         label.textContent = task.displayLabel;
         const state = document.createElement("p");
+        state.className = task.completed
+          ? "task-completion completed"
+          : "task-completion";
         state.textContent = task.completed ? "Completed" : "Incomplete";
-        item.append(label, state);
+        heading.append(label, state);
+        const location = taskLocationElement(task.location);
+        if (location) heading.append(location);
+        item.append(heading);
         if (task.description) {
           const description = document.createElement("p");
           description.textContent = task.description;
           item.append(description);
         }
-        const location = taskLocationElement(task.location);
-        if (location) item.append(location);
-        if (!task.completed) {
+        if (
+          !task.completed &&
+          canAnswer &&
+          task.taskType === "multiple-choice"
+        ) {
+          const choices = document.createElement("div");
+          choices.className = "task-answer-choices";
+          choices.setAttribute("role", "group");
+          choices.setAttribute("aria-label", `Answer for ${task.displayLabel}`);
+          const message = document.createElement("p");
+          message.className = "task-answer-choice-message";
+          message.setAttribute("role", "status");
+          const incorrect = new Set(task.incorrectChoices ?? []);
+          const buttons: HTMLButtonElement[] = [];
+          const refresh = (): void => {
+            for (const button of buttons) {
+              button.disabled = incorrect.has(button.value);
+              button.textContent =
+                button.value +
+                (incorrect.has(button.value) ? " — Incorrect" : "");
+            }
+          };
+          for (const choice of task.choices ?? []) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "task-answer-choice";
+            button.value = choice;
+            buttons.push(button);
+            button.addEventListener("click", async () => {
+              for (const option of buttons) option.disabled = true;
+              message.textContent = "Checking answer…";
+              try {
+                const result = await repository.answerAccountTask(
+                  huntId,
+                  task.id,
+                  choice,
+                  identity,
+                );
+                if (requestId !== huntRequest) return;
+                if (!result.ok) {
+                  message.textContent = result.message;
+                  if (result.message.includes("Hunt Ended")) {
+                    await loadHunt(huntId);
+                    return;
+                  }
+                  if (result.code === "unauthorized")
+                    void preparePlayerSignIn();
+                } else if (result.value.completed) {
+                  state.textContent = "Completed";
+                  choices.remove();
+                  await loadHunt(huntId);
+                  return;
+                } else {
+                  incorrect.add(choice);
+                  message.textContent =
+                    "Incorrect answer. Choose another option.";
+                }
+              } catch {
+                message.textContent =
+                  "The answer service could not be reached. Try again.";
+              } finally {
+                refresh();
+              }
+            });
+            choices.append(button);
+          }
+          refresh();
+          choices.append(message);
+          item.append(choices);
+        } else if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
+          answerForm.className = "task-answer-form";
           const answerLabel = document.createElement("label");
+          answerLabel.className = "task-answer-label";
           answerLabel.textContent = `Answer for ${task.displayLabel}`;
           const answer = document.createElement("input");
+          answer.type = "text";
+          answer.className = "task-answer-input";
           answer.required = true;
           answerLabel.append(answer);
+          const actions = document.createElement("div");
+          actions.className = "task-answer-actions";
           const submit = document.createElement("button");
           submit.type = "submit";
+          submit.className = "task-answer-submit";
           submit.textContent = "Submit answer";
           const message = document.createElement("p");
+          message.className = "task-answer-message";
           message.setAttribute("role", "status");
-          answerForm.append(answerLabel, submit, message);
+          actions.append(submit, message);
+          answerForm.append(answerLabel, actions);
           answerForm.addEventListener("submit", async (event) => {
             event.preventDefault();
             submit.disabled = true;
             try {
-              const result = await repository.answerAccountTask(
+              const answerResult = await repository.answerAccountTask(
                 huntId,
                 task.id,
                 answer.value,
                 identity,
               );
-              if (!result.ok) {
-                message.textContent = result.message;
-                if (result.code === "unauthorized") void preparePlayerSignIn();
+              if (!answerResult.ok) {
+                if (answerResult.message.includes("Hunt Ended")) {
+                  await loadHunt(huntId);
+                  return;
+                }
+                message.textContent = answerResult.message;
+                if (answerResult.code === "unauthorized")
+                  void preparePlayerSignIn();
                 return;
               }
               await loadHunt(huntId);
@@ -485,45 +959,109 @@ export function mountDisplayTasks(
         huntTasks.append(item);
       }
     };
+    reloadSelectedHunt = () => {
+      if (selectedHuntId) void loadHunt(selectedHuntId);
+    };
+    const closeDetails = (): void => {
+      selectedHuntId = null;
+      if (huntDetails.open) huntDetails.close();
+    };
+    closeHuntDetails.forEach((button) =>
+      button.addEventListener("click", closeDetails),
+    );
+    huntInput.addEventListener("input", () => {
+      const start = huntInput.selectionStart;
+      const end = huntInput.selectionEnd;
+      huntInput.value = huntInput.value.toUpperCase();
+      if (start !== null && end !== null)
+        huntInput.setSelectionRange(start, end);
+    });
     huntForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const isSharedLinkJoin = sharedLinkJoinPending;
+      sharedLinkJoinPending = false;
       const identity = storedIdentity();
       if (!identity) {
         huntStatus.textContent = "Sign in with Google first.";
         return;
       }
+      const accessCode = (
+        isSharedLinkJoin && autoJoin ? sharedCode : huntInput.value
+      )
+        .trim()
+        .toUpperCase();
+      huntInput.value = isSharedLinkJoin && autoJoin ? "" : accessCode;
       const button = huntForm.querySelector<HTMLButtonElement>(
         'button[type="submit"], button',
       );
       if (button) button.disabled = true;
       const requestId = ++huntRequest;
-      huntStatus.textContent = "Joining hunt...";
+      huntStatus.textContent = "Joining Hunt...";
       try {
-        const result = await repository.joinHunt(
-          huntInput.value.trim(),
-          identity,
-        );
+        const result = await repository.joinHunt(accessCode, identity);
         if (requestId !== huntRequest) return;
         if (!result.ok) {
           huntStatus.textContent = result.message;
           if (result.code === "unauthorized") void preparePlayerSignIn();
           return;
         }
-        await loadHunt(result.value.huntId);
+        if (isSharedLinkJoin) {
+          await loadHunts(
+            identity,
+            storedDisplayName(identity.accountId) ?? identity.email,
+          );
+          huntStatus.textContent =
+            "You joined the Hunt. It is now in your list.";
+        } else {
+          await loadHunt(result.value.huntId);
+        }
+      } catch {
+        huntStatus.textContent = "The Hunt service could not be reached.";
       } finally {
         if (button) button.disabled = false;
       }
     });
-    list.addEventListener("click", (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-        "button[data-hunt-id]",
+    const openHuntFromCard = (target: EventTarget | null): void => {
+      const card = (target as HTMLElement | null)?.closest<HTMLElement>(
+        ".player-hunt[data-hunt-id]",
       );
-      if (button) void loadHunt(button.dataset.huntId ?? "");
+      if (card) void loadHunt(card.dataset.huntId ?? "");
+    };
+    categories.addEventListener("click", (event) => {
+      openHuntFromCard(event.target);
     });
-    const sharedCode = new URLSearchParams(location.search).get("accessCode");
-    if (sharedCode) huntInput.value = sharedCode;
-    const selectedHunt = new URLSearchParams(location.search).get("huntId");
-    if (selectedHunt && previousIdentity) void loadHunt(selectedHunt);
+    categories.addEventListener("keydown", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest(".player-hunt[data-hunt-id]") &&
+        (event.key === "Enter" || event.key === " ")
+      ) {
+        event.preventDefault();
+        openHuntFromCard(event.target);
+      }
+    });
+    huntDetails.addEventListener("close", () => {
+      selectedHuntId = null;
+      document.body.classList.remove("player-hunt-modal-open");
+      renderCategories();
+    });
+    const timer = window.setInterval(() => {
+      if (!huntDetails.open) renderCategories();
+    }, 1000);
+    window.addEventListener("pagehide", () => window.clearInterval(timer), {
+      once: true,
+    });
+    if (sharedCode && !autoJoin) huntInput.value = sharedCode;
+    const requestedHunt = new URLSearchParams(location.search).get("huntId");
+    if (
+      sharedCode &&
+      previousIdentity &&
+      storedDisplayName(previousIdentity.accountId)
+    ) {
+      window.setTimeout(submitSharedLinkJoin, 0);
+    } else if (requestedHunt && previousIdentity) {
+      void loadHunt(requestedHunt);
+    }
   }
 
   signOut.addEventListener("click", () => {

@@ -1,5 +1,6 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
+  HuntStatus,
   OperationResult,
   PlayerHunt,
   PlayerIdentity,
@@ -44,15 +45,28 @@ export function createHuntRepository(): HuntRepository {
   async function creatorRequest<T>(
     path: string,
     input?: unknown,
+    method?: string,
   ): Promise<OperationResult<T>> {
     const session = await getCreatorSession();
     if (!session.ok) return session;
-    return request(path, input);
+    return request(path, input, method);
   }
   return {
     createHunt: (input) => creatorRequest("/api/admin/hunts", input),
     addTask: (id, input) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}/tasks`, input),
+    updateTask: (id, taskId, input) =>
+      creatorRequest(
+        `/api/admin/hunts/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`,
+        input,
+        "PATCH",
+      ),
+    deleteTask: (id, taskId) =>
+      creatorRequest(
+        `/api/admin/hunts/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}`,
+        undefined,
+        "DELETE",
+      ),
     getAdminHunt: (id) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
@@ -152,6 +166,16 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     typeof candidate.id !== "string" ||
     typeof candidate.name !== "string" ||
     typeof candidate.description !== "string" ||
+    typeof candidate.beginsAt !== "string" ||
+    !Number.isFinite(Date.parse(candidate.beginsAt)) ||
+    !(
+      candidate.endsAt === null ||
+      (typeof candidate.endsAt === "string" &&
+        Number.isFinite(Date.parse(candidate.endsAt)))
+    ) ||
+    (candidate.status !== "draft" &&
+      candidate.status !== "published" &&
+      candidate.status !== "archived") ||
     !Array.isArray(candidate.tasks)
   ) {
     throw new TypeError("Invalid Player Hunt response.");
@@ -188,6 +212,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     id: candidate.id,
     name: candidate.name,
     description: candidate.description,
+    beginsAt: candidate.beginsAt as string,
+    endsAt: candidate.endsAt as string | null,
+    status: candidate.status as HuntStatus,
     tasks,
   };
 }

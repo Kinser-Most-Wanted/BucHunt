@@ -129,13 +129,19 @@ function newAccessCode(hunts: HuntDefinition[]): string {
   } while (hunts.some((hunt) => hunt.accessCode === code));
   return code;
 }
-export function isHuntAvailable(
+export function isHuntJoinable(
   hunt: HuntDefinition,
   now = Date.now(),
 ): boolean {
   return (
     hunt.status !== "archived" &&
-    hunt.tasks.length > 0 &&
+    (hunt.endsAt === null || now < Date.parse(hunt.endsAt))
+  );
+}
+
+export function isHuntActive(hunt: HuntDefinition, now = Date.now()): boolean {
+  return (
+    hunt.status !== "archived" &&
     Date.parse(hunt.beginsAt) <= now &&
     (hunt.endsAt === null || now < Date.parse(hunt.endsAt))
   );
@@ -202,6 +208,8 @@ export class HuntStore {
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "taskType",
+      "choices",
       "displayLabel",
       "description",
       "requiredAnswer",
@@ -220,6 +228,55 @@ export class HuntStore {
       accepted(validateHunt(hunt));
       hunt.tasks.sort((left, right) => left.order - right.order);
       return task;
+    });
+  }
+  async updateTask(
+    id: string,
+    taskId: string,
+    input: unknown,
+  ): Promise<TaskDefinition> {
+    const fields = object(input);
+    inputFields(fields, [
+      "taskType",
+      "choices",
+      "displayLabel",
+      "description",
+      "requiredAnswer",
+      "location",
+      "order",
+      "answerCaseSensitive",
+      "hint",
+      "points",
+    ]);
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      const index = hunt.tasks.findIndex((item) => item.id === taskId);
+      if (index < 0) throw new StoreError("not-found", "Task not found.");
+      const previous = hunt.tasks[index];
+      if (!previous) throw new StoreError("not-found", "Task not found.");
+      const task = {
+        ...previous,
+        ...fields,
+        id: previous.id,
+      } as TaskDefinition;
+      hunt.tasks[index] = task;
+      hunt.updatedAt = new Date().toISOString();
+      accepted(validateHunt(hunt));
+      hunt.tasks.sort((left, right) => left.order - right.order);
+      return task;
+    });
+  }
+  async deleteTask(id: string, taskId: string): Promise<{ deleted: true }> {
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      const index = hunt.tasks.findIndex((item) => item.id === taskId);
+      if (index < 0) throw new StoreError("not-found", "Task not found.");
+      hunt.tasks.splice(index, 1);
+      hunt.updatedAt = new Date().toISOString();
+      accepted(validateHunt(hunt));
+      return { deleted: true as const };
     });
   }
 }

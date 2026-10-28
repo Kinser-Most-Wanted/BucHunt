@@ -64,7 +64,43 @@ function showIssues(root: HTMLElement, messages: string[]): void {
   }
 }
 
-function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
+let leafletLoad: Promise<LeafletApi> | null = null;
+
+function loadLeaflet(): Promise<LeafletApi> {
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletLoad) return leafletLoad;
+
+  leafletLoad = new Promise<LeafletApi>((resolve, reject) => {
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    stylesheet.integrity =
+      "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+    stylesheet.crossOrigin = "";
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+    script.crossOrigin = "";
+    script.async = true;
+    script.onload = () => {
+      if (window.L) resolve(window.L);
+      else reject(new Error("Leaflet did not initialize."));
+    };
+    script.onerror = () => reject(new Error("Leaflet could not be loaded."));
+    document.head.append(stylesheet, script);
+  }).catch((error: unknown) => {
+    leafletLoad = null;
+    throw error;
+  });
+
+  return leafletLoad;
+}
+
+function mountLocationPicker(
+  root: HTMLElement,
+  form: HTMLFormElement,
+): ((point: MapPoint, label?: string) => void) | undefined {
   const mapElement = root.querySelector<HTMLDivElement>(
     '[data-testid="task-location-map"]',
   );
@@ -93,45 +129,102 @@ function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
   )
     return;
 
-  const L = window.L;
-  if (!L) {
-    status.textContent =
-      "The map library could not load. Refresh the page to try again.";
-    return;
-  }
-
-  const map = L.map(mapElement, { scrollWheelZoom: false }).setView(
-    DEFAULT_MAP_CENTER,
-    16,
-  );
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
-
+  let map: LeafletMap | null = null;
   let marker: LeafletMarker | null = null;
+  let mapReady: Promise<void> | null = null;
+  let pendingLocation: { point: MapPoint; label?: string } | null = null;
   let lastSearchAt = 0;
   const searchCache = new Map<string, { point: MapPoint; label: string }>();
+
   const setLocation = (point: MapPoint, label?: string): void => {
     latitude.value = String(point.lat);
     longitude.value = String(point.lng);
-    if (marker) marker.setLatLng(point);
-    else {
-      marker = L.marker([point.lat, point.lng], { draggable: true }).addTo(map);
-      marker.on("dragend", () => {
-        if (marker) setLocation(marker.getLatLng());
-      });
+    pendingLocation = { point, label };
+    if (map && window.L) {
+      if (marker) marker.setLatLng(point);
+      else {
+        marker = window.L.marker([point.lat, point.lng], {
+          draggable: true,
+        }).addTo(map);
+        marker.on("dragend", () => {
+          if (marker) setLocation(marker.getLatLng());
+        });
+      }
+      pendingLocation = null;
     }
     coordinates.textContent = label
       ? `${label} · ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`
       : `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
     coordinates.hidden = false;
-    status.textContent =
-      "Location selected. Click the map or drag the pin to adjust it.";
+    status.textContent = map
+      ? "Location selected. Click the map or drag the pin to adjust it."
+      : "Location saved. The map will appear when it is ready.";
   };
 
-  map.on("click", (event) => setLocation(event.latlng));
+  const initializeMap = (): Promise<void> => {
+    if (map) return Promise.resolve();
+    if (mapReady) return mapReady;
+    status.textContent = "Loading the location map…";
+    mapReady = loadLeaflet()
+      .then((leaflet) => {
+        map = leaflet
+          .map(mapElement, { scrollWheelZoom: false })
+          .setView(DEFAULT_MAP_CENTER, 16);
+        leaflet
+          .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          })
+          .addTo(map);
+        map.on("click", (event) => setLocation(event.latlng));
+        window.requestAnimationFrame(() => map?.invalidateSize());
+
+        const savedLocation =
+          pendingLocation ??
+          (latitude.value && longitude.value
+            ? {
+                point: {
+                  lat: Number(latitude.value),
+                  lng: Number(longitude.value),
+                },
+              }
+            : null);
+        if (savedLocation)
+          setLocation(savedLocation.point, savedLocation.label);
+        else
+          status.textContent =
+            "Search for a place or click the map to choose a location.";
+      })
+      .catch(() => {
+        mapReady = null;
+        status.textContent =
+          "The map could not load. Check your connection and try again.";
+      });
+    return mapReady;
+  };
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          void initializeMap();
+        }
+      },
+      { rootMargin: "120px" },
+    );
+    observer.observe(mapElement);
+  } else {
+    searchControls.addEventListener("focusin", () => void initializeMap(), {
+      once: true,
+    });
+    mapElement.addEventListener("pointerenter", () => void initializeMap(), {
+      once: true,
+    });
+  }
+  document.addEventListener("hunt-details-edit", () => void initializeMap());
+
   const searchButton =
     searchControls.querySelector<HTMLButtonElement>("button");
   const search = async (): Promise<void> => {
@@ -141,11 +234,13 @@ function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
       return;
     }
 
-    const key = query.toLocaleLowerCase();
-    let result = searchCache.get(key);
     if (searchButton) searchButton.disabled = true;
     status.textContent = "Searching the map…";
     try {
+      await initializeMap();
+      if (!map) throw new Error("Map unavailable.");
+      const key = query.toLocaleLowerCase();
+      let result = searchCache.get(key);
       if (!result) {
         const wait = Math.max(0, 1100 - (Date.now() - lastSearchAt));
         if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -199,10 +294,11 @@ function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
   });
 
   form.addEventListener("reset", () => {
-    if (marker) {
+    if (marker && map) {
       map.removeLayer(marker);
       marker = null;
     }
+    pendingLocation = null;
     coordinates.textContent = "";
     coordinates.hidden = true;
     queryInput.value = "";
@@ -210,9 +306,11 @@ function mountLocationPicker(root: HTMLElement, form: HTMLFormElement): void {
       "Search for a place or click the map to choose a location.";
   });
 
-  status.textContent =
-    "Search for a place or click the map to choose a location.";
-  window.requestAnimationFrame(() => map.invalidateSize());
+  status.textContent = "The map loads when the task location picker is shown.";
+  return (point, label) => {
+    if (map) map.setView([point.lat, point.lng], 18);
+    setLocation(point, label);
+  };
 }
 
 function renderTasks(root: HTMLElement, tasks: TaskDefinition[]): void {
@@ -236,7 +334,24 @@ function renderTasks(root: HTMLElement, tasks: TaskDefinition[]): void {
     const description = document.createElement("span");
     description.textContent = task.description;
     content.append(label, description);
-    item.append(order, content);
+
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.dataset.testid = "edit-task";
+    edit.dataset.taskAction = "edit";
+    edit.dataset.taskId = task.id;
+    edit.setAttribute("aria-label", `Edit task: ${task.displayLabel}`);
+    edit.textContent = "Edit";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.testid = "delete-task";
+    remove.dataset.taskAction = "delete";
+    remove.dataset.taskId = task.id;
+    remove.setAttribute("aria-label", `Delete task: ${task.displayLabel}`);
+    remove.textContent = "Delete";
+
+    item.append(order, content, edit, remove);
     list.append(item);
   }
 }
@@ -249,58 +364,250 @@ export function mountDefineTask(
   const form = root.querySelector<HTMLFormElement>('[data-testid="task-form"]');
   const status = root.querySelector<HTMLElement>('[data-testid="task-status"]');
   if (!form || !status) return;
-  mountLocationPicker(root, form);
-  root.addEventListener("hunt-selected", () => {
-    renderTasks(root, []);
-    showIssues(root, []);
+  const setTaskLocation = mountLocationPicker(root, form);
+  const taskType = form.querySelector<HTMLSelectElement>('[name="taskType"]');
+  const updateTaskFields = (): void => {
+    for (const group of form.querySelectorAll<HTMLElement>(
+      "[data-task-fields]",
+    )) {
+      const active = group.dataset.taskFields === taskType?.value;
+      group.hidden = !active;
+      for (const input of group.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input, textarea"))
+        input.disabled = !active;
+    }
+  };
+  taskType?.addEventListener("change", updateTaskFields);
+  form.addEventListener("reset", () => {
+    if (taskType) taskType.value = "";
+    updateTaskFields();
+  });
+  updateTaskFields();
+  const taskList = root.querySelector<HTMLOListElement>(
+    '[data-testid="defined-task-list"]',
+  );
+  const submitButton = form.querySelector<HTMLButtonElement>(
+    'button[type="submit"]',
+  );
+  if (!taskList || !submitButton) return;
+  const addTaskLabel = submitButton.textContent ?? "Add task to hunt";
+  const cancelEdit = document.createElement("button");
+  cancelEdit.type = "button";
+  cancelEdit.dataset.testid = "cancel-task-edit";
+  cancelEdit.textContent = "Cancel edit";
+  cancelEdit.hidden = true;
+  submitButton.after(cancelEdit);
+
+  let displayedTasks: TaskDefinition[] = [];
+  let editingTaskId: string | null = null;
+  const huntInput = field<HTMLInputElement>(form, "huntId");
+  const orderInput = field<HTMLInputElement>(form, "order");
+  const resetEditor = (huntId = huntInput?.value.trim() ?? ""): void => {
+    editingTaskId = null;
+    submitButton.textContent = addTaskLabel;
+    cancelEdit.hidden = true;
+    form.reset();
+    if (huntInput) huntInput.value = huntId;
+    const points = field<HTMLInputElement>(form, "points");
+    if (points) points.value = "0";
+    if (orderInput)
+      orderInput.value = String(
+        Math.max(0, ...displayedTasks.map((task) => task.order)) + 1,
+      );
+  };
+  const showTasks = (tasks: TaskDefinition[]): void => {
+    displayedTasks = tasks;
+    renderTasks(root, tasks);
+  };
+  const editTask = (task: TaskDefinition): void => {
+    editingTaskId = task.id;
+    submitButton.textContent = "Save task changes";
+    cancelEdit.hidden = false;
+    const multipleChoice = task.taskType === "multiple-choice";
+    if (taskType) {
+      taskType.value = task.taskType ?? "single-word-trivia";
+      updateTaskFields();
+    }
+    const displayLabel = field<HTMLInputElement>(form, "displayLabel");
+    const description = field<HTMLInputElement | HTMLTextAreaElement>(
+      form,
+      multipleChoice ? "question" : "description",
+    );
+    const requiredAnswer = field<HTMLInputElement>(
+      form,
+      multipleChoice ? "correctAnswer" : "requiredAnswer",
+    );
+    const latitude = field<HTMLInputElement>(form, "latitude");
+    const longitude = field<HTMLInputElement>(form, "longitude");
     const order = field<HTMLInputElement>(form, "order");
-    if (order) order.value = "1";
-    status.textContent =
-      "Hunt selection updated. Add a task or load its saved tasks.";
+    const points = field<HTMLInputElement>(form, "points");
+    const hint = field<HTMLInputElement>(form, "hint");
+    const answerCaseSensitive = field<HTMLInputElement>(
+      form,
+      "answerCaseSensitive",
+    );
+    if (displayLabel) displayLabel.value = task.displayLabel;
+    if (description) description.value = task.description;
+    if (requiredAnswer) requiredAnswer.value = task.requiredAnswer;
+    if (multipleChoice) {
+      const incorrectChoices = (task.choices ?? []).filter(
+        (choice) => choice !== task.requiredAnswer,
+      );
+      for (const index of [1, 2, 3]) {
+        const input = field<HTMLInputElement>(form, `incorrectAnswer${index}`);
+        if (input) input.value = incorrectChoices[index - 1] ?? "";
+      }
+    }
+    if (latitude) latitude.value = String(task.location.latitude);
+    if (longitude) longitude.value = String(task.location.longitude);
+    if (order) order.value = String(task.order);
+    if (points) points.value = String(task.points);
+    if (hint) hint.value = task.hint ?? "";
+    if (answerCaseSensitive)
+      answerCaseSensitive.checked = task.answerCaseSensitive;
+    setTaskLocation?.({
+      lat: task.location.latitude,
+      lng: task.location.longitude,
+    });
+    showIssues(root, []);
+    status.textContent = `Editing “${task.displayLabel}”. Save your changes or cancel the edit.`;
+    displayLabel?.focus();
+  };
+
+  cancelEdit.addEventListener("click", () => {
+    resetEditor();
+    status.textContent = "Task edit cancelled.";
   });
 
-  root
-    .querySelector('[data-testid="load-admin-hunt"]')
-    ?.addEventListener("click", async () => {
-      const id = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
-      if (!id) {
-        status.textContent = "Choose a hunt from My hunts first.";
+  root.addEventListener("hunt-selected", () => {
+    showTasks([]);
+    if (editingTaskId) resetEditor();
+    showIssues(root, []);
+    if (orderInput) orderInput.value = "1";
+    status.textContent = "Hunt selected. Add or update its tasks below.";
+  });
+
+  root.addEventListener("load-hunt-tasks", async (event) => {
+    const preloaded = (
+      event as CustomEvent<{ tasks?: TaskDefinition[]; huntName?: string }>
+    ).detail;
+    const id = huntInput?.value.trim() ?? "";
+    if (!id) {
+      status.textContent = "Choose a hunt from My hunts first.";
+      return;
+    }
+    if (preloaded?.tasks) {
+      if (editingTaskId) resetEditor(id);
+      showTasks(preloaded.tasks);
+      if (orderInput)
+        orderInput.value = String(
+          Math.max(0, ...preloaded.tasks.map((task) => task.order)) + 1,
+        );
+      status.textContent = `${preloaded.tasks.length} tasks loaded for ${preloaded.huntName ?? "this hunt"}.`;
+      window.dispatchEvent(new Event("resize"));
+      return;
+    }
+    try {
+      const result = await repository.getAdminHunt(id);
+      if (!result.ok) {
+        showIssues(root, [result.message]);
         return;
       }
-      try {
-        const result = await repository.getAdminHunt(id);
-        if (!result.ok) {
-          showIssues(root, [result.message]);
-          return;
-        }
-        renderTasks(root, result.value.tasks);
-        const order = field<HTMLInputElement>(form, "order");
-        if (order)
-          order.value = String(
-            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
-          );
-        status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
-      } catch {
-        status.textContent = "The hunt service could not be reached.";
+      if (editingTaskId) resetEditor(id);
+      showTasks(result.value.tasks);
+      if (orderInput)
+        orderInput.value = String(
+          Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+        );
+      status.textContent = `${result.value.tasks.length} tasks loaded for ${result.value.name}.`;
+      window.dispatchEvent(new Event("resize"));
+    } catch {
+      status.textContent = "The hunt service could not be reached.";
+    }
+  });
+
+  taskList.addEventListener("click", async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "button[data-task-action]",
+    );
+    if (!button) return;
+    const task = displayedTasks.find(
+      (item) => item.id === button.dataset.taskId,
+    );
+    if (!task) return;
+    if (button.dataset.taskAction === "edit") {
+      editTask(task);
+      return;
+    }
+    if (button.dataset.taskAction !== "delete") return;
+    if (!window.confirm(`Delete “${task.displayLabel}” from this hunt?`))
+      return;
+
+    const huntId = huntInput?.value.trim() ?? "";
+    if (!huntId) {
+      status.textContent = "Choose a hunt from My hunts first.";
+      return;
+    }
+    button.disabled = true;
+    status.textContent = `Deleting “${task.displayLabel}”…`;
+    try {
+      const deleted = await repository.deleteTask(huntId, task.id);
+      if (!deleted.ok) {
+        showIssues(
+          root,
+          deleted.issues?.map((issue) => issue.message) ?? [deleted.message],
+        );
+        status.textContent = "Task was not deleted.";
+        return;
       }
-    });
+      showTasks(displayedTasks.filter((item) => item.id !== task.id));
+      if (editingTaskId === task.id) resetEditor(huntId);
+      const result = await repository.getAdminHunt(huntId);
+      if (result.ok) showTasks(result.value.tasks);
+      status.textContent = result.ok
+        ? `“${task.displayLabel}” was deleted from this hunt.`
+        : `“${task.displayLabel}” was deleted, but the task list could not be refreshed: ${result.message}`;
+    } catch {
+      status.textContent = "The task service could not be reached. Try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     showIssues(root, []);
 
-    const huntId = field<HTMLInputElement>(form, "huntId")?.value.trim() ?? "";
+    const huntId = huntInput?.value.trim() ?? "";
     const displayLabel =
       field<HTMLInputElement>(form, "displayLabel")?.value.trim() ?? "";
+    const multipleChoice = taskType?.value === "multiple-choice";
     const description =
-      field<HTMLTextAreaElement>(form, "description")?.value.trim() ?? "";
+      field<HTMLInputElement | HTMLTextAreaElement>(
+        form,
+        multipleChoice ? "question" : "description",
+      )?.value.trim() ?? "";
     const requiredAnswer =
-      field<HTMLInputElement>(form, "requiredAnswer")?.value.trim() ?? "";
+      field<HTMLInputElement>(
+        form,
+        multipleChoice ? "correctAnswer" : "requiredAnswer",
+      )?.value.trim() ?? "";
+    const choices = [
+      requiredAnswer,
+      ...[1, 2, 3].map(
+        (index) =>
+          field<HTMLInputElement>(
+            form,
+            `incorrectAnswer${index}`,
+          )?.value.trim() ?? "",
+      ),
+    ];
     const latitudeValue =
       field<HTMLInputElement>(form, "latitude")?.value ?? "";
     const longitudeValue =
       field<HTMLInputElement>(form, "longitude")?.value ?? "";
-    const orderValue = field<HTMLInputElement>(form, "order")?.value ?? "";
+    const orderValue = orderInput?.value ?? "";
     const pointsValue = field<HTMLInputElement>(form, "points")?.value ?? "0";
     const hintValue = field<HTMLInputElement>(form, "hint")?.value.trim() ?? "";
     const answerCaseSensitive =
@@ -311,6 +618,15 @@ export function mountDefineTask(
     const order = Number(orderValue);
     const points = Number(pointsValue);
     const issues: string[] = [];
+    if (!taskType?.value) issues.push("Select a task type.");
+    if (
+      multipleChoice &&
+      (choices.some((choice) => !choice) ||
+        new Set(choices.map((choice) => choice.toLowerCase())).size !== 4)
+    )
+      issues.push(
+        "Enter one correct answer and three distinct incorrect answers.",
+      );
     if (!huntId) issues.push("Enter the hunt ID for this task.");
     if (!displayLabel) issues.push("Enter a display label.");
     if (!description) issues.push("Enter the clue and instructions.");
@@ -340,53 +656,55 @@ export function mountDefineTask(
     }
 
     const task: TaskInput = {
+      taskType: multipleChoice ? "multiple-choice" : "single-word-trivia",
+      ...(multipleChoice ? { choices } : {}),
       displayLabel,
       description,
       requiredAnswer,
       location: { latitude, longitude },
       order,
-      answerCaseSensitive,
+      answerCaseSensitive: multipleChoice ? false : answerCaseSensitive,
       hint: hintValue || null,
       points,
     };
-    const button = form.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
-    if (button) button.disabled = true;
-    status.textContent = "Saving task…";
+    const taskIdBeingEdited = editingTaskId;
+    submitButton.disabled = true;
+    status.textContent = taskIdBeingEdited
+      ? "Saving task changes…"
+      : "Saving task…";
     try {
-      const saved = await repository.addTask(huntId, task);
+      const saved = taskIdBeingEdited
+        ? await repository.updateTask(huntId, taskIdBeingEdited, task)
+        : await repository.addTask(huntId, task);
       if (!saved.ok) {
         showIssues(
           root,
           saved.issues?.map((issue) => issue.message) ?? [saved.message],
         );
-        status.textContent = "Task was not saved.";
+        status.textContent = taskIdBeingEdited
+          ? "Task changes were not saved."
+          : "Task was not saved.";
         return;
       }
 
-      status.textContent = "Task saved. Refreshing the hunt task list…";
+      const verb = taskIdBeingEdited ? "updated" : "saved";
+      resetEditor(huntId);
+      status.textContent = `Task ${verb}. Refreshing the hunt task list…`;
       const result = await repository.getAdminHunt(huntId);
       if (result.ok) {
-        renderTasks(root, result.value.tasks);
-        status.textContent = `“${saved.value.displayLabel}” was saved and appears in this hunt’s task list.`;
-        form.reset();
-        const pointsInput = field<HTMLInputElement>(form, "points");
-        const orderInput = field<HTMLInputElement>(form, "order");
-        if (pointsInput) pointsInput.value = "0";
+        showTasks(result.value.tasks);
+        status.textContent = `“${saved.value.displayLabel}” was ${verb} and appears in this hunt’s task list.`;
         if (orderInput)
           orderInput.value = String(
-            Math.max(0, ...result.value.tasks.map((task) => task.order)) + 1,
+            Math.max(0, ...result.value.tasks.map((item) => item.order)) + 1,
           );
-        const huntInput = field<HTMLInputElement>(form, "huntId");
-        if (huntInput) huntInput.value = huntId;
       } else {
-        status.textContent = `Task was saved, but the updated hunt list could not be loaded: ${result.message}`;
+        status.textContent = `Task was ${verb}, but the updated hunt list could not be loaded: ${result.message}`;
       }
     } catch {
       status.textContent = "The task service could not be reached. Try again.";
     } finally {
-      if (button) button.disabled = false;
+      submitButton.disabled = false;
     }
   });
 }

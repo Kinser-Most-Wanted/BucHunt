@@ -13,7 +13,26 @@ export function mountCreateHunt(
 ): void {
   const form = root.querySelector<HTMLFormElement>('[data-testid="hunt-form"]');
   const status = root.querySelector<HTMLElement>('[data-testid="hunt-status"]');
-  if (!form || !status) return;
+  const createDialog = document.querySelector<HTMLDialogElement>(
+    '[data-testid="create-hunt-dialog"]',
+  );
+  const manageDialog = document.querySelector<HTMLDialogElement>(
+    '[data-testid="hunt-details-dialog"]',
+  );
+  const managerView = manageDialog?.querySelector<HTMLElement>(
+    '[data-testid="manage-hunts-view"]',
+  );
+  const overviewView = manageDialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-overview"]',
+  );
+  const editorView = manageDialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-editor"]',
+  );
+  const mode = manageDialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-dialog-mode"]',
+  );
+  if (!form || !status || !createDialog || !manageDialog || !managerView)
+    return;
   const profile = document.querySelector<HTMLElement>(
     '[data-testid="creator-id"]',
   )!;
@@ -34,6 +53,10 @@ export function mountCreateHunt(
   const taskHunt = document.querySelector<HTMLInputElement>(
     '#define-task [name="huntId"]',
   )!;
+  const selector = document.querySelector<HTMLSelectElement>(
+    '[data-testid="edit-hunt-selector"]',
+  )!;
+  const editTitle = document.querySelector<HTMLElement>("#hunt-edit-title")!;
   let selected: HuntSummary | undefined;
   let availableHunts: HuntSummary[] = [];
   let querySelectionApplied = false;
@@ -41,18 +64,49 @@ export function mountCreateHunt(
     "huntId",
   );
 
+  function populateHuntSelector(): void {
+    selector.replaceChildren();
+    for (const hunt of availableHunts) {
+      const option = document.createElement("option");
+      option.value = hunt.id;
+      option.textContent = hunt.name + " (" + hunt.role + ")";
+      selector.append(option);
+    }
+    selector.value = selected?.id ?? "";
+  }
+
+  function showManagerView(): void {
+    if (overviewView) overviewView.hidden = true;
+    if (editorView) editorView.hidden = true;
+    managerView!.hidden = false;
+    if (mode) mode.textContent = "YOUR ADVENTURES";
+    manageDialog!.setAttribute("aria-labelledby", "manage-hunts-title");
+    if (!manageDialog!.open) manageDialog!.showModal();
+    void refresh();
+  }
+
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
     const id = selected.id;
+    const creators = manageDialog!.querySelector<HTMLElement>(
+      '[data-testid="hunt-creators"]',
+    );
+    const contributorsStatus = manageDialog!.querySelector<HTMLElement>(
+      '[data-testid="contributors-load-status"]',
+    );
+    if (contributorsStatus)
+      contributorsStatus.textContent = "Loading contributors…";
     const result = await request<string[]>(
-      `/api/admin/hunts/${id}/contributors`,
+      `/api/admin/hunts/${encodeURIComponent(id)}/contributors`,
     );
     if (selected?.id !== id) return;
     if (!result.ok) {
       memberStatus.textContent = result.message;
+      if (contributorsStatus) contributorsStatus.textContent = result.message;
       return;
     }
     memberList.replaceChildren();
+    creators?.replaceChildren();
     for (const creatorId of result.value) {
       const item = document.createElement("li");
       const label = document.createElement("span");
@@ -78,45 +132,44 @@ export function mountCreateHunt(
       });
       item.append(label, remove);
       memberList.append(item);
+      const chip = document.createElement("li");
+      chip.className = "creator-chip";
+      chip.textContent = `Contributor · ${creatorId}`;
+      creators?.append(chip);
+    }
+    if (contributorsStatus) {
+      contributorsStatus.textContent = result.value.length
+        ? ""
+        : "No contributors have been added yet.";
     }
   }
-  function select(hunt: HuntSummary, loadTasks: boolean): void {
+  function select(hunt: HuntSummary, loadContributors = true): void {
     selected = hunt;
     taskHunt.value = hunt.id;
+    editTitle.textContent = "Editing " + hunt.name;
+    populateHuntSelector();
     document
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
-    panel.hidden = hunt.role !== "owner";
-    panel.open = hunt.role === "owner";
+    panel.hidden = false;
+    panel.open = false;
+    memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
-    const link = root.querySelector<HTMLAnchorElement>(
-      '[data-testid="hunt-player-link"]',
-    );
-    if (link) {
-      link.hidden = true;
-      void repository.getAdminHunt(hunt.id).then((result) => {
-        if (selected?.id !== hunt.id || !result.ok || !result.value.accessCode)
-          return;
-        link.href = `./player.html?accessCode=${encodeURIComponent(result.value.accessCode)}`;
-        link.hidden = false;
-      });
-    }
-    if (loadTasks)
-      document
-        .querySelector<HTMLButtonElement>('[data-testid="load-admin-hunt"]')
-        ?.click();
-    if (hunt.role === "owner") void renderContributors();
+    if (loadContributors && hunt.role === "owner") void renderContributors();
   }
   document.addEventListener("hunt-details-edit", (event: Event) => {
-    const huntId = (event as CustomEvent<{ huntId?: string }>).detail?.huntId;
-    const hunt = availableHunts.find((item) => item.id === huntId);
+    const detail = (
+      event as CustomEvent<{ huntId?: string; tasks?: unknown[] }>
+    ).detail;
+    const hunt = availableHunts.find((item) => item.id === detail?.huntId);
     if (!hunt) return;
-    select(hunt, true);
-    document.getElementById("define-task")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    select(hunt, false);
+    document.getElementById("define-task")?.dispatchEvent(
+      new CustomEvent("load-hunt-tasks", {
+        detail: { tasks: detail.tasks, huntName: hunt.name },
+      }),
+    );
   });
   async function refresh(): Promise<void> {
     const session = await getCreatorSession();
@@ -134,7 +187,7 @@ export function mountCreateHunt(
     list.replaceChildren();
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
-      : "No hunts yet. Create your first hunt below.";
+      : "No hunts yet. Create one to get started.";
     for (const hunt of result.value) {
       const item = document.createElement("li");
       const button = document.createElement("button");
@@ -145,17 +198,26 @@ export function mountCreateHunt(
       role.textContent = `(${hunt.role})`;
       button.append(role);
       button.addEventListener("click", () => {
+        select(hunt);
         void openHuntDetails(hunt.id, hunt.role);
       });
       item.append(button);
       list.append(item);
     }
+    populateHuntSelector();
     if (!querySelectionApplied && requestedHuntId) {
       const requestedHunt = result.value.find(
         (hunt) => hunt.id === requestedHuntId,
       );
       querySelectionApplied = true;
-      if (requestedHunt) select(requestedHunt, true);
+      if (requestedHunt) {
+        select(requestedHunt);
+        void openHuntDetails(requestedHunt.id, requestedHunt.role).then(() => {
+          document
+            .querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
+            ?.click();
+        });
+      }
     }
     if (selected && !result.value.some((hunt) => hunt.id === selected?.id)) {
       selected = undefined;
@@ -167,10 +229,30 @@ export function mountCreateHunt(
     }
   }
   document
+    .querySelector('[data-testid="open-create-hunt"]')
+    ?.addEventListener("click", () => createDialog.showModal());
+  document
+    .querySelector('[data-testid="close-create-hunt"]')
+    ?.addEventListener("click", () => createDialog.close());
+  document
+    .querySelector('[data-testid="open-manage-hunts"]')
+    ?.addEventListener("click", showManagerView);
+  document
+    .querySelector('[data-testid="back-to-manage-hunts"]')
+    ?.addEventListener("click", showManagerView);
+  document
     .querySelector('[data-testid="refresh-my-hunts"]')
     ?.addEventListener("click", () => {
       void refresh();
     });
+  selector.addEventListener("change", async () => {
+    const hunt = availableHunts.find((item) => item.id === selector.value);
+    if (!hunt) return;
+    await openHuntDetails(hunt.id, hunt.role);
+    document
+      .querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
+      ?.click();
+  });
   document
     .querySelector('[data-testid="copy-creator-id"]')
     ?.addEventListener("click", async () => {
@@ -242,13 +324,14 @@ export function mountCreateHunt(
         ].join(" ");
         return;
       }
-      status.textContent = `Hunt saved: ${result.value.name}. Add its tasks below.`;
+      status.textContent = `Hunt saved: ${result.value.name}. Open Manage Hunts to add tasks or edit details.`;
       select(
         { id: result.value.id, name: result.value.name, role: "owner" },
         false,
       );
       form.reset();
-      await refresh();
+      createDialog.close();
+      showManagerView();
     } catch {
       status.textContent =
         "Hunt could not be saved. Check the dates and try again.";

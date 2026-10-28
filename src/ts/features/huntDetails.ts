@@ -1,11 +1,12 @@
 import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
-import { createHuntRepository, getCreatorSession, request } from "./huntRepository.js";
+import { createHuntRepository } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
 );
 const repository = createHuntRepository();
 let activeRequest = 0;
+let activeHunt: HuntDefinition | undefined;
 
 function addFact(list: HTMLElement, label: string, value: string): void {
   const item = document.createElement("div");
@@ -52,9 +53,55 @@ function renderTask(task: TaskDefinition): HTMLLIElement {
   return item;
 }
 
+type DialogView = "manage" | "overview" | "editing";
+
+function setDialogView(view: DialogView): void {
+  if (!dialog) return;
+  const manager = dialog.querySelector<HTMLElement>(
+    '[data-testid="manage-hunts-view"]',
+  );
+  const overview = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-overview"]',
+  );
+  const editor = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-details-editor"]',
+  );
+  const mode = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-dialog-mode"]',
+  );
+  if (manager) manager.hidden = view !== "manage";
+  if (overview) overview.hidden = view !== "overview";
+  if (editor) editor.hidden = view !== "editing";
+  if (mode)
+    mode.textContent =
+      view === "manage"
+        ? "YOUR ADVENTURES"
+        : view === "editing"
+          ? "EDIT HUNT TASKS"
+          : "HUNT OVERVIEW";
+  const heading =
+    view === "manage"
+      ? "manage-hunts-title"
+      : view === "editing"
+        ? "hunt-edit-title"
+        : "hunt-details-title";
+  dialog.setAttribute("aria-labelledby", heading);
+  if (view === "editing") window.dispatchEvent(new Event("resize"));
+}
+
+function setDetailView(editing: boolean): void {
+  setDialogView(editing ? "editing" : "overview");
+}
+
 function resetDialog(): void {
-  const facts = dialog?.querySelector<HTMLElement>('[data-testid="hunt-facts"]');
-  const creators = dialog?.querySelector<HTMLElement>('[data-testid="hunt-creators"]');
+  activeHunt = undefined;
+  setDetailView(false);
+  const facts = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-facts"]',
+  );
+  const creators = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-creators"]',
+  );
   const tasks = dialog?.querySelector<HTMLOListElement>(
     '[data-testid="hunt-detail-tasks"]',
   );
@@ -90,8 +137,17 @@ function resetDialog(): void {
 
 function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   if (!dialog) return;
-  dialog.querySelector<HTMLElement>('[data-testid="hunt-detail-name"]')!.textContent =
-    hunt.name;
+  activeHunt = hunt;
+  const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
+    '[data-testid="contributors-panel"]',
+  );
+  if (contributorsPanel) {
+    contributorsPanel.hidden = false;
+    contributorsPanel.open = false;
+  }
+  dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-detail-name"]',
+  )!.textContent = hunt.name;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-description"]',
   )!.textContent = hunt.description || "A BucHunt adventure.";
@@ -110,7 +166,8 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   const playerLink = dialog.querySelector<HTMLAnchorElement>(
     '[data-testid="player-hunt-link"]',
   )!;
-  playerLink.href = `./player.html?accessCode=${encodeURIComponent(hunt.accessCode ?? "")}`;
+  const encodedAccessCode = encodeURIComponent(hunt.accessCode ?? "");
+  playerLink.href = `./player.html?accessCode=${encodedAccessCode}&autoJoin=1`;
 
   const facts = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',
@@ -125,42 +182,19 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   addFact(facts, "Ends", formatDate(hunt.endsAt));
   addFact(facts, "Created", formatDate(hunt.createdAt));
   addFact(facts, "Last updated", formatDate(hunt.updatedAt));
-  addFact(
-    facts,
-    "Access code",
-    hunt.accessCode ? hunt.accessCode : "Not set",
-  );
-
-  const creators = dialog.querySelector<HTMLElement>(
-    '[data-testid="hunt-creators"]',
+  const accessCode = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-access-code"]',
   )!;
-  const owner = document.createElement("li");
-  owner.className = "creator-chip creator-owner";
-  owner.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
-  creators.append(owner);
+  accessCode.textContent = hunt.accessCode || "Not set";
+  const ownerLabel = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-owner"]',
+  )!;
+  ownerLabel.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
+
   const contributorsStatus = dialog.querySelector<HTMLElement>(
     '[data-testid="contributors-load-status"]',
   )!;
-  if (role === "owner") {
-    void request<string[]>(
-      `/api/admin/hunts/${encodeURIComponent(hunt.id)}/contributors`,
-    ).then((result) => {
-      if (!dialog.open || dialog.dataset.huntId !== hunt.id) return;
-      if (!result.ok) {
-        contributorsStatus.textContent = result.message;
-        return;
-      }
-      for (const creatorId of result.value) {
-        const contributor = document.createElement("li");
-        contributor.className = "creator-chip";
-        contributor.textContent = `Contributor · ${creatorId}`;
-        creators.append(contributor);
-      }
-      contributorsStatus.textContent = result.value.length
-        ? ""
-        : "No contributors have been added yet.";
-    });
-  } else {
+  if (role !== "owner") {
     contributorsStatus.textContent =
       "Contributor details are visible to the hunt owner.";
   }
@@ -179,22 +213,28 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   emptyTasks.hidden = hunt.tasks.length !== 0;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-status"]',
-  )!.textContent = `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
+  )!.textContent =
+    `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
 }
 
-dialog?.querySelector<HTMLButtonElement>(
-  '[data-testid="close-hunt-details"]',
-)?.addEventListener("click", () => dialog.close());
-dialog?.querySelector<HTMLButtonElement>(
-  '[data-testid="edit-hunt-link"]',
-)?.addEventListener("click", () => {
-  const huntId = dialog.dataset.huntId;
-  if (!huntId) return;
-  dialog.close();
-  document.dispatchEvent(
-    new CustomEvent("hunt-details-edit", { detail: { huntId } }),
-  );
-});
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="close-hunt-details"]')
+  ?.addEventListener("click", () => dialog.close());
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
+  ?.addEventListener("click", () => {
+    const huntId = dialog.dataset.huntId;
+    if (!huntId) return;
+    setDetailView(true);
+    document.dispatchEvent(
+      new CustomEvent("hunt-details-edit", {
+        detail: { huntId, tasks: activeHunt?.tasks },
+      }),
+    );
+  });
+dialog
+  ?.querySelector<HTMLButtonElement>('[data-testid="back-to-hunt-details"]')
+  ?.addEventListener("click", () => setDetailView(false));
 dialog?.addEventListener("click", (event) => {
   if (event.target === dialog) dialog.close();
 });
@@ -206,6 +246,7 @@ export async function openHuntDetails(
   if (!dialog) return;
   const requestId = ++activeRequest;
   resetDialog();
+  setDialogView("overview");
   dialog.dataset.huntId = huntId;
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-name"]',
@@ -215,8 +256,6 @@ export async function openHuntDetails(
   )!.textContent = "Loading hunt details…";
   if (!dialog.open) dialog.showModal();
   try {
-    const creator = await getCreatorSession();
-    if (!creator.ok) throw new Error(creator.message);
     const result = await repository.getAdminHunt(huntId);
     if (requestId !== activeRequest || !dialog.open) return;
     if (!result.ok) throw new Error(result.message);

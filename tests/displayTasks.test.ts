@@ -395,7 +395,6 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await mapToggle.click();
   const taskMap = answerTask.locator('iframe[title="Task location map"]');
   await expect(taskMap).toBeVisible();
-  const detailsDialog = page.getByTestId("player-hunt-details");
   const closeButton = page.getByTestId("close-player-hunt-details");
   const huntStatus = page.getByTestId("player-hunt-lookup-status");
   await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(

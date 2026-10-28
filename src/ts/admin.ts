@@ -71,6 +71,17 @@ const accountStatus = document.querySelector<HTMLElement>(
 );
 const isHomePage = document.body.dataset.page === "home";
 const isAdminPage = document.body.dataset.page === "admin";
+const foundationFeaturesReady = isAdminPage
+  ? new Promise<void>((resolve) => {
+      if (document.documentElement.dataset.buchuntFeaturesReady === "true") {
+        resolve();
+        return;
+      }
+      document.addEventListener("buchunt:features-ready", () => resolve(), {
+        once: true,
+      });
+    })
+  : Promise.resolve();
 const statusText = document.getElementById("admin-status") as HTMLElement;
 const signOut = document.getElementById("sign-out") as HTMLButtonElement | null;
 const homeSignInLink = document.getElementById(
@@ -334,6 +345,7 @@ async function showSession(): Promise<void> {
       ...user,
       role: isAdministrator ? "administrator" : "user",
     });
+  if (isAdminPage && isAdministrator) await foundationFeaturesReady;
   if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
   if (adminDenied) adminDenied.hidden = isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;

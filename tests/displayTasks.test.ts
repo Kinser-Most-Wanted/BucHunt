@@ -428,6 +428,22 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   expect(
     await detailsDialog.evaluate((dialog) => dialog.scrollTop),
   ).toBeGreaterThan(0);
+  const closeButtonBounds = await closeButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const dialogRect = button.closest("dialog")!.getBoundingClientRect();
+    return {
+      insideLeft: buttonRect.left >= dialogRect.left,
+      insideRight: buttonRect.right <= dialogRect.right,
+      insideTop: buttonRect.top >= dialogRect.top,
+      insideBottom: buttonRect.bottom <= dialogRect.bottom,
+    };
+  });
+  expect(closeButtonBounds).toEqual({
+    insideLeft: true,
+    insideRight: true,
+    insideTop: true,
+    insideBottom: true,
+  });
   await expect(closeButton).toBeInViewport();
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();

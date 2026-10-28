@@ -2285,10 +2285,7 @@ body[data-page="player"].player-hunt-modal-open {
 .player-hunt-details .dialog-close-button {
   position: relative;
   flex: 0 0 auto;
-  transform: translate(
-    calc(clamp(1rem, 3vw, 2rem) - 0.5rem),
-    calc(-1 * clamp(1rem, 3vw, 2rem) + 0.5rem)
-  );
+  transform: none;
   border-color: rgb(255 255 255 / 28%);
   background: #17406f;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);

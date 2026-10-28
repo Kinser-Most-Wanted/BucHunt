@@ -175,9 +175,7 @@ function huntStatusPresentation(
 }
 
 function isHuntCompleted(hunt: PlayerHunt): boolean {
-  return (
-    hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed)
-  );
+  return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
 }
 
 function updateHuntCardStatus(
@@ -784,10 +782,7 @@ export function mountDisplayTasks(
       huntStatus.dataset.status = completedHunt
         ? "completed"
         : presentation.tone;
-      addFact(
-        "Status",
-        completedHunt ? "Hunt completed" : presentation.label,
-      );
+      addFact("Status", completedHunt ? "Hunt completed" : presentation.label);
       addFact("Starts", formattedTime(hunt.beginsAt));
       addFact(
         "Ends",

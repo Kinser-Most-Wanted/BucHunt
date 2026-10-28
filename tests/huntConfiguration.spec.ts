@@ -105,9 +105,7 @@ async function installAdminSession(page: Page): Promise<void> {
 
 async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
   await page.waitForFunction(() =>
-    Boolean(
-      (window as unknown as { __testMapReady?: boolean }).__testMapReady,
-    ),
+    Boolean((window as unknown as { __testMapReady?: boolean }).__testMapReady),
   );
   await page.evaluate(
     ({ latitude, longitude }) =>

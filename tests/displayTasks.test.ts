@@ -717,9 +717,9 @@ test("multiple-choice selections submit immediately, retain rejected options, an
   await item.getByRole("button", { name: "Square", exact: true }).click();
   await expect(item).toContainText("Completed");
   await expect(item.getByRole("button")).toHaveCount(0);
-  await expect(
-    page.locator(".player-hunt .hunt-state-badge"),
-  ).toHaveText("Hunt complete");
+  await expect(page.locator(".player-hunt .hunt-state-badge")).toHaveText(
+    "Hunt complete",
+  );
   await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
     "Hunt complete",
   );

@@ -80,8 +80,7 @@ function loadLeaflet(): Promise<LeafletApi> {
 
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.integrity =
-      "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+    script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
     script.crossOrigin = "";
     script.async = true;
     script.onload = () => {
@@ -168,10 +167,9 @@ function mountLocationPicker(
     status.textContent = "Loading the location map…";
     mapReady = loadLeaflet()
       .then((leaflet) => {
-        map = leaflet.map(mapElement, { scrollWheelZoom: false }).setView(
-          DEFAULT_MAP_CENTER,
-          16,
-        );
+        map = leaflet
+          .map(mapElement, { scrollWheelZoom: false })
+          .setView(DEFAULT_MAP_CENTER, 16);
         leaflet
           .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
@@ -192,7 +190,8 @@ function mountLocationPicker(
                 },
               }
             : null);
-        if (savedLocation) setLocation(savedLocation.point, savedLocation.label);
+        if (savedLocation)
+          setLocation(savedLocation.point, savedLocation.label);
         else
           status.textContent =
             "Search for a place or click the map to choose a location.";
@@ -261,7 +260,8 @@ function mountLocationPicker(
         }>;
         const match = matches[0];
         if (!match) {
-          status.textContent = "No matching place found. Try a different search.";
+          status.textContent =
+            "No matching place found. Try a different search.";
           return;
         }
         result = {

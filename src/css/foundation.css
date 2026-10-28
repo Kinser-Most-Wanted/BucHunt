@@ -3292,10 +3292,11 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   }
 }
 
-
 .player-hunt[data-hunt-status="completed"] {
   border-left: 4px solid #5ddca3;
-  box-shadow: 0 0 0 1px rgb(93 220 163 / 24%), 0 1rem 2.5rem rgb(25 183 124 / 12%);
+  box-shadow:
+    0 0 0 1px rgb(93 220 163 / 24%),
+    0 1rem 2.5rem rgb(25 183 124 / 12%);
 }
 .player-hunt .hunt-state-badge[data-status="completed"],
 .player-hunt-details .details-status[data-status="completed"] {

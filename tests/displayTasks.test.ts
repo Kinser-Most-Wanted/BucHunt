@@ -280,16 +280,17 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "Taskless Hunt",
   );
   await expect(page.getByTestId("player-hunt-details")).toBeVisible();
+  await expect(page.getByTestId("back-to-hunts")).toHaveCount(0);
   await expect(page.getByTestId("player-hunt-no-tasks")).toBeVisible();
   expect(huntListRequests).toBe(1);
-  await page.getByTestId("back-to-hunts").click();
+  await page.getByTestId("close-player-hunt-details").click();
   await page
     .getByTestId("player-future-hunt-list")
     .locator('[data-hunt-id="hunt-future"]')
     .click();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("Future Hunt");
   await expect(page.getByTestId("player-task-list")).toBeEmpty();
-  await page.getByTestId("back-to-hunts").click();
+  await page.getByTestId("close-player-hunt-details").click();
   await page
     .getByTestId("player-past-hunt-list")
     .locator('[data-hunt-id="hunt-past"]')
@@ -297,7 +298,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
     "Hunt Ended",
   );
-  await page.getByTestId("back-to-hunts").click();
+  await page.getByTestId("close-player-hunt-details").click();
   await page.getByLabel("Access code").fill("abcd1234");
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
   await page.getByRole("button", { name: "Join Hunt" }).click();

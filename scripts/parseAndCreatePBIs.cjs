@@ -4,7 +4,6 @@ const { execFileSync } = require('node:child_process');
 const token = process.env.GITHUB_TOKEN;
 const repository = process.env.GITHUB_REPOSITORY;
 const [owner, repo] = (repository || '').split('/');
-const projectsToken = process.env.PROJECTS_TOKEN;
 
 async function api(route, options = {}) {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}${route}`, {
@@ -24,100 +23,6 @@ async function api(route, options = {}) {
     throw error;
   }
   return data;
-}
-
-async function graphql(query, variables = {}) {
-  const response = await fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${projectsToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const result = await response.json();
-  if (!response.ok || result.errors?.length) {
-    throw new Error(`Projects API: ${result.errors?.map(e => e.message).join('; ') || result.message || response.status}`);
-  }
-  return result.data;
-}
-
-async function findProjects() {
-  const data = await graphql(`query($org: String!) {
-    organization(login: $org) {
-      projectsV2(first: 100) {
-        pageInfo { hasNextPage }
-        nodes {
-          id title
-          fields(first: 100) {
-            pageInfo { hasNextPage }
-            nodes {
-              ... on ProjectV2SingleSelectField { id name options { id name } }
-            }
-          }
-        }
-      }
-    }
-  }`, { org: owner });
-  const projects = data.organization?.projectsV2;
-  if (!projects || projects.pageInfo.hasNextPage) throw new Error('Cannot uniquely find both projects in the first 100 organization projects');
-  const named = title => {
-    const matches = projects.nodes.filter(p => p.title.toLowerCase() === title.toLowerCase());
-    if (matches.length !== 1) throw new Error(`Expected one project named "${title}", found ${matches.length}`);
-    if (matches[0].fields.pageInfo.hasNextPage) throw new Error(`Too many fields in ${title}`);
-    return matches[0];
-  };
-  const product = named(process.env.PRODUCT_BACKLOG_NAME || 'Product Backlog');
-  const sprint = named(process.env.SPRINT_BACKLOG_NAME || 'Sprint Backlog');
-  if (product.id === sprint.id) throw new Error('Product and Sprint Backlog must be different projects');
-  const sprintStatus = sprint.fields.nodes.find(f => f?.name === 'Status');
-  if (!sprintStatus) throw new Error('Sprint Backlog needs a Status field for the No Status column');
-  const productStatus = product.fields.nodes.find(f => f?.name === 'Status');
-  const catchAll = productStatus?.options?.find(option => option.name === 'Catch All PBI');
-  if (!catchAll) throw new Error('Product Backlog needs a Status option named "Catch All PBI"');
-  return { product, sprint, sprintStatus, productStatus, catchAll };
-}
-
-async function linkedItems(issueNodeId) {
-  const data = await graphql(`query($id: ID!) {
-    node(id: $id) {
-      ... on Issue {
-        projectItems(first: 100) {
-          pageInfo { hasNextPage }
-          nodes { id project { id } }
-        }
-      }
-    }
-  }`, { id: issueNodeId });
-  const items = data.node?.projectItems;
-  if (!items || items.pageInfo.hasNextPage) throw new Error('Cannot inspect all existing project items for issue');
-  return items.nodes;
-}
-
-async function addToProject(project, issueNodeId, existingItems) {
-  const existing = existingItems.find(item => item.project.id === project.id);
-  if (existing) return { id: existing.id, added: false };
-  const data = await graphql(`mutation($project: ID!, $issue: ID!) {
-    addProjectV2ItemById(input: { projectId: $project, contentId: $issue }) { item { id } }
-  }`, { project: project.id, issue: issueNodeId });
-  return { id: data.addProjectV2ItemById.item.id, added: true };
-}
-
-async function setProductCatchAll(project, itemId, fieldId, optionId) {
-  await graphql(`mutation($project: ID!, $item: ID!, $field: ID!, $value: ProjectV2FieldValue!) {
-    updateProjectV2ItemFieldValue(input: {
-      projectId: $project, itemId: $item, fieldId: $field, value: $value
-    }) { projectV2Item { id } }
-  }`, { project: project.id, item: itemId, field: fieldId, value: { singleSelectOptionId: optionId } });
-}
-
-async function clearStatus(project, itemId, fieldId) {
-  await graphql(`mutation($project: ID!, $item: ID!, $field: ID!) {
-    clearProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $field }) {
-      projectV2Item { id }
-    }
-  }`, { project: project.id, item: itemId, field: fieldId });
 }
 
 function changedFiles() {
@@ -218,7 +123,6 @@ async function main() {
   if (!entries.length) { console.log('No sprint goals or PBIs in changed Markdown files.'); return; }
   await ensureLabel('PBI', '5319E7');
   await ensureLabel('Sprint Goal', 'D93F0B');
-  const createdItems = [];
   for (const entry of entries) {
     await ensureLabel(`Sprint ${entry.sprint}`, '0E8A16');
     const existing = await existingIssue(entry.title);
@@ -227,26 +131,6 @@ async function main() {
       body: JSON.stringify({ title: entry.title, body: entry.body, labels: entry.labels }),
     });
     console.log(`${existing ? 'Found' : 'Created'} #${issue.number}: ${entry.title}`);
-    createdItems.push({ issue, existing });
-  }
-  // Project access must not prevent the issues from being created. Report routing failure afterward.
-  if (!projectsToken) {
-    console.warn('PROJECTS_TOKEN is not set: created issues without adding them to Projects');
-    return;
-  }
-  const projects = await findProjects();
-  for (const { issue, existing } of createdItems) {
-    const items = await linkedItems(issue.node_id);
-    const productItem = await addToProject(projects.product, issue.node_id, items);
-    // A new issue may have been auto-added before this step. Leave manually sorted issues alone.
-    if (productItem.added || !existing) {
-      await setProductCatchAll(projects.product, productItem.id, projects.productStatus.id, projects.catchAll.id);
-    }
-    const sprintItem = await addToProject(projects.sprint, issue.node_id, items);
-    // No Status is an unset Status value. Preserve an existing issue's manually managed status.
-    // A project auto-add workflow may have added a newly created issue before this step.
-    if (sprintItem.added || !existing) await clearStatus(projects.sprint, sprintItem.id, projects.sprintStatus.id);
-    console.log(`Added #${issue.number} to Product Backlog and Sprint Backlog`);
   }
 }
 

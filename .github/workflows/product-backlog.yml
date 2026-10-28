@@ -1,4 +1,4 @@
-name: Create and route sprint goals and PBI issues
+name: Create sprint goals and PBI issues
 
 on:
   push:
@@ -20,13 +20,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Create sprint goals and PBIs in both backlog intake columns
+      - name: Create sprint goals and PBI issues
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # A token with project read/write access to both organization projects.
-          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
-          PRODUCT_BACKLOG_NAME: Product Backlog
-          SPRINT_BACKLOG_NAME: Sprint Backlog
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
         run: node scripts/parseAndCreatePBIs.cjs

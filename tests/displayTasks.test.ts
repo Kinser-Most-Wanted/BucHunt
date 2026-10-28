@@ -32,6 +32,49 @@ test("empty player dashboard points players to the join card above", async ({
   );
 });
 
+test("admin join links do not fill the access-code form", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-auto-join",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem(
+      "buchunt.player-profile.google-account-auto-join",
+      "Baja",
+    );
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  let joins = 0;
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/join")) {
+      joins += 1;
+      expect(route.request().postDataJSON()).toEqual({
+        accessCode: "ABCD1234",
+      });
+      await route.fulfill({ json: { ok: true, value: { huntId: "hunt-1" } } });
+      return;
+    }
+    await route.fulfill({ json: { ok: true, value: [] } });
+  });
+
+  await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
+  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.locator('[name="accessCode"]')).toHaveValue("");
+  await expect.poll(() => joins).toBe(1);
+  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+});
+
 test("Google sign-in lets a player open and revisit saved progress", async ({
   page,
 }) => {
@@ -147,7 +190,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     });
   });
 
-  await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
+  await page.goto("/player.html?accessCode=ABCD1234");
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
   await expect(page.getByTestId("player-name-form")).toBeVisible();
   await page.getByTestId("player-display-name-input").fill("Baja");
@@ -162,7 +205,6 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "sticky",
   );
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
-  await expect(page.locator('[name="accessCode"]')).toHaveValue("");
   await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
   await expect(page.getByTestId("player-email")).toBeHidden();

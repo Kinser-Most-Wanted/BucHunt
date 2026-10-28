@@ -64,6 +64,40 @@ function showIssues(root: HTMLElement, messages: string[]): void {
   }
 }
 
+let leafletLoad: Promise<LeafletApi> | null = null;
+
+function loadLeaflet(): Promise<LeafletApi> {
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletLoad) return leafletLoad;
+
+  leafletLoad = new Promise<LeafletApi>((resolve, reject) => {
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    stylesheet.integrity =
+      "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+    stylesheet.crossOrigin = "";
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.integrity =
+      "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+    script.crossOrigin = "";
+    script.async = true;
+    script.onload = () => {
+      if (window.L) resolve(window.L);
+      else reject(new Error("Leaflet did not initialize."));
+    };
+    script.onerror = () => reject(new Error("Leaflet could not be loaded."));
+    document.head.append(stylesheet, script);
+  }).catch((error: unknown) => {
+    leafletLoad = null;
+    throw error;
+  });
+
+  return leafletLoad;
+}
+
 function mountLocationPicker(
   root: HTMLElement,
   form: HTMLFormElement,
@@ -96,45 +130,101 @@ function mountLocationPicker(
   )
     return;
 
-  const L = window.L;
-  if (!L) {
-    status.textContent =
-      "The map library could not load. Refresh the page to try again.";
-    return;
-  }
-
-  const map = L.map(mapElement, { scrollWheelZoom: false }).setView(
-    DEFAULT_MAP_CENTER,
-    16,
-  );
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
-
+  let map: LeafletMap | null = null;
   let marker: LeafletMarker | null = null;
+  let mapReady: Promise<void> | null = null;
+  let pendingLocation: { point: MapPoint; label?: string } | null = null;
   let lastSearchAt = 0;
   const searchCache = new Map<string, { point: MapPoint; label: string }>();
+
   const setLocation = (point: MapPoint, label?: string): void => {
     latitude.value = String(point.lat);
     longitude.value = String(point.lng);
-    if (marker) marker.setLatLng(point);
-    else {
-      marker = L.marker([point.lat, point.lng], { draggable: true }).addTo(map);
-      marker.on("dragend", () => {
-        if (marker) setLocation(marker.getLatLng());
-      });
+    pendingLocation = { point, label };
+    if (map && window.L) {
+      if (marker) marker.setLatLng(point);
+      else {
+        marker = window.L.marker([point.lat, point.lng], {
+          draggable: true,
+        }).addTo(map);
+        marker.on("dragend", () => {
+          if (marker) setLocation(marker.getLatLng());
+        });
+      }
+      pendingLocation = null;
     }
     coordinates.textContent = label
       ? `${label} · ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`
       : `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
     coordinates.hidden = false;
-    status.textContent =
-      "Location selected. Click the map or drag the pin to adjust it.";
+    status.textContent = map
+      ? "Location selected. Click the map or drag the pin to adjust it."
+      : "Location saved. The map will appear when it is ready.";
   };
 
-  map.on("click", (event) => setLocation(event.latlng));
+  const initializeMap = (): Promise<void> => {
+    if (map) return Promise.resolve();
+    if (mapReady) return mapReady;
+    status.textContent = "Loading the location map…";
+    mapReady = loadLeaflet()
+      .then((leaflet) => {
+        map = leaflet.map(mapElement, { scrollWheelZoom: false }).setView(
+          DEFAULT_MAP_CENTER,
+          16,
+        );
+        leaflet
+          .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          })
+          .addTo(map);
+        map.on("click", (event) => setLocation(event.latlng));
+        window.requestAnimationFrame(() => map?.invalidateSize());
+
+        const savedLocation =
+          pendingLocation ??
+          (latitude.value && longitude.value
+            ? {
+                point: {
+                  lat: Number(latitude.value),
+                  lng: Number(longitude.value),
+                },
+              }
+            : null);
+        if (savedLocation) setLocation(savedLocation.point, savedLocation.label);
+        else
+          status.textContent =
+            "Search for a place or click the map to choose a location.";
+      })
+      .catch(() => {
+        mapReady = null;
+        status.textContent =
+          "The map could not load. Check your connection and try again.";
+      });
+    return mapReady;
+  };
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          void initializeMap();
+        }
+      },
+      { rootMargin: "120px" },
+    );
+    observer.observe(mapElement);
+  } else {
+    searchControls.addEventListener("focusin", () => void initializeMap(), {
+      once: true,
+    });
+    mapElement.addEventListener("pointerenter", () => void initializeMap(), {
+      once: true,
+    });
+  }
+
   const searchButton =
     searchControls.querySelector<HTMLButtonElement>("button");
   const search = async (): Promise<void> => {
@@ -144,11 +234,13 @@ function mountLocationPicker(
       return;
     }
 
-    const key = query.toLocaleLowerCase();
-    let result = searchCache.get(key);
     if (searchButton) searchButton.disabled = true;
     status.textContent = "Searching the map…";
     try {
+      await initializeMap();
+      if (!map) throw new Error("Map unavailable.");
+      const key = query.toLocaleLowerCase();
+      let result = searchCache.get(key);
       if (!result) {
         const wait = Math.max(0, 1100 - (Date.now() - lastSearchAt));
         if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -169,8 +261,7 @@ function mountLocationPicker(
         }>;
         const match = matches[0];
         if (!match) {
-          status.textContent =
-            "No matching place found. Try a different search.";
+          status.textContent = "No matching place found. Try a different search.";
           return;
         }
         result = {
@@ -202,10 +293,11 @@ function mountLocationPicker(
   });
 
   form.addEventListener("reset", () => {
-    if (marker) {
+    if (marker && map) {
       map.removeLayer(marker);
       marker = null;
     }
+    pendingLocation = null;
     coordinates.textContent = "";
     coordinates.hidden = true;
     queryInput.value = "";
@@ -213,11 +305,9 @@ function mountLocationPicker(
       "Search for a place or click the map to choose a location.";
   });
 
-  status.textContent =
-    "Search for a place or click the map to choose a location.";
-  window.requestAnimationFrame(() => map.invalidateSize());
+  status.textContent = "The map loads when the task location picker is shown.";
   return (point, label) => {
-    map.setView([point.lat, point.lng], 18);
+    if (map) map.setView([point.lat, point.lng], 18);
     setLocation(point, label);
   };
 }

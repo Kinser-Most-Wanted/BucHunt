@@ -3291,3 +3291,21 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
     width: 100%;
   }
 }
+
+
+.player-hunt[data-hunt-status="completed"] {
+  border-left: 4px solid #5ddca3;
+  box-shadow: 0 0 0 1px rgb(93 220 163 / 24%), 0 1rem 2.5rem rgb(25 183 124 / 12%);
+}
+.player-hunt .hunt-state-badge[data-status="completed"],
+.player-hunt-details .details-status[data-status="completed"] {
+  border-color: rgb(93 220 163 / 55%);
+  background: rgb(25 183 124 / 20%);
+  color: #8df0c0;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.player-hunt-details .details-status[data-status="completed"] {
+  box-shadow: 0 0 1.5rem rgb(25 183 124 / 18%);
+}

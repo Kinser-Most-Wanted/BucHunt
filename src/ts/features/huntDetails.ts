@@ -170,7 +170,8 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   const playerLink = dialog.querySelector<HTMLAnchorElement>(
     '[data-testid="player-hunt-link"]',
   )!;
-  playerLink.href = `./player.html?accessCode=${encodeURIComponent(hunt.accessCode ?? "")}`;
+  const accessCode = encodeURIComponent(hunt.accessCode ?? "");
+  playerLink.href = `./player.html?accessCode=${accessCode}&autoJoin=1`;
 
   const facts = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',

@@ -58,6 +58,10 @@ async function installMapMock(context: BrowserContext): Promise<void> {
       value: (lat: number, lng: number) =>
         clickListener?.({ latlng: { lat, lng } }),
     });
+    Object.defineProperty(window, "__testMapReady", {
+      configurable: true,
+      get: () => Boolean(clickListener),
+    });
   });
   await context.route(
     "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
@@ -100,6 +104,11 @@ async function installAdminSession(page: Page): Promise<void> {
 }
 
 async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
+  await page.waitForFunction(() =>
+    Boolean(
+      (window as unknown as { __testMapReady?: boolean }).__testMapReady,
+    ),
+  );
   await page.evaluate(
     ({ latitude, longitude }) =>
       (
@@ -313,7 +322,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(
     "href",
-    /accessCode=[A-F0-9]{8}$/,
+    /accessCode=[A-F0-9]{8}&autoJoin=1$/,
   );
   await expect(page.getByTestId("hunt-detail-tasks")).toContainText(
     "Find the fountain",

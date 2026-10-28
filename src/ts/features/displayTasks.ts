@@ -174,12 +174,21 @@ function huntStatusPresentation(
   };
 }
 
+function isHuntCompleted(hunt: PlayerHunt): boolean {
+  return (
+    hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed)
+  );
+}
+
 function updateHuntCardStatus(
   card: HTMLElement,
   hunt: PlayerHunt,
   now: number,
 ): void {
-  const presentation = huntStatusPresentation(hunt, now);
+  const completed = isHuntCompleted(hunt);
+  const presentation = completed
+    ? { tone: "completed", label: "Hunt complete" }
+    : huntStatusPresentation(hunt, now);
   card.dataset.huntStatus = presentation.tone;
   const badge = card.querySelector<HTMLElement>(".hunt-state-badge");
   if (badge) {
@@ -567,11 +576,9 @@ export function mountDisplayTasks(
     }
   };
   let pendingIdentity: PlayerIdentity | null = null;
-  const sharedCode =
-    new URLSearchParams(location.search)
-      .get("accessCode")
-      ?.trim()
-      .toUpperCase() ?? "";
+  const pageParams = new URLSearchParams(location.search);
+  const sharedCode = pageParams.get("accessCode")?.trim().toUpperCase() ?? "";
+  const autoJoin = pageParams.get("autoJoin") === "1";
   let sharedLinkJoinPending = false;
 
   const requestDisplayName = (signedIn: PlayerIdentity): void => {
@@ -769,10 +776,18 @@ export function mountDisplayTasks(
         120,
         280,
       );
+      const completedHunt = isHuntCompleted(hunt);
       const presentation = huntStatusPresentation(hunt, now);
-      huntStatus.textContent = presentation.message;
-      huntStatus.dataset.status = presentation.tone;
-      addFact("Status", presentation.label);
+      huntStatus.textContent = completedHunt
+        ? "Hunt complete! Every task is finished."
+        : presentation.message;
+      huntStatus.dataset.status = completedHunt
+        ? "completed"
+        : presentation.tone;
+      addFact(
+        "Status",
+        completedHunt ? "Hunt completed" : presentation.label,
+      );
       addFact("Starts", formattedTime(hunt.beginsAt));
       addFact(
         "Ends",
@@ -968,8 +983,12 @@ export function mountDisplayTasks(
         huntStatus.textContent = "Sign in with Google first.";
         return;
       }
-      const accessCode = huntInput.value.trim().toUpperCase();
-      huntInput.value = accessCode;
+      const accessCode = (
+        isSharedLinkJoin && autoJoin ? sharedCode : huntInput.value
+      )
+        .trim()
+        .toUpperCase();
+      huntInput.value = isSharedLinkJoin && autoJoin ? "" : accessCode;
       const button = huntForm.querySelector<HTMLButtonElement>(
         'button[type="submit"], button',
       );
@@ -1030,7 +1049,7 @@ export function mountDisplayTasks(
     window.addEventListener("pagehide", () => window.clearInterval(timer), {
       once: true,
     });
-    if (sharedCode) huntInput.value = sharedCode;
+    if (sharedCode && !autoJoin) huntInput.value = sharedCode;
     const requestedHunt = new URLSearchParams(location.search).get("huntId");
     if (
       sharedCode &&

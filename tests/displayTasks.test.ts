@@ -147,7 +147,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     });
   });
 
-  await page.goto("/player.html?accessCode=ABCD1234");
+  await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
   await expect(page.getByTestId("player-hunt-lookup")).toBeHidden();
   await expect(page.getByTestId("player-name-form")).toBeVisible();
   await page.getByTestId("player-display-name-input").fill("Baja");
@@ -162,6 +162,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "sticky",
   );
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
+  await expect(page.locator('[name="accessCode"]')).toHaveValue("");
   await page.getByTestId("player-account").click();
   await expect(page.getByTestId("player-google-email")).toBeVisible();
   await expect(page.getByTestId("player-email")).toBeHidden();
@@ -716,5 +717,11 @@ test("multiple-choice selections submit immediately, retain rejected options, an
   await item.getByRole("button", { name: "Square", exact: true }).click();
   await expect(item).toContainText("Completed");
   await expect(item.getByRole("button")).toHaveCount(0);
+  await expect(
+    page.locator(".player-hunt .hunt-state-badge"),
+  ).toHaveText("Hunt complete");
+  await expect(page.getByTestId("player-hunt-lookup-status")).toContainText(
+    "Hunt complete",
+  );
   expect(answers).toEqual(["Circle", "Circle", "Square"]);
 });

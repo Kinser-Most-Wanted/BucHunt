@@ -827,10 +827,7 @@ export function mountDisplayTasks(
           const choices = document.createElement("div");
           choices.className = "task-answer-choices";
           choices.setAttribute("role", "group");
-          choices.setAttribute(
-            "aria-label",
-            `Answer for ${task.displayLabel}`,
-          );
+          choices.setAttribute("aria-label", `Answer for ${task.displayLabel}`);
           const message = document.createElement("p");
           message.className = "task-answer-choice-message";
           message.setAttribute("role", "status");

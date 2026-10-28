@@ -118,13 +118,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     name: "Ending Soon Hunt",
     endsAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
   };
-  const savedHunts = [
-    hunt,
-    endingSoonHunt,
-    futureHunt,
-    pastHunt,
-    tasklessHunt,
-  ];
+  const savedHunts = [hunt, endingSoonHunt, futureHunt, pastHunt, tasklessHunt];
   let huntListRequests = 0;
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
@@ -206,9 +200,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "",
   );
   await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "test",
-  );
+  await expect(page.getByTestId("player-hunt-list")).toContainText("test");
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Time remaining",
   );
@@ -307,9 +299,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(page.getByTestId("player-task-status")).toContainText(
     "5 saved Hunts",
   );
-  await expect(page.getByTestId("player-hunt-list")).toContainText(
-    "test",
-  );
+  await expect(page.getByTestId("player-hunt-list")).toContainText("test");
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Old Fountain",
   );
@@ -330,9 +320,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .locator('[data-hunt-id="hunt-1"]')
     .click();
   await expect(detailsDialog).toBeVisible();
-  expect(
-    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
-  ).toBe(0);
+  expect(await detailsDialog.evaluate((dialog) => dialog.scrollTop)).toBe(0);
   const answerTask = page
     .getByTestId("player-task")
     .filter({ hasText: "Library Steps" });
@@ -347,9 +335,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     dialogTop: intro.closest("dialog")!.getBoundingClientRect().top,
   }));
   expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
-  await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText(
-    "test",
-  );
+  await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText("test");
   await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
     "test",
   );

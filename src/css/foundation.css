@@ -3167,7 +3167,9 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin: 0;
   padding: 0;
 }
-.player-hunt-details .hunt-detail-task-heading > .task-location:has(.task-location-map:not([hidden])) {
+.player-hunt-details
+  .hunt-detail-task-heading
+  > .task-location:has(.task-location-map:not([hidden])) {
   grid-column: 1 / -1;
   grid-row: 3;
   justify-items: stretch;

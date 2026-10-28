@@ -97,4 +97,3 @@ export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
 }
-

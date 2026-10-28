@@ -274,9 +274,7 @@ export function mountDefineTask(
   const status = root.querySelector<HTMLElement>('[data-testid="task-status"]');
   if (!form || !status) return;
   const setTaskLocation = mountLocationPicker(root, form);
-  const taskType = form.querySelector<HTMLSelectElement>(
-    '[name="taskType"]',
-  );
+  const taskType = form.querySelector<HTMLSelectElement>('[name="taskType"]');
   const updateTaskFields = (): void => {
     for (const group of form.querySelectorAll<HTMLElement>(
       "[data-task-fields]",
@@ -366,10 +364,7 @@ export function mountDefineTask(
         (choice) => choice !== task.requiredAnswer,
       );
       for (const index of [1, 2, 3]) {
-        const input = field<HTMLInputElement>(
-          form,
-          `incorrectAnswer${index}`,
-        );
+        const input = field<HTMLInputElement>(form, `incorrectAnswer${index}`);
         if (input) input.value = incorrectChoices[index - 1] ?? "";
       }
     }

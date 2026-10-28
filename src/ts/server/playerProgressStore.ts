@@ -2,6 +2,7 @@ import { JsonFile, StoreError } from "./huntStore.js";
 interface ProgressFile {
   schemaVersion: 1;
   players: Record<string, Record<string, string[]>>;
+  incorrectChoices?: Record<string, Record<string, Record<string, string[]>>>;
 }
 function progress(value: unknown): ProgressFile {
   if (!value || typeof value !== "object") throw new Error("Invalid progress");
@@ -19,6 +20,23 @@ function progress(value: unknown): ProgressFile {
     for (const ids of Object.values(hunts))
       if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string"))
         throw new Error("Invalid progress");
+  }
+  if (data.incorrectChoices !== undefined) {
+    const object = (value: unknown): value is Record<string, unknown> =>
+      !!value && typeof value === "object" && !Array.isArray(value);
+    if (!object(data.incorrectChoices)) throw new Error("Invalid attempts");
+    for (const hunts of Object.values(data.incorrectChoices)) {
+      if (!object(hunts)) throw new Error("Invalid attempts");
+      for (const tasks of Object.values(hunts)) {
+        if (!object(tasks)) throw new Error("Invalid attempts");
+        for (const choices of Object.values(tasks))
+          if (
+            !Array.isArray(choices) ||
+            choices.some((choice) => typeof choice !== "string")
+          )
+            throw new Error("Invalid attempts");
+      }
+    }
   }
   return data;
 }
@@ -43,6 +61,34 @@ export class PlayerProgressStore {
       Object.hasOwn(data.players[player], hunt)
       ? data.players[player][hunt]
       : [];
+  }
+  async incorrect(
+    player: string,
+    hunt: string,
+  ): Promise<Record<string, string[]>> {
+    const data = await this.file.get();
+    return data.incorrectChoices?.[player]?.[hunt] ?? {};
+  }
+  async rejectChoice(
+    player: string,
+    hunt: string,
+    task: string,
+    choice: string,
+  ): Promise<void> {
+    if (
+      ![player, hunt, task].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)) ||
+      [player, hunt, task].some((id) =>
+        ["__proto__", "constructor", "prototype"].includes(id),
+      )
+    )
+      throw new StoreError("validation", "Invalid progress identifier.");
+    await this.file.update((data) => {
+      const players = (data.incorrectChoices ??= {});
+      const hunts = (players[player] ??= {});
+      const tasks = (hunts[hunt] ??= {});
+      const choices = (tasks[task] ??= []);
+      if (!choices.includes(choice)) choices.push(choice);
+    });
   }
   async join(player: string, hunt: string): Promise<void> {
     if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))

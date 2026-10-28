@@ -1,5 +1,9 @@
 import { OAuth2Client } from "google-auth-library";
-import type { HuntDefinition, PlayerHunt } from "../foundation/types.js";
+import type {
+  HuntDefinition,
+  PlayerHunt,
+  TaskDefinition,
+} from "../foundation/types.js";
 import {
   createServer,
   type IncomingMessage,
@@ -61,6 +65,33 @@ function json(response: ServerResponse, status: number, value: unknown): void {
   });
   response.end(JSON.stringify(value));
 }
+function playerChoices(task: TaskDefinition, incorrectChoices: string[]) {
+  return task.taskType === "multiple-choice"
+    ? {
+        taskType: task.taskType,
+        choices: [...task.choices!].sort(),
+        incorrectChoices,
+      }
+    : { taskType: "single-word-trivia" as const };
+}
+async function evaluateChoice(
+  store: PlayerProgressStore,
+  player: string,
+  hunt: string,
+  task: TaskDefinition,
+  answer: string,
+): Promise<boolean> {
+  if (!task.choices?.includes(answer))
+    throw new StoreError("validation", "Select one of the available choices.");
+  if ((await store.incorrect(player, hunt))[task.id]?.includes(answer))
+    return false;
+  if (answer !== task.requiredAnswer) {
+    await store.rejectChoice(player, hunt, task.id, answer);
+    return false;
+  }
+  await store.complete(player, hunt, task.id);
+  return true;
+}
 export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
@@ -110,6 +141,7 @@ export function createApplication(options: ServerOptions = {}) {
     hunt: HuntDefinition,
   ): Promise<PlayerHunt> {
     const completed = await accountProgress.completed(player, hunt.id);
+    const incorrect = await accountProgress.incorrect(player, hunt.id);
     return {
       id: hunt.id,
       name: hunt.name,
@@ -126,6 +158,7 @@ export function createApplication(options: ServerOptions = {}) {
           description: task.description,
           location: task.location,
           completed: completed.includes(task.id),
+          ...playerChoices(task, incorrect[task.id] ?? []),
         })),
     };
   }
@@ -255,6 +288,17 @@ export function createApplication(options: ServerOptions = {}) {
                 : undefined;
             if (typeof answer !== "string" || !answer.trim())
               throw new StoreError("validation", "Enter an answer.");
+            if (task.taskType === "multiple-choice") {
+              const completed = await evaluateChoice(
+                accountProgress,
+                player,
+                hunt.id,
+                task,
+                answer,
+              );
+              json(response, 200, { ok: true, value: { completed } });
+              return;
+            }
             const normalize = (answer: string) =>
               task.answerCaseSensitive
                 ? answer.trim()
@@ -475,6 +519,17 @@ export function createApplication(options: ServerOptions = {}) {
               : undefined;
           if (typeof answer !== "string" || !answer.trim())
             throw new StoreError("validation", "Enter an answer.");
+          if (task.taskType === "multiple-choice") {
+            const completed = await evaluateChoice(
+              progress,
+              player,
+              hunt.id,
+              task,
+              answer,
+            );
+            json(response, 200, { ok: true, value: { completed } });
+            return;
+          }
           const normalize = (text: string) =>
             task.answerCaseSensitive ? text.trim() : text.trim().toLowerCase();
           if (normalize(answer) !== normalize(task.requiredAnswer))
@@ -488,6 +543,7 @@ export function createApplication(options: ServerOptions = {}) {
         }
         if (method === "GET" && !match[2]) {
           const completed = await progress.completed(player, hunt.id);
+          const incorrect = await progress.incorrect(player, hunt.id);
           json(response, 200, {
             ok: true,
             value: {
@@ -506,6 +562,7 @@ export function createApplication(options: ServerOptions = {}) {
                   description: task.description,
                   location: task.location,
                   completed: completed.includes(task.id),
+                  ...playerChoices(task, incorrect[task.id] ?? []),
                 })),
             },
           });

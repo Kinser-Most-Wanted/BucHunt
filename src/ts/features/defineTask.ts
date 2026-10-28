@@ -274,6 +274,27 @@ export function mountDefineTask(
   const status = root.querySelector<HTMLElement>('[data-testid="task-status"]');
   if (!form || !status) return;
   const setTaskLocation = mountLocationPicker(root, form);
+  const taskType = form.querySelector<HTMLSelectElement>(
+    '[name="taskType"]',
+  );
+  const updateTaskFields = (): void => {
+    for (const group of form.querySelectorAll<HTMLElement>(
+      "[data-task-fields]",
+    )) {
+      const active = group.dataset.taskFields === taskType?.value;
+      group.hidden = !active;
+      for (const input of group.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input, textarea"))
+        input.disabled = !active;
+    }
+  };
+  taskType?.addEventListener("change", updateTaskFields);
+  form.addEventListener("reset", () => {
+    if (taskType) taskType.value = "";
+    updateTaskFields();
+  });
+  updateTaskFields();
   const taskList = root.querySelector<HTMLOListElement>(
     '[data-testid="defined-task-list"]',
   );
@@ -314,9 +335,20 @@ export function mountDefineTask(
     editingTaskId = task.id;
     submitButton.textContent = "Save task changes";
     cancelEdit.hidden = false;
+    const multipleChoice = task.taskType === "multiple-choice";
+    if (taskType) {
+      taskType.value = task.taskType ?? "single-word-trivia";
+      updateTaskFields();
+    }
     const displayLabel = field<HTMLInputElement>(form, "displayLabel");
-    const description = field<HTMLTextAreaElement>(form, "description");
-    const requiredAnswer = field<HTMLInputElement>(form, "requiredAnswer");
+    const description = field<HTMLInputElement | HTMLTextAreaElement>(
+      form,
+      multipleChoice ? "question" : "description",
+    );
+    const requiredAnswer = field<HTMLInputElement>(
+      form,
+      multipleChoice ? "correctAnswer" : "requiredAnswer",
+    );
     const latitude = field<HTMLInputElement>(form, "latitude");
     const longitude = field<HTMLInputElement>(form, "longitude");
     const order = field<HTMLInputElement>(form, "order");
@@ -329,6 +361,18 @@ export function mountDefineTask(
     if (displayLabel) displayLabel.value = task.displayLabel;
     if (description) description.value = task.description;
     if (requiredAnswer) requiredAnswer.value = task.requiredAnswer;
+    if (multipleChoice) {
+      const incorrectChoices = (task.choices ?? []).filter(
+        (choice) => choice !== task.requiredAnswer,
+      );
+      for (const index of [1, 2, 3]) {
+        const input = field<HTMLInputElement>(
+          form,
+          `incorrectAnswer${index}`,
+        );
+        if (input) input.value = incorrectChoices[index - 1] ?? "";
+      }
+    }
     if (latitude) latitude.value = String(task.location.latitude);
     if (longitude) longitude.value = String(task.location.longitude);
     if (order) order.value = String(task.order);
@@ -452,10 +496,27 @@ export function mountDefineTask(
     const huntId = huntInput?.value.trim() ?? "";
     const displayLabel =
       field<HTMLInputElement>(form, "displayLabel")?.value.trim() ?? "";
+    const multipleChoice = taskType?.value === "multiple-choice";
     const description =
-      field<HTMLTextAreaElement>(form, "description")?.value.trim() ?? "";
+      field<HTMLInputElement | HTMLTextAreaElement>(
+        form,
+        multipleChoice ? "question" : "description",
+      )?.value.trim() ?? "";
     const requiredAnswer =
-      field<HTMLInputElement>(form, "requiredAnswer")?.value.trim() ?? "";
+      field<HTMLInputElement>(
+        form,
+        multipleChoice ? "correctAnswer" : "requiredAnswer",
+      )?.value.trim() ?? "";
+    const choices = [
+      requiredAnswer,
+      ...[1, 2, 3].map(
+        (index) =>
+          field<HTMLInputElement>(
+            form,
+            `incorrectAnswer${index}`,
+          )?.value.trim() ?? "",
+      ),
+    ];
     const latitudeValue =
       field<HTMLInputElement>(form, "latitude")?.value ?? "";
     const longitudeValue =
@@ -471,6 +532,15 @@ export function mountDefineTask(
     const order = Number(orderValue);
     const points = Number(pointsValue);
     const issues: string[] = [];
+    if (!taskType?.value) issues.push("Select a task type.");
+    if (
+      multipleChoice &&
+      (choices.some((choice) => !choice) ||
+        new Set(choices.map((choice) => choice.toLowerCase())).size !== 4)
+    )
+      issues.push(
+        "Enter one correct answer and three distinct incorrect answers.",
+      );
     if (!huntId) issues.push("Enter the hunt ID for this task.");
     if (!displayLabel) issues.push("Enter a display label.");
     if (!description) issues.push("Enter the clue and instructions.");
@@ -500,12 +570,14 @@ export function mountDefineTask(
     }
 
     const task: TaskInput = {
+      taskType: multipleChoice ? "multiple-choice" : "single-word-trivia",
+      ...(multipleChoice ? { choices } : {}),
       displayLabel,
       description,
       requiredAnswer,
       location: { latitude, longitude },
       order,
-      answerCaseSensitive,
+      answerCaseSensitive: multipleChoice ? false : answerCaseSensitive,
       hint: hintValue || null,
       points,
     };

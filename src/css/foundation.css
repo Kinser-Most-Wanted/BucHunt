@@ -2504,6 +2504,47 @@ body[data-page="player"].player-hunt-modal-open {
   box-shadow: 0 7px 20px rgb(0 0 0 / 22%);
   transform: translateY(-1px);
 }
+.player-hunt-details .task-answer-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+.player-hunt-details .task-answer-choice {
+  min-height: 3rem;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgb(139 188 255 / 28%);
+  border-radius: 0.7rem;
+  background: rgb(139 188 255 / 9%);
+  color: #eef5ff;
+  font-weight: 700;
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+.player-hunt-details .task-answer-choice:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #8bbcff;
+  background: rgb(139 188 255 / 17%);
+}
+.player-hunt-details .task-answer-choice:disabled {
+  border-color: rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 5%);
+  color: #9caec3;
+}
+.player-hunt-details .task-answer-choice-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ffc8bd;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.player-hunt-details .task-answer-choice-message:empty {
+  display: none;
+}
 .player-hunt-details .task-answer-message {
   margin: 0;
   color: #ffc8bd;

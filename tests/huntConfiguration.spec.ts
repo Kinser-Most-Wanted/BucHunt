@@ -265,6 +265,9 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page
     .getByLabel("Display label", { exact: true })
     .fill("Find the fountain");
+  await page
+    .getByLabel("Task type", { exact: true })
+    .selectOption("single-word-trivia");
   await page.getByLabel("Clue and instructions").fill("Read the plaque");
   await page.getByLabel("Required answer", { exact: true }).fill("Bucky");
   await page.getByTestId("task-location-query").fill("Student Center");
@@ -440,6 +443,9 @@ test("only owners and contributors can configure a hunt through the creator work
     await member
       .getByLabel("Display label", { exact: true })
       .fill("Collaborator task");
+    await member
+      .getByLabel("Task type", { exact: true })
+      .selectOption("single-word-trivia");
     await member.getByLabel("Clue and instructions").fill("Look nearby");
     await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
     await clickMap(member, 36, -82);
@@ -490,4 +496,76 @@ test("only owners and contributors can configure a hunt through the creator work
     await contributor.close();
     await stranger.close();
   }
+});
+
+test("task type selection creates multiple-choice configuration and resets after saving", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  await page
+    .getByLabel("Hunt name", { exact: true })
+    .fill("Multiple choice hunt");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill("Shapes around campus");
+  await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
+  await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+  await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Multiple choice hunt (owner)", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit hunt tasks" }).click();
+  const type = page.getByLabel("Task type", { exact: true });
+  await expect(type).toHaveValue("");
+  await expect(type.locator('option[value=""]')).toBeDisabled();
+  await type.selectOption("single-word-trivia");
+  await expect(
+    page.getByLabel("Required answer", { exact: true }),
+  ).toBeVisible();
+  await type.selectOption("multiple-choice");
+  await expect(
+    page.getByLabel("Required answer", { exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Display label", { exact: true }).fill("Street sign");
+  const question = page.getByLabel("What is the question being asked?");
+  await expect(question).toHaveAttribute(
+    "placeholder",
+    "What shape is the sign on xyz street at abc building?",
+  );
+  await question.fill("What shape is this sign?");
+  await page.getByLabel("Correct Answer", { exact: true }).fill("Square");
+  for (const [index, choice] of ["Circle", "Triangle", "Octagon"].entries())
+    await page
+      .getByLabel(`Incorrect Answer ${index + 1}`, { exact: true })
+      .fill(choice);
+  await clickMap(page, 36, -82);
+  const request = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/tasks") && request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Add task to hunt" }).click();
+  expect((await request).postDataJSON()).toMatchObject({
+    taskType: "multiple-choice",
+    description: "What shape is this sign?",
+    requiredAnswer: "Square",
+    choices: ["Square", "Circle", "Triangle", "Octagon"],
+  });
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was saved and appears",
+  );
+  await expect(type).toHaveValue("");
+  await expect(question).toBeDisabled();
+  await page.getByTestId("edit-task").click();
+  await expect(type).toHaveValue("multiple-choice");
+  await expect(question).toHaveValue("What shape is this sign?");
+  await expect(page.getByLabel("Correct Answer", { exact: true })).toHaveValue(
+    "Square",
+  );
+  await expect(
+    page.getByLabel("Incorrect Answer 1", { exact: true }),
+  ).toHaveValue("Circle");
 });

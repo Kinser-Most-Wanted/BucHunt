@@ -11,11 +11,11 @@
     "test:e2e:ui": "playwright test --ui",
     "serve": "node src/js/server/server.js",
     "test": "playwright test",
-    "format:check": "prettier --check src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts",
+    "format:check": "prettier --check package.json src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntValidation.test.ts data/hunts.schema.json src/ts/foundation/types.ts src/ts/validation/huntValidation.ts tests/displayTasks.test.ts src/css/foundation.css tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts",
     "build:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --outDir",
     "check:admin": "tsc src/server/admin.ts --target ES2022 --module commonjs --lib ES2022,DOM --strict --skipLibCheck --noEmit",
     "test:admin": "node --experimental-strip-types --test src/server/admin.test.ts",
-    "format": "prettier --write src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts"
+    "format": "prettier --write package.json src/ts/server src/ts/features/createHunt.ts src/ts/features/defineTask.ts src/ts/features/displayTasks.ts src/ts/features/huntRepository.ts src/admin.html src/player.html tests/huntValidation.test.ts data/hunts.schema.json src/ts/foundation/types.ts src/ts/validation/huntValidation.ts tests/displayTasks.test.ts src/css/foundation.css tests/huntPersistence.test.ts tests/huntConfiguration.spec.ts tests/deployment.spec.ts"
   },
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {

@@ -50,6 +50,20 @@
         "points"
       ],
       "properties": {
+        "taskType": {
+          "enum": ["single-word-trivia", "multiple-choice"]
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
         "id": {
           "type": "string",
           "minLength": 1,
@@ -99,7 +113,27 @@
           "minimum": 0,
           "default": 0
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "taskType": {
+                "const": "multiple-choice"
+              }
+            },
+            "required": ["taskType"]
+          },
+          "then": {
+            "required": ["choices"]
+          },
+          "else": {
+            "not": {
+              "required": ["choices"]
+            }
+          }
+        }
+      ]
     },
     "hunt": {
       "type": "object",

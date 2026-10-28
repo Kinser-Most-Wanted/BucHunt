@@ -650,3 +650,85 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
   );
   await expect(page).toHaveURL(/\/player\.html$/);
 });
+
+test("multiple-choice selections submit immediately, retain rejected options, and recover from network errors", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "a@example.com",
+        accountId: "player-a",
+        idToken: "test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.player-a", "Player A");
+  });
+  const task = {
+    id: "task-choice",
+    huntId: "hunt-choice",
+    displayLabel: "Sign shape",
+    description: "What shape is the sign?",
+    taskType: "multiple-choice",
+    choices: ["Circle", "Octagon", "Square", "Triangle"],
+    incorrectChoices: [] as string[],
+    completed: false,
+  };
+  const hunt = {
+    id: "hunt-choice",
+    name: "Shape hunt",
+    description: "Find a sign",
+    beginsAt: "2026-10-15T10:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [task],
+  };
+  let fail = true;
+  const answers: string[] = [];
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: { role: "user" } } }),
+  );
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/answer")) {
+      const answer = route.request().postDataJSON().answer;
+      answers.push(answer);
+      if (fail) {
+        fail = false;
+        await route.abort();
+        return;
+      }
+      if (answer === "Square") task.completed = true;
+      else task.incorrectChoices.push(answer);
+      await route.fulfill({
+        json: { ok: true, value: { completed: task.completed } },
+      });
+    } else
+      await route.fulfill({
+        json: { ok: true, value: path.endsWith("/hunts") ? [hunt] : hunt },
+      });
+  });
+  await page.goto("/player.html?huntId=hunt-choice");
+  const item = page.getByTestId("player-task");
+  await expect(item.getByRole("button")).toHaveCount(4);
+  await item.getByRole("button", { name: "Circle", exact: true }).click();
+  await expect(item.getByRole("status")).toContainText("Try again.");
+  await expect(
+    item.getByRole("button", { name: "Circle", exact: true }),
+  ).toBeEnabled();
+  await item.getByRole("button", { name: "Circle", exact: true }).click();
+  await expect(
+    item.getByRole("button", { name: "Circle — Incorrect", exact: true }),
+  ).toBeDisabled();
+  await expect(item.getByRole("status")).toContainText("Incorrect answer");
+  await page.reload();
+  await expect(
+    item.getByRole("button", { name: "Circle — Incorrect", exact: true }),
+  ).toBeDisabled();
+  await item.getByRole("button", { name: "Square", exact: true }).click();
+  await expect(item).toContainText("Completed");
+  await expect(item.getByRole("button")).toHaveCount(0);
+  expect(answers).toEqual(["Circle", "Circle", "Square"]);
+});

@@ -99,6 +99,85 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
   }
 });
 
+test("multiple-choice answers persist rejected choices per account and complete only on the configured answer", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-multiple-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  const saved = await store.addTask(hunt.id, {
+    ...task,
+    taskType: "multiple-choice",
+    requiredAnswer: "Square",
+    choices: ["Square", "Circle", "Triangle", "Octagon"],
+  });
+  expect(
+    (await new HuntStore(join(directory, "hunts.json")).get(hunt.id)).tasks[0],
+  ).toEqual(saved);
+  let app = createApplication({
+    dataDirectory: directory,
+    verifyPlayerToken: async (token) => token,
+  });
+  const listen = async () => {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/player/account`;
+  };
+  let base = await listen();
+  const call = (path: string, value?: unknown, token = "player-a") =>
+    fetch(base + path, {
+      method: value === undefined ? "GET" : "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: value === undefined ? undefined : JSON.stringify(value),
+    });
+  const route = `/hunts/${hunt.id}`;
+  const answer = route + `/tasks/${saved.id}/answer`;
+  try {
+    expect((await call("/join", { accessCode: hunt.accessCode })).status).toBe(
+      200,
+    );
+    const displayed = (await (await call(route)).json()).value.tasks[0];
+    expect(displayed.choices).toEqual([
+      "Circle",
+      "Octagon",
+      "Square",
+      "Triangle",
+    ]);
+    expect(displayed).not.toHaveProperty("requiredAnswer");
+    expect((await call(answer, { answer: "not-a-choice" })).status).toBe(400);
+    expect(
+      (await (await call(answer, { answer: "Circle" })).json()).value.completed,
+    ).toBe(false);
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    app = createApplication({
+      dataDirectory: directory,
+      verifyPlayerToken: async (token) => token,
+    });
+    base = await listen();
+    expect((await (await call(route)).json()).value.tasks[0]).toMatchObject({
+      completed: false,
+      incorrectChoices: ["Circle"],
+    });
+    expect(
+      (await (await call(answer, { answer: "Circle" })).json()).value.completed,
+    ).toBe(false);
+    await call("/join", { accessCode: hunt.accessCode }, "player-b");
+    expect(
+      (await (await call(route, undefined, "player-b")).json()).value.tasks[0]
+        .incorrectChoices,
+    ).toEqual([]);
+    expect(
+      (await (await call(answer, { answer: "Square" })).json()).value.completed,
+    ).toBe(true);
+    expect((await (await call(route)).json()).value.tasks[0].completed).toBe(
+      true,
+    );
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("corrupt or unsupported stores are preserved and write failures reject", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-failure-"));
   try {

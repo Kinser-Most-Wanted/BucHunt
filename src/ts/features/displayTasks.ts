@@ -819,7 +819,79 @@ export function mountDisplayTasks(
           description.textContent = task.description;
           item.append(description);
         }
-        if (!task.completed && canAnswer) {
+        if (
+          !task.completed &&
+          canAnswer &&
+          task.taskType === "multiple-choice"
+        ) {
+          const choices = document.createElement("div");
+          choices.className = "task-answer-choices";
+          choices.setAttribute("role", "group");
+          choices.setAttribute(
+            "aria-label",
+            `Answer for ${task.displayLabel}`,
+          );
+          const message = document.createElement("p");
+          message.className = "task-answer-choice-message";
+          message.setAttribute("role", "status");
+          const incorrect = new Set(task.incorrectChoices ?? []);
+          const buttons: HTMLButtonElement[] = [];
+          const refresh = (): void => {
+            for (const button of buttons) {
+              button.disabled = incorrect.has(button.value);
+              button.textContent =
+                button.value +
+                (incorrect.has(button.value) ? " — Incorrect" : "");
+            }
+          };
+          for (const choice of task.choices ?? []) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "task-answer-choice";
+            button.value = choice;
+            buttons.push(button);
+            button.addEventListener("click", async () => {
+              for (const option of buttons) option.disabled = true;
+              message.textContent = "Checking answer…";
+              try {
+                const result = await repository.answerAccountTask(
+                  huntId,
+                  task.id,
+                  choice,
+                  identity,
+                );
+                if (requestId !== huntRequest) return;
+                if (!result.ok) {
+                  message.textContent = result.message;
+                  if (result.message.includes("Hunt Ended")) {
+                    await loadHunt(huntId);
+                    return;
+                  }
+                  if (result.code === "unauthorized")
+                    void preparePlayerSignIn();
+                } else if (result.value.completed) {
+                  state.textContent = "Completed";
+                  choices.remove();
+                  await loadHunt(huntId);
+                  return;
+                } else {
+                  incorrect.add(choice);
+                  message.textContent =
+                    "Incorrect answer. Choose another option.";
+                }
+              } catch {
+                message.textContent =
+                  "The answer service could not be reached. Try again.";
+              } finally {
+                refresh();
+              }
+            });
+            choices.append(button);
+          }
+          refresh();
+          choices.append(message);
+          item.append(choices);
+        } else if (!task.completed && canAnswer) {
           const answerForm = document.createElement("form");
           answerForm.className = "task-answer-form";
           const answerLabel = document.createElement("label");

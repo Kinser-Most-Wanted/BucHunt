@@ -438,7 +438,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(submitAnswer).toBeVisible();
   const buttonPositionBeforeFeedback = await submitAnswer.evaluate((button) => {
     const bounds = button.getBoundingClientRect();
-    return { left: bounds.left, top: bounds.top, right: bounds.right };
+    const actions = button.parentElement!.getBoundingClientRect();
+    return {
+      left: bounds.left - actions.left,
+      top: bounds.top - actions.top,
+      right: actions.right - bounds.right,
+    };
   });
   await answerTask.getByLabel("Answer for Library Steps").fill("wrong");
   await submitAnswer.click();
@@ -447,7 +452,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   const buttonPositionAfterFeedback = await submitAnswer.evaluate((button) => {
     const bounds = button.getBoundingClientRect();
-    return { left: bounds.left, top: bounds.top, right: bounds.right };
+    const actions = button.parentElement!.getBoundingClientRect();
+    return {
+      left: bounds.left - actions.left,
+      top: bounds.top - actions.top,
+      right: actions.right - bounds.right,
+    };
   });
   expect(buttonPositionAfterFeedback).toEqual(buttonPositionBeforeFeedback);
   const mapToggle = answerTask.getByRole("button", {

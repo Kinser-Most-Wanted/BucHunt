@@ -43,6 +43,7 @@ export interface PlayerTask {
   choices?: string[];
   incorrectChoices?: string[];
   description?: string;
+  hint?: string | null;
   id: string;
   huntId: string;
   displayLabel: string;

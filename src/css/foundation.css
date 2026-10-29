@@ -2168,6 +2168,11 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
   outline: 3px solid rgb(255 199 44 / 25%);
   outline-offset: 2px;
 }
+.past-hunt-filter-note {
+  margin: -0.4rem 0 1rem;
+  color: #aab7c7;
+  font-size: 0.82rem;
+}
 @media (max-width: 38rem) {
   .past-hunt-filter {
     grid-template-columns: 1fr;

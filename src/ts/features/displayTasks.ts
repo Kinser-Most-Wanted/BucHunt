@@ -501,8 +501,7 @@ export function mountDisplayTasks(
       renderHunts(list, groups.active, now);
       renderHunts(futureList, groups.future, now);
       const sortedPastHunts = [...groups.past].sort(
-        (left, right) =>
-          pastHuntTimestamp(right) - pastHuntTimestamp(left),
+        (left, right) => pastHuntTimestamp(right) - pastHuntTimestamp(left),
       );
       const matchingPastHunts =
         pastHuntFilter === "recent-3"

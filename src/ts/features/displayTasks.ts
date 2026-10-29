@@ -92,6 +92,7 @@ function taskLocationElement(
 
 type HuntPhase = "active" | "future" | "past";
 type PastHuntFilter =
+  | "recent-3"
   | "all"
   | "completed"
   | "incomplete"
@@ -186,18 +187,22 @@ function isHuntCompleted(hunt: PlayerHunt): boolean {
   return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
 }
 
+function pastHuntTimestamp(hunt: PlayerHunt): number {
+  return Date.parse(hunt.endsAt ?? hunt.beginsAt);
+}
+
 function matchesPastHuntFilter(
   hunt: PlayerHunt,
   filter: PastHuntFilter,
   now: number,
 ): boolean {
-  if (filter === "all") return true;
+  if (filter === "recent-3" || filter === "all") return true;
   if (filter === "completed") return isHuntCompleted(hunt);
   if (filter === "incomplete")
     return hunt.tasks.length > 0 && !isHuntCompleted(hunt);
   if (filter === "no-tasks") return hunt.tasks.length === 0;
 
-  const pastDate = Date.parse(hunt.endsAt ?? hunt.beginsAt);
+  const pastDate = pastHuntTimestamp(hunt);
   const daysSinceEnd = (now - pastDate) / (24 * 60 * 60 * 1000);
   if (!Number.isFinite(daysSinceEnd) || daysSinceEnd < 0) return false;
   if (filter === "last-7-days") return daysSinceEnd <= 7;
@@ -247,10 +252,13 @@ function renderHunts(
   list: HTMLUListElement,
   hunts: PlayerHunt[],
   now: number,
+  newestFirst = false,
 ): void {
   list.replaceChildren();
-  for (const hunt of [...hunts].sort(
-    (left, right) => Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
+  for (const hunt of [...hunts].sort((left, right) =>
+    newestFirst
+      ? pastHuntTimestamp(right) - pastHuntTimestamp(left)
+      : Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
   )) {
     const item = document.createElement("li");
     item.className = "player-hunt";
@@ -315,6 +323,18 @@ export function mountDisplayTasks(
   );
   const pastFilter = root.querySelector<HTMLSelectElement>(
     '[data-testid="past-hunt-filter"]',
+  );
+  const pastFilterNote = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunt-filter-note"]',
+  );
+  const activeHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="active-hunt-count"]',
+  );
+  const futureHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="future-hunt-count"]',
+  );
+  const pastHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunt-count"]',
   );
   const activeEmpty = root.querySelector<HTMLElement>(
     '[data-testid="active-hunts-empty"]',
@@ -386,6 +406,10 @@ export function mountDisplayTasks(
     !futureList ||
     !pastList ||
     !pastFilter ||
+    !pastFilterNote ||
+    !activeHuntCount ||
+    !futureHuntCount ||
+    !pastHuntCount ||
     !activeEmpty ||
     !futureEmpty ||
     !pastEmpty ||
@@ -442,7 +466,9 @@ export function mountDisplayTasks(
     categories.hidden = true;
     huntLookup.hidden = true;
     if (huntDetails.open) huntDetails.close();
+    heading.hidden = false;
     heading.textContent = "Sign in to see active Hunts";
+    status.hidden = false;
     list.replaceChildren();
     futureList.replaceChildren();
     pastList.replaceChildren();
@@ -450,7 +476,7 @@ export function mountDisplayTasks(
   };
 
   let displayedHunts: PlayerHunt[] = [];
-  let pastHuntFilter: PastHuntFilter = "all";
+  let pastHuntFilter: PastHuntFilter = "recent-3";
   let categorySignature = "";
   let selectedHuntId: string | null = null;
   let reloadSelectedHunt: (() => void) | undefined;
@@ -474,13 +500,40 @@ export function mountDisplayTasks(
       categorySignature = signature;
       renderHunts(list, groups.active, now);
       renderHunts(futureList, groups.future, now);
-      const pastHunts = groups.past.filter((hunt) =>
-        matchesPastHuntFilter(hunt, pastHuntFilter, now),
+      const sortedPastHunts = [...groups.past].sort(
+        (left, right) => pastHuntTimestamp(right) - pastHuntTimestamp(left),
       );
-      renderHunts(pastList, pastHunts, now);
+      const matchingPastHunts =
+        pastHuntFilter === "recent-3"
+          ? sortedPastHunts.slice(0, 3)
+          : sortedPastHunts.filter((hunt) =>
+              matchesPastHuntFilter(hunt, pastHuntFilter, now),
+            );
+      renderHunts(pastList, matchingPastHunts, now, true);
+      pastFilterNote.textContent =
+        pastHuntFilter === "recent-3"
+          ? "Showing up to 3 recent Past Hunts. Choose a filter to browse older hunts."
+          : pastHuntFilter === "all"
+            ? "Showing all past Hunts, newest first."
+            : "Showing all past Hunts that match this filter, newest first.";
+      activeHuntCount.textContent = `(${groups.active.length})`;
+      activeHuntCount.setAttribute(
+        "aria-label",
+        `${groups.active.length} active hunts`,
+      );
+      futureHuntCount.textContent = `(${groups.future.length})`;
+      futureHuntCount.setAttribute(
+        "aria-label",
+        `${groups.future.length} future hunts`,
+      );
+      pastHuntCount.textContent = `(${matchingPastHunts.length})`;
+      pastHuntCount.setAttribute(
+        "aria-label",
+        `${matchingPastHunts.length} past hunts shown`,
+      );
       activeEmpty.hidden = groups.active.length > 0;
       futureEmpty.hidden = groups.future.length > 0;
-      pastEmpty.hidden = pastHunts.length > 0;
+      pastEmpty.hidden = matchingPastHunts.length > 0;
       pastEmpty.textContent = groups.past.length
         ? "No past Hunts match this filter."
         : "No past Hunts yet.";
@@ -549,6 +602,7 @@ export function mountDisplayTasks(
     providerStatus.hidden = true;
     nameForm.hidden = true;
     heading.textContent = "Your Hunts";
+    heading.hidden = true;
     categories.hidden = false;
     huntLookup.hidden = false;
     signOut.hidden = false;
@@ -578,17 +632,20 @@ export function mountDisplayTasks(
     list.replaceChildren();
     futureList.replaceChildren();
     pastList.replaceChildren();
+    status.hidden = false;
     status.textContent = "Loading your hunts...";
     const result = await repository.listActiveHunts(signedIn);
     if (!result.ok) {
+      status.hidden = false;
       status.textContent = result.message;
       if (result.code === "unauthorized") void preparePlayerSignIn();
       return;
     }
     displayedHunts = result.value;
     renderCategories(true);
+    status.hidden = result.value.length > 0;
     status.textContent = result.value.length
-      ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
+      ? ""
       : "Your dashboard is ready. Join a hunt above to get started.";
   };
 

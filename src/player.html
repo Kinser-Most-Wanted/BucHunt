@@ -209,7 +209,15 @@
                 <p class="eyebrow">READY WHEN YOU ARE</p>
                 <h2 id="active-hunts-heading">Active Hunts</h2>
               </div>
-              <span class="hunt-state-badge">In progress</span>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="active-hunt-count"
+                  aria-label="0 active hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">In progress</span>
+              </div>
             </div>
             <ul
               data-testid="player-hunt-list"
@@ -233,7 +241,15 @@
                 <p class="eyebrow">COMING UP</p>
                 <h2 id="future-hunts-heading">Future Hunts</h2>
               </div>
-              <span class="hunt-state-badge">Starts soon</span>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="future-hunt-count"
+                  aria-label="0 future hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">Starts soon</span>
+              </div>
             </div>
             <ul
               data-testid="player-future-hunt-list"
@@ -257,11 +273,20 @@
                 <p class="eyebrow">YOUR HISTORY</p>
                 <h2 id="past-hunts-heading">Past Hunts</h2>
               </div>
-              <span class="hunt-state-badge">Hunt Ended</span>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="past-hunt-count"
+                  aria-label="0 past hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">Hunt Ended</span>
+              </div>
             </div>
             <label class="past-hunt-filter" for="past-hunt-filter">
               <span>Filter past Hunts</span>
               <select id="past-hunt-filter" data-testid="past-hunt-filter">
+                <option value="recent-3" selected>Most recent 3</option>
                 <option value="all">All past Hunts</option>
                 <option value="completed">Completed</option>
                 <option value="incomplete">Incomplete</option>
@@ -271,6 +296,14 @@
                 <option value="over-30-days">Ended over 30 days ago</option>
               </select>
             </label>
+            <p
+              class="past-hunt-filter-note"
+              data-testid="past-hunt-filter-note"
+              aria-live="polite"
+            >
+              Showing up to 3 recent Past Hunts. Choose a filter to browse older
+              hunts.
+            </p>
             <ul
               data-testid="player-past-hunt-list"
               aria-label="Past Hunts"

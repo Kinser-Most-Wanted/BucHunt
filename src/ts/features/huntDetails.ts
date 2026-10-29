@@ -5,8 +5,26 @@ const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
 );
 const repository = createHuntRepository();
+const copyAccessCodeButton = dialog?.querySelector<HTMLButtonElement>(
+  '[data-testid="copy-hunt-access-code"]',
+);
+const copyAccessCodeStatus = dialog?.querySelector<HTMLElement>(
+  '[data-testid="hunt-access-code-copy-status"]',
+);
 let activeRequest = 0;
 let activeHunt: HuntDefinition | undefined;
+
+copyAccessCodeButton?.addEventListener("click", async () => {
+  const accessCode = activeHunt?.accessCode;
+  if (!accessCode) return;
+  try {
+    await navigator.clipboard.writeText(accessCode);
+    if (copyAccessCodeStatus) copyAccessCodeStatus.textContent = "Copied!";
+  } catch {
+    if (copyAccessCodeStatus)
+      copyAccessCodeStatus.textContent = "Copy unavailable.";
+  }
+});
 
 function addFact(list: HTMLElement, label: string, value: string): void {
   const item = document.createElement("div");
@@ -186,6 +204,14 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
     '[data-testid="hunt-access-code"]',
   )!;
   accessCode.textContent = hunt.accessCode || "Not set";
+  if (copyAccessCodeButton) {
+    copyAccessCodeButton.hidden = !hunt.accessCode;
+    copyAccessCodeButton.setAttribute(
+      "aria-label",
+      hunt.accessCode ? "Copy access code" : "No access code to copy",
+    );
+  }
+  if (copyAccessCodeStatus) copyAccessCodeStatus.textContent = "";
   const ownerLabel = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-owner"]',
   )!;

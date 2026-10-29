@@ -745,6 +745,7 @@ export function mountDisplayTasks(
     const loadHunt = async (huntId: string): Promise<void> => {
       const requestId = ++huntRequest;
       selectedHuntId = huntId;
+      const scrollPosition = huntDetails.open ? huntDetails.scrollTop : 0;
       if (!huntDetails.open) {
         huntDetails.scrollTop = 0;
         huntDetails.showModal();
@@ -966,6 +967,11 @@ export function mountDisplayTasks(
         }
         huntTasks.append(item);
       }
+      window.requestAnimationFrame(() => {
+        if (requestId === huntRequest && huntDetails.open) {
+          huntDetails.scrollTop = scrollPosition;
+        }
+      });
     };
     reloadSelectedHunt = () => {
       if (selectedHuntId) void loadHunt(selectedHuntId);

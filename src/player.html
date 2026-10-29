@@ -262,6 +262,7 @@
             <label class="past-hunt-filter" for="past-hunt-filter">
               <span>Filter past Hunts</span>
               <select id="past-hunt-filter" data-testid="past-hunt-filter">
+                <option value="recent-3" selected>Most recent 3</option>
                 <option value="all">All past Hunts</option>
                 <option value="completed">Completed</option>
                 <option value="incomplete">Incomplete</option>
@@ -271,6 +272,13 @@
                 <option value="over-30-days">Ended over 30 days ago</option>
               </select>
             </label>
+            <p
+              class="past-hunt-filter-note"
+              data-testid="past-hunt-filter-note"
+              aria-live="polite"
+            >
+              Showing the 3 most recent Past Hunts. Choose a filter to browse older hunts.
+            </p>
             <ul
               data-testid="player-past-hunt-list"
               aria-label="Past Hunts"

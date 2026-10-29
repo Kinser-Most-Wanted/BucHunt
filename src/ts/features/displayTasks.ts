@@ -92,6 +92,7 @@ function taskLocationElement(
 
 type HuntPhase = "active" | "future" | "past";
 type PastHuntFilter =
+  | "recent-3"
   | "all"
   | "completed"
   | "incomplete"
@@ -186,18 +187,22 @@ function isHuntCompleted(hunt: PlayerHunt): boolean {
   return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
 }
 
+function pastHuntTimestamp(hunt: PlayerHunt): number {
+  return Date.parse(hunt.endsAt ?? hunt.beginsAt);
+}
+
 function matchesPastHuntFilter(
   hunt: PlayerHunt,
   filter: PastHuntFilter,
   now: number,
 ): boolean {
-  if (filter === "all") return true;
+  if (filter === "recent-3" || filter === "all") return true;
   if (filter === "completed") return isHuntCompleted(hunt);
   if (filter === "incomplete")
     return hunt.tasks.length > 0 && !isHuntCompleted(hunt);
   if (filter === "no-tasks") return hunt.tasks.length === 0;
 
-  const pastDate = Date.parse(hunt.endsAt ?? hunt.beginsAt);
+  const pastDate = pastHuntTimestamp(hunt);
   const daysSinceEnd = (now - pastDate) / (24 * 60 * 60 * 1000);
   if (!Number.isFinite(daysSinceEnd) || daysSinceEnd < 0) return false;
   if (filter === "last-7-days") return daysSinceEnd <= 7;
@@ -247,10 +252,13 @@ function renderHunts(
   list: HTMLUListElement,
   hunts: PlayerHunt[],
   now: number,
+  newestFirst = false,
 ): void {
   list.replaceChildren();
-  for (const hunt of [...hunts].sort(
-    (left, right) => Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
+  for (const hunt of [...hunts].sort((left, right) =>
+    newestFirst
+      ? pastHuntTimestamp(right) - pastHuntTimestamp(left)
+      : Date.parse(left.beginsAt) - Date.parse(right.beginsAt),
   )) {
     const item = document.createElement("li");
     item.className = "player-hunt";
@@ -315,6 +323,9 @@ export function mountDisplayTasks(
   );
   const pastFilter = root.querySelector<HTMLSelectElement>(
     '[data-testid="past-hunt-filter"]',
+  );
+  const pastFilterNote = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunt-filter-note"]',
   );
   const activeEmpty = root.querySelector<HTMLElement>(
     '[data-testid="active-hunts-empty"]',
@@ -386,6 +397,7 @@ export function mountDisplayTasks(
     !futureList ||
     !pastList ||
     !pastFilter ||
+    !pastFilterNote ||
     !activeEmpty ||
     !futureEmpty ||
     !pastEmpty ||
@@ -450,7 +462,7 @@ export function mountDisplayTasks(
   };
 
   let displayedHunts: PlayerHunt[] = [];
-  let pastHuntFilter: PastHuntFilter = "all";
+  let pastHuntFilter: PastHuntFilter = "recent-3";
   let categorySignature = "";
   let selectedHuntId: string | null = null;
   let reloadSelectedHunt: (() => void) | undefined;
@@ -474,13 +486,26 @@ export function mountDisplayTasks(
       categorySignature = signature;
       renderHunts(list, groups.active, now);
       renderHunts(futureList, groups.future, now);
-      const pastHunts = groups.past.filter((hunt) =>
-        matchesPastHuntFilter(hunt, pastHuntFilter, now),
+      const sortedPastHunts = [...groups.past].sort(
+        (left, right) =>
+          pastHuntTimestamp(right) - pastHuntTimestamp(left),
       );
-      renderHunts(pastList, pastHunts, now);
+      const matchingPastHunts =
+        pastHuntFilter === "recent-3"
+          ? sortedPastHunts.slice(0, 3)
+          : sortedPastHunts.filter((hunt) =>
+              matchesPastHuntFilter(hunt, pastHuntFilter, now),
+            );
+      renderHunts(pastList, matchingPastHunts, now, true);
+      pastFilterNote.textContent =
+        pastHuntFilter === "recent-3"
+          ? "Showing the 3 most recent Past Hunts. Choose a filter to browse older hunts."
+          : pastHuntFilter === "all"
+            ? "Showing all past Hunts, newest first."
+            : "Showing all past Hunts that match this filter, newest first.";
       activeEmpty.hidden = groups.active.length > 0;
       futureEmpty.hidden = groups.future.length > 0;
-      pastEmpty.hidden = pastHunts.length > 0;
+      pastEmpty.hidden = matchingPastHunts.length > 0;
       pastEmpty.textContent = groups.past.length
         ? "No past Hunts match this filter."
         : "No past Hunts yet.";

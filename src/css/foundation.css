@@ -2887,6 +2887,26 @@ body[data-page="admin"] .hunt-access-code strong {
   font-size: 0.9rem;
   letter-spacing: 0.12em;
 }
+
+body[data-page="admin"] .hunt-access-code .hunt-access-code-copy {
+  display: inline-grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  min-width: 0;
+  place-items: center;
+  margin: 0;
+  padding: 0.4rem;
+  border: 1px solid rgb(255 199 44 / 34%);
+  border-radius: 0.6rem;
+  background: rgb(255 199 44 / 10%);
+  color: #ffd45c;
+}
+
+body[data-page="admin"] .hunt-access-code-copy-status {
+  color: #ffd45c;
+  font-size: 0.78rem;
+  letter-spacing: normal;
+}
 body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin-top: 1.35rem;
 }

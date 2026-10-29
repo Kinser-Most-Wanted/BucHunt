@@ -2134,6 +2134,17 @@ body[data-page="player"] .hunt-access-code {
 .player-hunt-category-heading {
   margin-bottom: 1rem;
 }
+.hunt-category-indicators {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+}
+.hunt-category-count {
+  min-width: 2.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .player-hunt-category-heading .eyebrow {
   margin: 0 0 0.3rem;
   color: #ffc72c;

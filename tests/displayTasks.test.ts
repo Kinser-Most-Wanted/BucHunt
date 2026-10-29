@@ -351,9 +351,11 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await page.getByRole("button", { name: "Join Hunt" }).click();
   await expect(page.getByTestId("player-hunt-details")).toBeVisible();
   await expect(page.getByTestId("player-hunt-name")).toHaveText("test");
-  await expect(page.getByTestId("player-task-status")).toContainText(
-    "5 saved Hunts",
-  );
+  await expect(page.getByTestId("player-task-status")).toBeHidden();
+  await expect(page.getByTestId("player-heading")).toBeHidden();
+  await expect(page.getByTestId("active-hunt-count")).toHaveText("(3)");
+  await expect(page.getByTestId("future-hunt-count")).toHaveText("(1)");
+  await expect(page.getByTestId("past-hunt-count")).toHaveText("(1)");
   await expect(page.getByTestId("player-hunt-list")).toContainText("test");
   await expect(page.getByTestId("player-task-list")).toContainText(
     "Old Fountain",

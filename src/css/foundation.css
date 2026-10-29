@@ -1399,6 +1399,10 @@ body[data-page="admin"] select {
   background: #0b203d;
   color: #f4f5f9;
 }
+
+body[data-page="admin"] input[type="datetime-local"] {
+  color-scheme: dark;
+}
 body[data-page="admin"] input::placeholder,
 body[data-page="admin"] textarea::placeholder {
   color: #788394;

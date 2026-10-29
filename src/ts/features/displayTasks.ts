@@ -327,6 +327,15 @@ export function mountDisplayTasks(
   const pastFilterNote = root.querySelector<HTMLElement>(
     '[data-testid="past-hunt-filter-note"]',
   );
+  const activeHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="active-hunt-count"]',
+  );
+  const futureHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="future-hunt-count"]',
+  );
+  const pastHuntCount = root.querySelector<HTMLElement>(
+    '[data-testid="past-hunt-count"]',
+  );
   const activeEmpty = root.querySelector<HTMLElement>(
     '[data-testid="active-hunts-empty"]',
   );
@@ -398,6 +407,9 @@ export function mountDisplayTasks(
     !pastList ||
     !pastFilter ||
     !pastFilterNote ||
+    !activeHuntCount ||
+    !futureHuntCount ||
+    !pastHuntCount ||
     !activeEmpty ||
     !futureEmpty ||
     !pastEmpty ||
@@ -454,7 +466,9 @@ export function mountDisplayTasks(
     categories.hidden = true;
     huntLookup.hidden = true;
     if (huntDetails.open) huntDetails.close();
+    heading.hidden = false;
     heading.textContent = "Sign in to see active Hunts";
+    status.hidden = false;
     list.replaceChildren();
     futureList.replaceChildren();
     pastList.replaceChildren();
@@ -503,6 +517,21 @@ export function mountDisplayTasks(
           : pastHuntFilter === "all"
             ? "Showing all past Hunts, newest first."
             : "Showing all past Hunts that match this filter, newest first.";
+      activeHuntCount.textContent = `(${groups.active.length})`;
+      activeHuntCount.setAttribute(
+        "aria-label",
+        `${groups.active.length} active hunts`,
+      );
+      futureHuntCount.textContent = `(${groups.future.length})`;
+      futureHuntCount.setAttribute(
+        "aria-label",
+        `${groups.future.length} future hunts`,
+      );
+      pastHuntCount.textContent = `(${matchingPastHunts.length})`;
+      pastHuntCount.setAttribute(
+        "aria-label",
+        `${matchingPastHunts.length} past hunts shown`,
+      );
       activeEmpty.hidden = groups.active.length > 0;
       futureEmpty.hidden = groups.future.length > 0;
       pastEmpty.hidden = matchingPastHunts.length > 0;
@@ -574,6 +603,7 @@ export function mountDisplayTasks(
     providerStatus.hidden = true;
     nameForm.hidden = true;
     heading.textContent = "Your Hunts";
+    heading.hidden = true;
     categories.hidden = false;
     huntLookup.hidden = false;
     signOut.hidden = false;
@@ -603,17 +633,20 @@ export function mountDisplayTasks(
     list.replaceChildren();
     futureList.replaceChildren();
     pastList.replaceChildren();
+    status.hidden = false;
     status.textContent = "Loading your hunts...";
     const result = await repository.listActiveHunts(signedIn);
     if (!result.ok) {
+      status.hidden = false;
       status.textContent = result.message;
       if (result.code === "unauthorized") void preparePlayerSignIn();
       return;
     }
     displayedHunts = result.value;
     renderCategories(true);
+    status.hidden = result.value.length > 0;
     status.textContent = result.value.length
-      ? `${result.value.length} saved Hunt${result.value.length === 1 ? "" : "s"}.`
+      ? ""
       : "Your dashboard is ready. Join a hunt above to get started.";
   };
 

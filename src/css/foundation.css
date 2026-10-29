@@ -2142,6 +2142,38 @@ body[data-page="player"] .hunt-access-code {
   margin: 0;
   color: #f8f9fb;
 }
+.past-hunt-filter {
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 28rem;
+  margin: 0 0 1rem;
+  color: #cbd1dc;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+body[data-page="player"] .past-hunt-filter select {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 0.6rem;
+  background: #0b203d;
+  color: #f4f5f9;
+  color-scheme: dark;
+  font: inherit;
+}
+body[data-page="player"] .past-hunt-filter select:focus-visible {
+  border-color: #ffc72c;
+  outline: 3px solid rgb(255 199 44 / 25%);
+  outline-offset: 2px;
+}
+@media (max-width: 38rem) {
+  .past-hunt-filter {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+}
 .player-hunt-category .hunt-state-badge,
 .player-hunt .hunt-state-badge {
   flex: 0 0 auto;

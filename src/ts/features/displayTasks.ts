@@ -91,6 +91,14 @@ function taskLocationElement(
 }
 
 type HuntPhase = "active" | "future" | "past";
+type PastHuntFilter =
+  | "all"
+  | "completed"
+  | "incomplete"
+  | "no-tasks"
+  | "last-7-days"
+  | "last-30-days"
+  | "over-30-days";
 
 function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
   if (
@@ -176,6 +184,25 @@ function huntStatusPresentation(
 
 function isHuntCompleted(hunt: PlayerHunt): boolean {
   return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
+}
+
+function matchesPastHuntFilter(
+  hunt: PlayerHunt,
+  filter: PastHuntFilter,
+  now: number,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "completed") return isHuntCompleted(hunt);
+  if (filter === "incomplete")
+    return hunt.tasks.length > 0 && !isHuntCompleted(hunt);
+  if (filter === "no-tasks") return hunt.tasks.length === 0;
+
+  const pastDate = Date.parse(hunt.endsAt ?? hunt.beginsAt);
+  const daysSinceEnd = (now - pastDate) / (24 * 60 * 60 * 1000);
+  if (!Number.isFinite(daysSinceEnd) || daysSinceEnd < 0) return false;
+  if (filter === "last-7-days") return daysSinceEnd <= 7;
+  if (filter === "last-30-days") return daysSinceEnd <= 30;
+  return daysSinceEnd > 30;
 }
 
 function updateHuntCardStatus(
@@ -286,6 +313,9 @@ export function mountDisplayTasks(
   const pastList = root.querySelector<HTMLUListElement>(
     '[data-testid="player-past-hunt-list"]',
   );
+  const pastFilter = root.querySelector<HTMLSelectElement>(
+    '[data-testid="past-hunt-filter"]',
+  );
   const activeEmpty = root.querySelector<HTMLElement>(
     '[data-testid="active-hunts-empty"]',
   );
@@ -355,6 +385,7 @@ export function mountDisplayTasks(
     !list ||
     !futureList ||
     !pastList ||
+    !pastFilter ||
     !activeEmpty ||
     !futureEmpty ||
     !pastEmpty ||
@@ -419,6 +450,7 @@ export function mountDisplayTasks(
   };
 
   let displayedHunts: PlayerHunt[] = [];
+  let pastHuntFilter: PastHuntFilter = "all";
   let categorySignature = "";
   let selectedHuntId: string | null = null;
   let reloadSelectedHunt: (() => void) | undefined;
@@ -442,10 +474,16 @@ export function mountDisplayTasks(
       categorySignature = signature;
       renderHunts(list, groups.active, now);
       renderHunts(futureList, groups.future, now);
-      renderHunts(pastList, groups.past, now);
+      const pastHunts = groups.past.filter((hunt) =>
+        matchesPastHuntFilter(hunt, pastHuntFilter, now),
+      );
+      renderHunts(pastList, pastHunts, now);
       activeEmpty.hidden = groups.active.length > 0;
       futureEmpty.hidden = groups.future.length > 0;
-      pastEmpty.hidden = groups.past.length > 0;
+      pastEmpty.hidden = pastHunts.length > 0;
+      pastEmpty.textContent = groups.past.length
+        ? "No past Hunts match this filter."
+        : "No past Hunts yet.";
       if (!force && changed && selectedHuntId)
         window.setTimeout(() => reloadSelectedHunt?.(), 0);
     }
@@ -462,6 +500,11 @@ export function mountDisplayTasks(
         }
       });
   };
+
+  pastFilter.addEventListener("change", () => {
+    pastHuntFilter = pastFilter.value as PastHuntFilter;
+    renderCategories(true);
+  });
 
   const updateDisplayedHunt = (hunt: PlayerHunt): void => {
     const index = displayedHunts.findIndex((item) => item.id === hunt.id);

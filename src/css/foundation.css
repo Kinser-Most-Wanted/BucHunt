@@ -2015,6 +2015,7 @@ body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
   backdrop-filter: blur(3px);
 }
 
+html:has(body[data-page="admin"] dialog[open]),
 body[data-page="admin"]:has(dialog[open]) {
   overflow: hidden;
   overscroll-behavior: none;

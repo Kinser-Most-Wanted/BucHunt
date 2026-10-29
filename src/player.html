@@ -259,6 +259,18 @@
               </div>
               <span class="hunt-state-badge">Hunt Ended</span>
             </div>
+            <label class="past-hunt-filter" for="past-hunt-filter">
+              <span>Filter past Hunts</span>
+              <select id="past-hunt-filter" data-testid="past-hunt-filter">
+                <option value="all">All past Hunts</option>
+                <option value="completed">Completed</option>
+                <option value="incomplete">Incomplete</option>
+                <option value="no-tasks">No tasks</option>
+                <option value="last-7-days">Ended in the last 7 days</option>
+                <option value="last-30-days">Ended in the last 30 days</option>
+                <option value="over-30-days">Ended over 30 days ago</option>
+              </select>
+            </label>
             <ul
               data-testid="player-past-hunt-list"
               aria-label="Past Hunts"

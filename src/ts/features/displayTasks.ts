@@ -499,7 +499,7 @@ export function mountDisplayTasks(
       renderHunts(pastList, matchingPastHunts, now, true);
       pastFilterNote.textContent =
         pastHuntFilter === "recent-3"
-          ? "Showing the 3 most recent Past Hunts. Choose a filter to browse older hunts."
+          ? "Showing up to 3 recent Past Hunts. Choose a filter to browse older hunts."
           : pastHuntFilter === "all"
             ? "Showing all past Hunts, newest first."
             : "Showing all past Hunts that match this filter, newest first.";

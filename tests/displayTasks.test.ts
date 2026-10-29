@@ -123,6 +123,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
         id: "task-2",
         displayLabel: "Library Steps",
         description: "Look for the carved stone marker.",
+        hint: "Check the north side.",
         completed: false,
         location: { latitude: 36.305, longitude: -82.367 },
       },
@@ -383,6 +384,9 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "Library Steps",
   );
   await expect(answerTask).toContainText("Look for the carved stone marker.");
+  await expect(answerTask.locator(".task-hint")).toContainText(
+    "Hint: Check the north side.",
+  );
   const playerIntro = page.locator(".player-hunt-intro");
   const introBounds = await playerIntro.evaluate((intro) => ({
     panelTop: intro.getBoundingClientRect().top,

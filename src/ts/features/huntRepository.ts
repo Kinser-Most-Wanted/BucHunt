@@ -202,6 +202,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
       ...(typeof item.description === "string"
         ? { description: item.description }
         : {}),
+      ...(item.hint === null || typeof item.hint === "string"
+        ? { hint: item.hint }
+        : {}),
       completed: item.completed,
       ...(item.location !== undefined
         ? { location: parseTaskLocation(item.location) }

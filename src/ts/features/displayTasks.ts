@@ -836,6 +836,14 @@ export function mountDisplayTasks(
           description.textContent = task.description;
           item.append(description);
         }
+        if (task.hint?.trim()) {
+          const hint = document.createElement("p");
+          hint.className = "task-hint";
+          const hintLabel = document.createElement("strong");
+          hintLabel.textContent = "Hint: ";
+          hint.append(hintLabel, document.createTextNode(task.hint));
+          item.append(hint);
+        }
         if (
           !task.completed &&
           canAnswer &&

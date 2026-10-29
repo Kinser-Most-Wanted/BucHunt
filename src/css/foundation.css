@@ -2014,6 +2014,11 @@ body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
   background: rgb(6 9 14 / 76%);
   backdrop-filter: blur(3px);
 }
+
+body[data-page="admin"]:has(dialog[open]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 .hunt-details-dialog-heading {
   display: flex;
   align-items: center;
@@ -2776,6 +2781,7 @@ body[data-page="admin"] .create-hunt-launcher small {
   font-weight: 500;
 }
 body[data-page="admin"] .create-hunt-launcher-icon {
+  position: relative;
   display: grid;
   width: 2.5rem;
   height: 2.5rem;
@@ -2783,8 +2789,24 @@ body[data-page="admin"] .create-hunt-launcher-icon {
   place-items: center;
   border-radius: 50%;
   background: rgb(4 30 66 / 10%);
-  font-size: 1.7rem;
-  line-height: 1;
+  color: #082346;
+  font-size: 0;
+}
+
+body[data-page="admin"] .create-hunt-launcher-icon::before,
+body[data-page="admin"] .create-hunt-launcher-icon::after {
+  position: absolute;
+  inset: 0;
+  width: 1rem;
+  height: 0.14rem;
+  margin: auto;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+body[data-page="admin"] .create-hunt-launcher-icon::after {
+  transform: rotate(90deg);
 }
 body[data-page="admin"] .manage-hunts-launcher {
   align-self: center;

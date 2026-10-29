@@ -297,8 +297,29 @@
                 Owner · Creator information unavailable
               </p>
               <p class="hunt-access-code">
-                Access code
+                <span>Access code</span>
                 <strong data-testid="hunt-access-code">Not set</strong>
+                <button
+                  type="button"
+                  class="copy-icon-button hunt-access-code-copy"
+                  data-testid="copy-hunt-access-code"
+                  aria-label="Copy access code"
+                  title="Copy access code"
+                  hidden
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                    <path
+                      d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                    ></path>
+                  </svg>
+                </button>
+                <span
+                  class="hunt-access-code-copy-status"
+                  data-testid="hunt-access-code-copy-status"
+                  role="status"
+                  aria-live="polite"
+                ></span>
               </p>
             </div>
             <p

@@ -56,7 +56,12 @@ export function createHuntRepository(): HuntRepository {
     getAccountProfile: (identity) =>
       accountRequest("/api/player/account/profile", identity),
     saveAccountProfile: (displayName, identity) =>
-      accountRequest("/api/player/account/profile", identity, { displayName }, "PUT"),
+      accountRequest(
+        "/api/player/account/profile",
+        identity,
+        { displayName },
+        "PUT",
+      ),
     createHunt: (input) => creatorRequest("/api/admin/hunts", input),
     addTask: (id, input) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}/tasks`, input),

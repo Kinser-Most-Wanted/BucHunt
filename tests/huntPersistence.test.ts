@@ -225,7 +225,10 @@ test("account nicknames persist by verified Google identity across server restar
         Authorization: `Bearer ${bearer}`,
         "Content-Type": "application/json",
       },
-      body: displayName === undefined ? undefined : JSON.stringify({ displayName }),
+      body:
+        displayName === undefined
+          ? undefined
+          : JSON.stringify({ displayName }),
     });
   try {
     expect((await request("GET", "")).status).toBe(401);
@@ -234,9 +237,9 @@ test("account nicknames persist by verified Google identity across server restar
     });
     expect((await request("PUT", token, "   ")).status).toBe(400);
     expect((await request("PUT", token, "A".repeat(41))).status).toBe(400);
-    expect((await (await request("PUT", token, "  Baja  ")).json()).value).toEqual({
-      displayName: "Baja",
-    });
+    expect(
+      (await (await request("PUT", token, "  Baja  ")).json()).value,
+    ).toEqual({ displayName: "Baja" });
     await stop();
     app = createApplication({
       dataDirectory: directory,
@@ -246,9 +249,9 @@ test("account nicknames persist by verified Google identity across server restar
     expect((await (await request("GET")).json()).value).toEqual({
       displayName: "Baja",
     });
-    expect((await (await request("GET", "a-different-google-subject")).json()).value).toEqual({
-      displayName: null,
-    });
+    expect(
+      (await (await request("GET", "a-different-google-subject")).json()).value,
+    ).toEqual({ displayName: null });
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });

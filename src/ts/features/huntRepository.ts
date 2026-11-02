@@ -4,7 +4,6 @@ import type {
   OperationResult,
   PlayerHunt,
   PlayerIdentity,
-  PlayerProfile,
 } from "../foundation/types.js";
 
 export interface CreatorIdentity {

@@ -702,7 +702,9 @@ export function mountDisplayTasks(
     const name = nameInput.value.trim();
     if (!signedIn || !name) return;
     nameInput.disabled = true;
-    void repository.saveAccountProfile(name, signedIn).then((saved) => {
+    void repository
+      .saveAccountProfile(name, signedIn)
+      .then((saved) => {
       nameInput.disabled = false;
       if (!saved.ok) {
         providerStatus.hidden = false;
@@ -724,11 +726,13 @@ export function mountDisplayTasks(
       } else {
         void loadHunts(signedIn, saved.value.displayName ?? name);
       }
-    }).catch(() => {
-      nameInput.disabled = false;
-      providerStatus.hidden = false;
-      providerStatus.textContent = "Could not save your display name. Try again.";
-    });
+      })
+      .catch(() => {
+        nameInput.disabled = false;
+        providerStatus.hidden = false;
+        providerStatus.textContent =
+          "Could not save your display name. Try again.";
+      });
   });
 
   const toggleSensitiveValue = (
@@ -781,9 +785,10 @@ export function mountDisplayTasks(
   const previousIdentity = storedIdentity();
   if (previousIdentity) {
     void repository.getAccountProfile(previousIdentity).then(async (profile) => {
-      const serverName = profile.ok && typeof profile.value.displayName === "string"
-        ? profile.value.displayName.trim()
-        : "";
+      const serverName =
+        profile.ok && typeof profile.value.displayName === "string"
+          ? profile.value.displayName.trim()
+          : "";
       if (serverName) {
         try {
           localStorage.setItem(
@@ -798,13 +803,16 @@ export function mountDisplayTasks(
       }
       const legacyName = storedDisplayName(previousIdentity.accountId);
       if (legacyName) {
-        const migrated = await repository.saveAccountProfile(legacyName, previousIdentity);
+        const migrated = await repository.saveAccountProfile(
+          legacyName,
+          previousIdentity,
+        );
         if (migrated.ok) {
           const name = migrated.value.displayName ?? legacyName;
           void loadHunts(previousIdentity, name);
           return;
         }
-        // Keep existing signed-in behavior available if profile persistence is temporarily down.
+        // Keep signed-in behavior available if persistence is temporarily down.
         void loadHunts(previousIdentity, legacyName);
         return;
       }

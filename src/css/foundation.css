@@ -1593,13 +1593,15 @@ body:is([data-page="player"], [data-page="admin"])
 }
 body:is([data-page="player"], [data-page="admin"])
   .player-account-dropdown
-  .account-name-edit-form label {
+  .account-name-edit-form
+  label {
   margin: 0;
   color: #cbd1dc;
 }
 body:is([data-page="player"], [data-page="admin"])
   .player-account-dropdown
-  .account-name-edit-form input {
+  .account-name-edit-form
+  input {
   margin: 0;
   border-color: rgb(255 255 255 / 14%);
   background: #0b203d;
@@ -1607,7 +1609,8 @@ body:is([data-page="player"], [data-page="admin"])
 }
 body:is([data-page="player"], [data-page="admin"])
   .player-account-dropdown
-  .account-name-edit-form button {
+  .account-name-edit-form
+  button {
   margin: 0.25rem 0 0;
 }
 body:is([data-page="player"], [data-page="admin"]) .player-account-sign-out {

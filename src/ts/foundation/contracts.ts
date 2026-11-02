@@ -5,6 +5,7 @@ import type {
   HuntInput,
   OperationResult,
   PlayerIdentity,
+  PlayerProfile,
   PlayerHunt,
   TaskDefinition,
   TaskInput,
@@ -39,6 +40,11 @@ export interface HuntRepository {
   ): Promise<OperationResult<{ deleted: true }>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
+  getAccountProfile(identity: PlayerIdentity): Promise<OperationResult<PlayerProfile>>;
+  saveAccountProfile(
+    displayName: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerProfile>>;
   joinHunt(
     accessCode: string,
     identity: PlayerIdentity,

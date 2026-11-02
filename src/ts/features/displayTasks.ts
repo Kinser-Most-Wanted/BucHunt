@@ -379,29 +379,17 @@ export function mountDisplayTasks(
   const displayName = findAccountElement<HTMLElement>(
     '[data-testid="player-display-name"]',
   );
-  const emailDetails = findAccountElement<HTMLElement>(
-    '[data-testid="player-google-email"]',
+  const accountNameEditToggle = findAccountElement<HTMLButtonElement>(
+    '[data-testid="player-change-display-name"]',
   );
-  const email = findAccountElement<HTMLOutputElement>(
-    '[data-testid="player-email"]',
+  const accountNameForm = findAccountElement<HTMLFormElement>(
+    '[data-testid="player-account-name-form"]',
   );
-  const emailToggle = findAccountElement<HTMLButtonElement>(
-    '[data-testid="email-toggle"]',
+  const accountNameInput = findAccountElement<HTMLInputElement>(
+    '[data-testid="player-account-name-input"]',
   );
-  const copyEmail = findAccountElement<HTMLButtonElement>(
-    '[data-testid="copy-email"]',
-  );
-  const accountIdDetails = findAccountElement<HTMLElement>(
-    '[data-testid="player-google-account-id"]',
-  );
-  const accountIdToggle = findAccountElement<HTMLButtonElement>(
-    '[data-testid="account-id-toggle"]',
-  );
-  const accountIdValue = findAccountElement<HTMLOutputElement>(
-    '[data-testid="account-id-value"]',
-  );
-  const copyAccountId = findAccountElement<HTMLButtonElement>(
-    '[data-testid="copy-account-id"]',
+  const accountNameStatus = findAccountElement<HTMLElement>(
+    '[data-testid="player-account-name-status"]',
   );
   const nameForm = root.querySelector<HTMLFormElement>(
     '[data-testid="player-name-form"]',
@@ -433,14 +421,10 @@ export function mountDisplayTasks(
     !signOut ||
     !account ||
     !displayName ||
-    !emailDetails ||
-    !email ||
-    !emailToggle ||
-    !copyEmail ||
-    !accountIdDetails ||
-    !accountIdToggle ||
-    !accountIdValue ||
-    !copyAccountId ||
+    !accountNameEditToggle ||
+    !accountNameForm ||
+    !accountNameInput ||
+    !accountNameStatus ||
     !nameForm ||
     !nameInput ||
     !huntLookup
@@ -464,19 +448,10 @@ export function mountDisplayTasks(
     signOut.hidden = true;
     account.hidden = true;
     account.open = false;
-    emailDetails.hidden = true;
-    email.hidden = true;
-    emailToggle.hidden = false;
-    emailToggle.textContent = "Show Google account email";
-    emailToggle.setAttribute("aria-expanded", "false");
-    copyEmail.hidden = true;
-    accountIdDetails.hidden = true;
-    accountIdValue.hidden = true;
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-    copyAccountId.hidden = true;
-    accountIdToggle.setAttribute("aria-expanded", "false");
+    accountNameEditToggle.hidden = false;
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
+    accountNameForm.hidden = true;
+    accountNameStatus.hidden = true;
     nameForm.hidden = true;
     categories.hidden = true;
     huntLookup.hidden = true;
@@ -491,6 +466,9 @@ export function mountDisplayTasks(
   };
 
   let displayedHunts: PlayerHunt[] = [];
+  let activeIdentity: PlayerIdentity | null = null;
+  let currentNickname = "";
+  let currentRoleLabel = "Player";
   let pastHuntFilter: PastHuntFilter = "recent-3";
   let categorySignature = "";
   let selectedHuntId: string | null = null;
@@ -608,6 +586,8 @@ export function mountDisplayTasks(
     signedIn: PlayerIdentity,
     name: string,
   ): Promise<void> => {
+    activeIdentity = signedIn;
+    currentNickname = name;
     setGoogleSignInEnabled(false);
     providerStatus.hidden = true;
     nameForm.hidden = true;
@@ -621,24 +601,14 @@ export function mountDisplayTasks(
     void currentAccountRole().then((role) => {
       if (account.hidden || storedIdentity()?.accountId !== signedIn.accountId)
         return;
-      displayName.textContent = role
-        ? `${name} (${role === "administrator" ? "Admin" : "Player"})`
-        : name;
+      currentRoleLabel = role === "administrator" ? "Admin" : "Player";
+      displayName.textContent = `${currentNickname} (${currentRoleLabel})`;
     });
-    email.textContent = signedIn.email;
-    emailDetails.hidden = false;
-    email.hidden = true;
-    emailToggle.hidden = false;
-    emailToggle.textContent = "Show Google account email";
-    emailToggle.setAttribute("aria-expanded", "false");
-    copyEmail.hidden = true;
-    accountIdValue.textContent = signedIn.accountId;
-    accountIdDetails.hidden = false;
-    accountIdValue.hidden = true;
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-    copyAccountId.hidden = true;
+    accountNameEditToggle.hidden = false;
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
+    accountNameForm.hidden = true;
+    accountNameInput.value = name;
+    accountNameStatus.hidden = true;
     list.replaceChildren();
     futureList.replaceChildren();
     pastList.replaceChildren();
@@ -693,8 +663,8 @@ export function mountDisplayTasks(
     pendingIdentity = signedIn;
     setGoogleSignInEnabled(false);
     account.hidden = true;
-    emailDetails.hidden = true;
-    accountIdDetails.hidden = true;
+    accountNameForm.hidden = true;
+    accountNameStatus.hidden = true;
     heading.textContent = "Set up your player profile";
     nameForm.hidden = false;
     categories.hidden = true;
@@ -745,46 +715,57 @@ export function mountDisplayTasks(
       });
   });
 
-  const toggleSensitiveValue = (
-    value: HTMLOutputElement,
-    toggle: HTMLButtonElement,
-    copyButton: HTMLButtonElement,
-    label: string,
-  ): void => {
-    const reveal = value.hidden;
-    value.hidden = !reveal;
-    copyButton.hidden = !reveal;
-    toggle.textContent = reveal
-      ? `Hide Google account ${label}`
-      : `Show Google account ${label}`;
-    toggle.setAttribute("aria-expanded", String(reveal));
-  };
-
-  const copySensitiveValue = async (
-    value: HTMLOutputElement,
-    label: string,
-  ): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(value.textContent ?? "");
-      providerStatus.hidden = false;
-      providerStatus.textContent = `Google account ${label} copied.`;
-    } catch {
-      providerStatus.hidden = false;
-      providerStatus.textContent = `Could not copy the Google account ${label}. Check clipboard permissions and try again.`;
+  accountNameEditToggle.addEventListener("click", () => {
+    const opening = accountNameForm.hidden;
+    accountNameForm.hidden = !opening;
+    accountNameEditToggle.setAttribute("aria-expanded", String(opening));
+    accountNameStatus.hidden = true;
+    if (opening) {
+      accountNameInput.value = currentNickname;
+      accountNameInput.focus();
     }
-  };
+  });
 
-  emailToggle.addEventListener("click", () => {
-    toggleSensitiveValue(email, emailToggle, copyEmail, "email");
-  });
-  accountIdToggle.addEventListener("click", () => {
-    toggleSensitiveValue(accountIdValue, accountIdToggle, copyAccountId, "ID");
-  });
-  copyEmail.addEventListener("click", () => {
-    void copySensitiveValue(email, "email");
-  });
-  copyAccountId.addEventListener("click", () => {
-    void copySensitiveValue(accountIdValue, "ID");
+  accountNameForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const identity = activeIdentity ?? storedIdentity();
+    const name = accountNameInput.value.trim();
+    if (!identity || !name) return;
+    const submitButton = accountNameForm.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    if (submitButton) submitButton.disabled = true;
+    accountNameStatus.hidden = true;
+    void repository
+      .saveAccountProfile(name, identity)
+      .then((saved) => {
+        if (!saved.ok) {
+          accountNameStatus.textContent = saved.message;
+          accountNameStatus.hidden = false;
+          return;
+        }
+        currentNickname = saved.value.displayName?.trim() || name;
+        accountNameInput.value = currentNickname;
+        displayName.textContent = `${currentNickname} (${currentRoleLabel})`;
+        try {
+          localStorage.setItem(
+            `${PLAYER_PROFILE_KEY_PREFIX}${identity.accountId}`,
+            currentNickname,
+          );
+        } catch {
+          // The account profile is authoritative; browser storage is only a cache.
+        }
+        accountNameStatus.textContent = "Display name updated.";
+        accountNameStatus.hidden = false;
+      })
+      .catch(() => {
+        accountNameStatus.textContent =
+          "Could not save your display name. Try again.";
+        accountNameStatus.hidden = false;
+      })
+      .finally(() => {
+        if (submitButton) submitButton.disabled = false;
+      });
   });
 
   googleSignIn.addEventListener("click", () => {

@@ -162,12 +162,12 @@ async function loadAccountNickname(user: {
   }
   if (
     identity?.accountId !== user.subject ||
-    typeof identity.idToken !== "string" ||
-    identity.idToken === "verified-server-session"
+    typeof verifiedIdentity.idToken !== "string" ||
+    verifiedIdentity.idToken === "verified-server-session"
   )
     return;
   const headers = {
-    Authorization: `Bearer ${identity.idToken}`,
+    Authorization: `Bearer ${verifiedIdentity.idToken}`,
     "Content-Type": "application/json",
   };
   try {
@@ -214,6 +214,7 @@ async function loadAccountNickname(user: {
       // The account profile is authoritative; browser storage is only a cache.
     }
     adminAccountNickname = nickname;
+    if (accountNameInput) accountNameInput.value = nickname;
     accountDisplayName.textContent = `${nickname} (${adminAccountRoleLabel})`;
   } catch {
     // Keep the cached nickname visible when the profile endpoint is unavailable.
@@ -304,9 +305,9 @@ accountNameForm?.addEventListener("submit", (event) => {
   }
   if (
     !identity ||
-    typeof identity.accountId !== "string" ||
-    typeof identity.idToken !== "string" ||
-    identity.idToken === "verified-server-session"
+    typeof verifiedIdentity.accountId !== "string" ||
+    typeof verifiedIdentity.idToken !== "string" ||
+    verifiedIdentity.idToken === "verified-server-session"
   ) {
     if (accountStatus) {
       accountStatus.textContent = "Sign in again to change your display name.";
@@ -314,6 +315,7 @@ accountNameForm?.addEventListener("submit", (event) => {
     }
     return;
   }
+  const verifiedIdentity = identity as { accountId: string; idToken: string };
   const submitButton = accountNameForm.querySelector<HTMLButtonElement>(
     'button[type="submit"]',
   );
@@ -322,7 +324,7 @@ accountNameForm?.addEventListener("submit", (event) => {
   void fetch("/api/player/account/profile", {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${identity.idToken}`,
+      Authorization: `Bearer ${verifiedIdentity.idToken}`,
       "Content-Type": "application/json",
     },
     credentials: "omit",
@@ -348,7 +350,7 @@ accountNameForm?.addEventListener("submit", (event) => {
       }
       try {
         localStorage.setItem(
-          `${PLAYER_PROFILE_KEY_PREFIX}${identity.accountId}`,
+          `${PLAYER_PROFILE_KEY_PREFIX}${verifiedIdentity.accountId}`,
           adminAccountNickname,
         );
       } catch {

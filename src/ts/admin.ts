@@ -42,33 +42,20 @@ const accountMenu = document.getElementById(
 const accountDisplayName = document.querySelector<HTMLElement>(
   '[data-testid="admin-display-name"]',
 );
-const accountEmailDetails = document.querySelector<HTMLElement>(
-  '[data-testid="admin-google-email"]',
+const accountNameEditToggle = document.querySelector<HTMLButtonElement>(
+  '[data-testid="admin-change-display-name"]',
 );
-const accountEmail = document.querySelector<HTMLOutputElement>(
-  '[data-testid="admin-email-value"]',
+const accountNameForm = document.querySelector<HTMLFormElement>(
+  '[data-testid="admin-account-name-form"]',
 );
-const accountEmailToggle = document.querySelector<HTMLButtonElement>(
-  '[data-testid="admin-email-toggle"]',
-);
-const accountEmailCopy = document.querySelector<HTMLButtonElement>(
-  '[data-testid="admin-copy-email"]',
-);
-const accountIdDetails = document.querySelector<HTMLElement>(
-  '[data-testid="admin-google-account-id"]',
-);
-const accountId = document.querySelector<HTMLOutputElement>(
-  '[data-testid="admin-id-value"]',
-);
-const accountIdToggle = document.querySelector<HTMLButtonElement>(
-  '[data-testid="admin-id-toggle"]',
-);
-const accountIdCopy = document.querySelector<HTMLButtonElement>(
-  '[data-testid="admin-copy-id"]',
+const accountNameInput = document.querySelector<HTMLInputElement>(
+  '[data-testid="admin-account-name-input"]',
 );
 const accountStatus = document.querySelector<HTMLElement>(
   '[data-testid="admin-account-status"]',
 );
+let adminAccountNickname = "";
+let adminAccountRoleLabel = "Player";
 const isHomePage = document.body.dataset.page === "home";
 const isAdminPage = document.body.dataset.page === "admin";
 const foundationFeaturesReady = isAdminPage
@@ -226,7 +213,8 @@ async function loadAccountNickname(user: {
     } catch {
       // The account profile is authoritative; browser storage is only a cache.
     }
-    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
+    adminAccountNickname = nickname;
+    accountDisplayName.textContent = `${nickname} (${adminAccountRoleLabel})`;
   } catch {
     // Keep the cached nickname visible when the profile endpoint is unavailable.
   }
@@ -239,6 +227,8 @@ function setAccountMenu(user: {
   if (!accountMenu) return;
   const subject = typeof user.subject === "string" ? user.subject : "";
   const email = typeof user.email === "string" ? user.email : "";
+  adminAccountRoleLabel =
+    user.role === "administrator" ? "Admin" : "Player";
   let nickname = email.split("@")[0] || "Google account";
   try {
     const savedName = localStorage
@@ -248,82 +238,21 @@ function setAccountMenu(user: {
   } catch {
     // Use the Google account name if browser storage is unavailable.
   }
+  adminAccountNickname = nickname;
   if (accountDisplayName) {
-    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
+    accountDisplayName.textContent = `${nickname} (${adminAccountRoleLabel})`;
   }
-  if (accountEmail) accountEmail.textContent = email;
-  if (accountId) accountId.textContent = subject;
-  if (accountMenu) {
-    accountMenu.hidden = false;
-    accountMenu.open = false;
-  }
-  if (accountEmailDetails) accountEmailDetails.hidden = false;
-  if (accountEmail) accountEmail.hidden = true;
-  if (accountEmailToggle) {
-    accountEmailToggle.hidden = false;
-    accountEmailToggle.textContent = "Show Google account email";
-    accountEmailToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountEmailCopy) accountEmailCopy.hidden = true;
-  if (accountIdDetails) accountIdDetails.hidden = false;
-  if (accountId) accountId.hidden = true;
-  if (accountIdToggle) {
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountNameInput) accountNameInput.value = nickname;
+  accountMenu.hidden = false;
+  accountMenu.open = false;
+  if (accountNameEditToggle)
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
+  if (accountNameForm) accountNameForm.hidden = true;
   if (accountStatus) {
     accountStatus.hidden = true;
     accountStatus.textContent = "";
   }
 }
-function toggleAccountDetail(
-  value: HTMLOutputElement | null,
-  toggle: HTMLButtonElement | null,
-  copy: HTMLButtonElement | null,
-  label: string,
-): void {
-  if (!value || !toggle || !copy) return;
-  value.hidden = !value.hidden;
-  const revealed = !value.hidden;
-  copy.hidden = !revealed;
-  toggle.textContent = `${revealed ? "Hide" : "Show"} Google account ${label}`;
-  toggle.setAttribute("aria-expanded", String(revealed));
-}
-function copyAccountDetail(
-  value: HTMLOutputElement | null,
-  label: string,
-): void {
-  if (!value || !accountStatus) return;
-  void navigator.clipboard
-    .writeText(value.textContent ?? "")
-    .then(() => {
-      accountStatus.textContent = `Google account ${label} copied.`;
-      accountStatus.hidden = false;
-    })
-    .catch(() => {
-      accountStatus.textContent = `Could not copy the Google account ${label}.`;
-      accountStatus.hidden = false;
-    });
-}
-accountEmailToggle?.addEventListener("click", () =>
-  toggleAccountDetail(
-    accountEmail,
-    accountEmailToggle,
-    accountEmailCopy,
-    "email",
-  ),
-);
-accountIdToggle?.addEventListener("click", () =>
-  toggleAccountDetail(accountId, accountIdToggle, accountIdCopy, "ID"),
-);
-accountEmailCopy?.addEventListener("click", () =>
-  copyAccountDetail(accountEmail, "email"),
-);
-accountIdCopy?.addEventListener("click", () =>
-  copyAccountDetail(accountId, "ID"),
-);
 function signedOut(message: string): void {
   clearTimeout(expiryTimer);
   clearPlayerSession();
@@ -336,22 +265,9 @@ function signedOut(message: string): void {
     accountMenu.hidden = true;
     accountMenu.open = false;
   }
-  if (accountEmailDetails) accountEmailDetails.hidden = true;
-  if (accountEmail) accountEmail.hidden = true;
-  if (accountEmailToggle) {
-    accountEmailToggle.hidden = false;
-    accountEmailToggle.textContent = "Show Google account email";
-    accountEmailToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountEmailCopy) accountEmailCopy.hidden = true;
-  if (accountIdDetails) accountIdDetails.hidden = true;
-  if (accountId) accountId.hidden = true;
-  if (accountIdToggle) {
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountNameForm) accountNameForm.hidden = true;
+  if (accountNameEditToggle)
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
   if (accountStatus) {
     accountStatus.hidden = true;
     accountStatus.textContent = "";
@@ -359,6 +275,103 @@ function signedOut(message: string): void {
   if (homeSignInLink) homeSignInLink.hidden = false;
   statusText.textContent = message;
 }
+accountNameEditToggle?.addEventListener("click", () => {
+  if (!accountNameForm || !accountNameInput) return;
+  const opening = accountNameForm.hidden;
+  accountNameForm.hidden = !opening;
+  accountNameEditToggle.setAttribute("aria-expanded", String(opening));
+  if (accountStatus) accountStatus.hidden = true;
+  if (opening) {
+    accountNameInput.value = adminAccountNickname;
+    accountNameInput.focus();
+  }
+});
+accountNameForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = accountNameInput?.value.trim() ?? "";
+  if (!name || !accountNameInput) return;
+  let identity: { accountId?: unknown; idToken?: unknown } | null = null;
+  try {
+    identity = JSON.parse(
+      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+    ) as { accountId?: unknown; idToken?: unknown } | null;
+  } catch {
+    if (accountStatus) {
+      accountStatus.textContent = "Sign in again to change your display name.";
+      accountStatus.hidden = false;
+    }
+    return;
+  }
+  if (
+    !identity ||
+    typeof identity.accountId !== "string" ||
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
+  ) {
+    if (accountStatus) {
+      accountStatus.textContent = "Sign in again to change your display name.";
+      accountStatus.hidden = false;
+    }
+    return;
+  }
+  const submitButton = accountNameForm.querySelector<HTMLButtonElement>(
+    'button[type="submit"]',
+  );
+  if (submitButton) submitButton.disabled = true;
+  if (accountStatus) accountStatus.hidden = true;
+  void fetch("/api/player/account/profile", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${identity.idToken}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "omit",
+    cache: "no-store",
+    body: JSON.stringify({ displayName: name }),
+  })
+    .then(async (response) => {
+      const result = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        value?: { displayName?: unknown };
+      };
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message ?? "Could not save your display name.");
+      }
+      adminAccountNickname =
+        typeof result.value?.displayName === "string"
+          ? result.value.displayName.trim()
+          : name;
+      accountNameInput.value = adminAccountNickname;
+      if (accountDisplayName) {
+        accountDisplayName.textContent = `${adminAccountNickname} (${adminAccountRoleLabel})`;
+      }
+      try {
+        localStorage.setItem(
+          `${PLAYER_PROFILE_KEY_PREFIX}${identity.accountId}`,
+          adminAccountNickname,
+        );
+      } catch {
+        // The account profile is authoritative; browser storage is only a cache.
+      }
+      if (accountStatus) {
+        accountStatus.textContent = "Display name updated.";
+        accountStatus.hidden = false;
+      }
+    })
+    .catch((error: unknown) => {
+      if (accountStatus) {
+        accountStatus.textContent =
+          error instanceof Error
+            ? error.message
+            : "Could not save your display name. Try again.";
+        accountStatus.hidden = false;
+      }
+    })
+    .finally(() => {
+      if (submitButton) submitButton.disabled = false;
+    });
+});
 class ApiError extends Error {
   constructor(
     message: string,

@@ -52,6 +52,15 @@ export function createHuntRepository(): HuntRepository {
     return request(path, input, method);
   }
   return {
+    getAccountProfile: (identity) =>
+      accountRequest("/api/player/account/profile", identity),
+    saveAccountProfile: (displayName, identity) =>
+      accountRequest(
+        "/api/player/account/profile",
+        identity,
+        { displayName },
+        "PUT",
+      ),
     createHunt: (input) => creatorRequest("/api/admin/hunts", input),
     addTask: (id, input) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}/tasks`, input),
@@ -107,10 +116,11 @@ async function accountRequest<T>(
   path: string,
   identity: PlayerIdentity,
   input?: unknown,
+  method?: string,
 ): Promise<OperationResult<T>> {
   try {
     const response = await fetch(path, {
-      method: input === undefined ? "GET" : "POST",
+      method: method ?? (input === undefined ? "GET" : "POST"),
       credentials: "omit",
       cache: "no-store",
       headers: {

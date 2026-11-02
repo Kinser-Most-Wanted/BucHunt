@@ -14,6 +14,7 @@ import {
   isHuntJoinable,
 } from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
+import { PlayerProfileStore } from "../src/ts/server/playerProfileStore.js";
 
 const input = {
   name: "Campus",
@@ -197,6 +198,22 @@ test("corrupt or unsupported stores are preserved and write failures reject", as
     await rm(path);
     await mkdir(path);
     await expect(new HuntStore(path).create(input, "owner")).rejects.toThrow();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("player profiles persist separately by Google account", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-profile-"));
+  const accountA = `google-${"a".repeat(64)}`;
+  const accountB = `google-${"b".repeat(64)}`;
+  try {
+    const path = join(directory, "player-profiles.json");
+    const profiles = new PlayerProfileStore(path);
+    await profiles.save(accountA, { displayName: "Baja" });
+    const restarted = new PlayerProfileStore(path);
+    expect(await restarted.get(accountA)).toEqual({ displayName: "Baja" });
+    expect(await restarted.get(accountB)).toEqual({ displayName: null });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

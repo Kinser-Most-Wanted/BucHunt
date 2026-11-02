@@ -21,6 +21,7 @@ import {
   isHuntJoinable,
 } from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
+import { PlayerProfileStore } from "./playerProfileStore.js";
 
 interface ServerOptions {
   dataDirectory?: string;
@@ -104,6 +105,9 @@ export function createApplication(options: ServerOptions = {}) {
   );
   const accountProgress = new PlayerProgressStore(
     resolve(directory, "account-player-progress.json"),
+  );
+  const accountProfiles = new PlayerProfileStore(
+    resolve(directory, "player-profiles.json"),
   );
   const google = new OAuth2Client(options.googleClientId);
   async function playerId(request: IncomingMessage): Promise<string | null> {
@@ -204,6 +208,20 @@ export function createApplication(options: ServerOptions = {}) {
             ok: false,
             code: "unauthorized",
             message: "Sign in with Google again to access saved progress.",
+          });
+          return;
+        }
+        if (path === "/api/player/account/profile" && method === "GET") {
+          json(response, 200, {
+            ok: true,
+            value: await accountProfiles.get(player),
+          });
+          return;
+        }
+        if (path === "/api/player/account/profile" && method === "PUT") {
+          json(response, 200, {
+            ok: true,
+            value: await accountProfiles.save(player, await body(request)),
           });
           return;
         }

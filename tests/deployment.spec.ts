@@ -113,6 +113,19 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     };
   });
 
+  await page.route("**/api/player/account/profile", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: {
+          displayName:
+            route.request().method() === "PUT"
+              ? route.request().postDataJSON().displayName
+              : null,
+        },
+      },
+    }),
+  );
   await page.route("**/api/player/account/hunts", (route) =>
     route.fulfill({ json: { ok: true, value: [] } }),
   );

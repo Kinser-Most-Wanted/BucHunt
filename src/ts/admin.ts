@@ -177,7 +177,7 @@ async function loadAccountNickname(user: {
       cache: "no-store",
     });
     if (!response.ok) return;
-    const result = await response.json() as {
+    const result = (await response.json()) as {
       ok?: boolean;
       value?: { displayName?: unknown };
     };
@@ -187,9 +187,10 @@ async function loadAccountNickname(user: {
         : "";
     if (!nickname) {
       try {
-        nickname = localStorage
-          .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`)
-          ?.trim() ?? "";
+        nickname =
+          localStorage
+            .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`)
+            ?.trim() ?? "";
       } catch {
         nickname = "";
       }
@@ -228,8 +229,7 @@ function setAccountMenu(user: {
   if (!accountMenu) return;
   const subject = typeof user.subject === "string" ? user.subject : "";
   const email = typeof user.email === "string" ? user.email : "";
-  adminAccountRoleLabel =
-    user.role === "administrator" ? "Admin" : "Player";
+  adminAccountRoleLabel = user.role === "administrator" ? "Admin" : "Player";
   let nickname = email.split("@")[0] || "Google account";
   try {
     const savedName = localStorage

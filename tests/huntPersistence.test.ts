@@ -202,64 +202,80 @@ test("corrupt or unsupported stores are preserved and write failures reject", as
   }
 });
 
-test("account nicknames persist by verified Google identity across server restarts", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "buchunt-profile-"));
-  const token = "google-subject-for-profile";
-  let app = createApplication({
-    dataDirectory: directory,
-    verifyPlayerToken: async (credential) => credential,
-  });
-  const start = async () => {
-    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
-    return `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/player/account/profile`;
-  };
-  const stop = async () =>
-    new Promise<void>((resolve, reject) =>
-      app.close((error) => (error ? reject(error) : resolve())),
-    );
-  let endpoint = await start();
-  const request = (method: string, bearer = token, displayName?: unknown) =>
-    fetch(endpoint, {
-      method,
-      headers: {
-        Authorization: `Bearer ${bearer}`,
-        "Content-Type": "application/json",
-      },
-      body:
-        displayName === undefined
-          ? undefined
-          : JSON.stringify({ displayName }),
-    });
-  try {
-    expect((await request("GET", "")).status).toBe(401);
-    expect((await (await request("GET")).json()).value).toEqual({
-      displayName: null,
-    });
-    expect((await request("PUT", token, "   ")).status).toBe(400);
-    expect((await request("PUT", token, "A".repeat(41))).status).toBe(400);
-    expect(
-      (await (await request("PUT", token, "  Baja  ")).json()).value,
-    ).toEqual({ displayName: "Baja" });
-    await stop();
-    app = createApplication({
+test(
+  "account nicknames persist by verified Google identity across server restarts",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "buchunt-profile-"));
+    const token = "google-subject-for-profile";
+    let app = createApplication({
       dataDirectory: directory,
       verifyPlayerToken: async (credential) => credential,
     });
-    endpoint = await start();
-    expect((await (await request("GET")).json()).value).toEqual({
-      displayName: "Baja",
-    });
-    const otherAccountResponse = await request(
-      "GET",
-      "a-different-google-subject",
-    );
-    const otherAccount = await otherAccountResponse.json();
-    expect(otherAccount.value).toEqual({ displayName: null });
-  } finally {
-    await stop();
-    await rm(directory, { recursive: true, force: true });
-  }
-});
+    const start = async () => {
+      await new Promise<void>((resolve) =>
+        app.listen(0, "127.0.0.1", resolve),
+      );
+      const port = (app.address() as AddressInfo).port;
+      return `http://127.0.0.1:${port}/api/player/account/profile`;
+    };
+    async function stop() {
+      await new Promise<void>((resolve, reject) =>
+        app.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+    let endpoint = await start();
+    async function request(
+      method: string,
+      bearer = token,
+      displayName?: unknown,
+    ) {
+      return fetch(endpoint, {
+        method,
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "Content-Type": "application/json",
+        },
+        body:
+          displayName === undefined
+            ? undefined
+            : JSON.stringify({ displayName }),
+      });
+    }
+    try {
+      expect((await request("GET", "")).status).toBe(401);
+      const initialResponse = await request("GET");
+      expect((await initialResponse.json()).value).toEqual({
+        displayName: null,
+      });
+      expect((await request("PUT", token, "   ")).status).toBe(400);
+      expect((await request("PUT", token, "A".repeat(41))).status).toBe(400);
+      const savedResponse = await request("PUT", token, "  Baja  ");
+      expect((await savedResponse.json()).value).toEqual({
+        displayName: "Baja",
+      });
+      await stop();
+      app = createApplication({
+        dataDirectory: directory,
+        verifyPlayerToken: async (credential) => credential,
+      });
+      endpoint = await start();
+      const restoredResponse = await request("GET");
+      expect((await restoredResponse.json()).value).toEqual({
+        displayName: "Baja",
+      });
+      const otherAccountResponse = await request(
+        "GET",
+        "a-different-google-subject",
+      );
+      expect((await otherAccountResponse.json()).value).toEqual({
+        displayName: null,
+      });
+    } finally {
+      await stop();
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
 
 test("creator ownership, contributor grants, privacy and restart persistence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-api-"));

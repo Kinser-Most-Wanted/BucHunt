@@ -784,44 +784,47 @@ export function mountDisplayTasks(
   providerStatus.hidden = true;
   const previousIdentity = storedIdentity();
   if (previousIdentity) {
-    void repository.getAccountProfile(previousIdentity).then(async (profile) => {
-      const serverName =
-        profile.ok && typeof profile.value.displayName === "string"
-          ? profile.value.displayName.trim()
-          : "";
-      if (serverName) {
-        try {
-          localStorage.setItem(
-            `${PLAYER_PROFILE_KEY_PREFIX}${previousIdentity.accountId}`,
-            serverName,
-          );
-        } catch {
-          // Browser storage is a cache; the account profile remains authoritative.
-        }
-        void loadHunts(previousIdentity, serverName);
-        return;
-      }
-      const legacyName = storedDisplayName(previousIdentity.accountId);
-      if (legacyName) {
-        const migrated = await repository.saveAccountProfile(
-          legacyName,
-          previousIdentity,
-        );
-        if (migrated.ok) {
-          const name = migrated.value.displayName ?? legacyName;
-          void loadHunts(previousIdentity, name);
+    void repository
+      .getAccountProfile(previousIdentity)
+      .then(async (profile) => {
+        const serverName =
+          profile.ok && typeof profile.value.displayName === "string"
+            ? profile.value.displayName.trim()
+            : "";
+        if (serverName) {
+          try {
+            localStorage.setItem(
+              `${PLAYER_PROFILE_KEY_PREFIX}${previousIdentity.accountId}`,
+              serverName,
+            );
+          } catch {
+            // The account profile is authoritative; browser storage is a cache.
+          }
+          void loadHunts(previousIdentity, serverName);
           return;
         }
-        // Keep signed-in behavior available if persistence is temporarily down.
-        void loadHunts(previousIdentity, legacyName);
-        return;
-      }
-      requestDisplayName(previousIdentity);
-    }).catch(() => {
-      const legacyName = storedDisplayName(previousIdentity.accountId);
-      if (legacyName) void loadHunts(previousIdentity, legacyName);
-      else requestDisplayName(previousIdentity);
-    });
+        const legacyName = storedDisplayName(previousIdentity.accountId);
+        if (legacyName) {
+          const migrated = await repository.saveAccountProfile(
+            legacyName,
+            previousIdentity,
+          );
+          if (migrated.ok) {
+            const name = migrated.value.displayName ?? legacyName;
+            void loadHunts(previousIdentity, name);
+            return;
+          }
+          // Keep signed-in behavior available if persistence is temporarily down.
+          void loadHunts(previousIdentity, legacyName);
+          return;
+        }
+        requestDisplayName(previousIdentity);
+      })
+      .catch(() => {
+        const legacyName = storedDisplayName(previousIdentity.accountId);
+        if (legacyName) void loadHunts(previousIdentity, legacyName);
+        else requestDisplayName(previousIdentity);
+      });
   } else showSignedOut("No tasks loaded.");
 
   const huntForm = root.querySelector<HTMLFormElement>(

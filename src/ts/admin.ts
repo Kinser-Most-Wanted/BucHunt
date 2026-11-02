@@ -356,6 +356,8 @@ accountNameForm?.addEventListener("submit", (event) => {
       } catch {
         // The account profile is authoritative; browser storage is only a cache.
       }
+      accountNameEditToggle?.setAttribute("aria-expanded", "false");
+      if (accountNameForm) accountNameForm.hidden = true;
       if (accountStatus) {
         accountStatus.textContent = "Display name updated.";
         accountStatus.hidden = false;

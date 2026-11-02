@@ -59,6 +59,9 @@ export interface PlayerHunt {
   status: HuntStatus;
   tasks: PlayerTask[];
 }
+export interface PlayerProfile {
+  displayName: string | null;
+}
 export interface PlayerIdentity {
   email: string;
   accountId: string;

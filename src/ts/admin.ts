@@ -419,7 +419,7 @@ async function showSession(): Promise<void> {
       role: isAdministrator ? "administrator" : "user",
     });
   if (accountMenu) {
-    await loadAccountNickname({
+    void loadAccountNickname({
       ...user,
       role: isAdministrator ? "administrator" : "user",
     });

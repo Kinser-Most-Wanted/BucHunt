@@ -705,27 +705,27 @@ export function mountDisplayTasks(
     void repository
       .saveAccountProfile(name, signedIn)
       .then((saved) => {
-      nameInput.disabled = false;
-      if (!saved.ok) {
-        providerStatus.hidden = false;
-        providerStatus.textContent = saved.message;
-        return;
-      }
-      try {
-        localStorage.setItem(
-          `${PLAYER_PROFILE_KEY_PREFIX}${signedIn.accountId}`,
-          saved.value.displayName ?? name,
-        );
-      } catch {
-        // Browser storage is only a cache; the account profile is saved remotely.
-      }
-      pendingIdentity = null;
-      providerStatus.hidden = true;
-      if (sharedCode) {
-        window.setTimeout(submitSharedLinkJoin, 0);
-      } else {
-        void loadHunts(signedIn, saved.value.displayName ?? name);
-      }
+        nameInput.disabled = false;
+        if (!saved.ok) {
+          providerStatus.hidden = false;
+          providerStatus.textContent = saved.message;
+          return;
+        }
+        try {
+          localStorage.setItem(
+            `${PLAYER_PROFILE_KEY_PREFIX}${signedIn.accountId}`,
+            saved.value.displayName ?? name,
+          );
+        } catch {
+          // Browser storage is a cache; the account profile is saved remotely.
+        }
+        pendingIdentity = null;
+        providerStatus.hidden = true;
+        if (sharedCode) {
+          window.setTimeout(submitSharedLinkJoin, 0);
+        } else {
+          void loadHunts(signedIn, saved.value.displayName ?? name);
+        }
       })
       .catch(() => {
         nameInput.disabled = false;

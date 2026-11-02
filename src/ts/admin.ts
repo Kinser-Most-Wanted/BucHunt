@@ -162,12 +162,12 @@ async function loadAccountNickname(user: {
   }
   if (
     identity?.accountId !== user.subject ||
-    typeof verifiedIdentity.idToken !== "string" ||
-    verifiedIdentity.idToken === "verified-server-session"
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
   )
     return;
   const headers = {
-    Authorization: `Bearer ${verifiedIdentity.idToken}`,
+    Authorization: `Bearer ${identity.idToken}`,
     "Content-Type": "application/json",
   };
   try {
@@ -305,9 +305,9 @@ accountNameForm?.addEventListener("submit", (event) => {
   }
   if (
     !identity ||
-    typeof verifiedIdentity.accountId !== "string" ||
-    typeof verifiedIdentity.idToken !== "string" ||
-    verifiedIdentity.idToken === "verified-server-session"
+    typeof identity.accountId !== "string" ||
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
   ) {
     if (accountStatus) {
       accountStatus.textContent = "Sign in again to change your display name.";

@@ -57,15 +57,6 @@ test("admin join links do not fill the access-code form", async ({ page }) => {
   let joins = 0;
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/profile")) {
-      if (route.request().method() === "PUT") {
-        profileDisplayName = route.request().postDataJSON().displayName;
-      }
-      await route.fulfill({
-        json: { ok: true, value: { displayName: profileDisplayName } },
-      });
-      return;
-    }
     if (path.endsWith("/join")) {
       joins += 1;
       expect(route.request().postDataJSON()).toEqual({
@@ -180,6 +171,15 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     );
     expect(route.request().headers().cookie).toBeUndefined();
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      if (route.request().method() === "PUT") {
+        profileDisplayName = route.request().postDataJSON().displayName;
+      }
+      await route.fulfill({
+        json: { ok: true, value: { displayName: profileDisplayName } },
+      });
+      return;
+    }
     if (path.endsWith("/join")) {
       expect(route.request().method()).toBe("POST");
       expect(route.request().postDataJSON()).toEqual({

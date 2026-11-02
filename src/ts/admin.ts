@@ -158,6 +158,79 @@ function rememberPlayerSession(
     /* The server session remains authoritative if browser storage is unavailable. */
   }
 }
+async function loadAccountNickname(user: {
+  subject?: unknown;
+  email?: unknown;
+  role?: unknown;
+}): Promise<void> {
+  if (typeof user.subject !== "string" || typeof user.email !== "string")
+    return;
+  let identity: { accountId?: unknown; idToken?: unknown } | null = null;
+  try {
+    identity = JSON.parse(
+      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+    ) as { accountId?: unknown; idToken?: unknown } | null;
+  } catch {
+    return;
+  }
+  if (
+    identity?.accountId !== user.subject ||
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
+  )
+    return;
+  const headers = {
+    Authorization: `Bearer ${identity.idToken}`,
+    "Content-Type": "application/json",
+  };
+  try {
+    const response = await fetch("/api/player/account/profile", {
+      headers,
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!response.ok) return;
+    const result = await response.json() as {
+      ok?: boolean;
+      value?: { displayName?: unknown };
+    };
+    let nickname =
+      typeof result.value?.displayName === "string"
+        ? result.value.displayName.trim()
+        : "";
+    if (!nickname) {
+      try {
+        nickname = localStorage
+          .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`)
+          ?.trim() ?? "";
+      } catch {
+        nickname = "";
+      }
+      if (nickname) {
+        const saved = await fetch("/api/player/account/profile", {
+          method: "PUT",
+          headers,
+          credentials: "omit",
+          cache: "no-store",
+          body: JSON.stringify({ displayName: nickname }),
+        });
+        if (!saved.ok) return;
+      }
+    }
+    if (!nickname || !accountDisplayName) return;
+    try {
+      localStorage.setItem(
+        `${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`,
+        nickname,
+      );
+    } catch {
+      // The account profile is authoritative; browser storage is only a cache.
+    }
+    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
+  } catch {
+    // Keep the cached nickname visible when the profile endpoint is unavailable.
+  }
+}
 function setAccountMenu(user: {
   subject?: unknown;
   email?: unknown;
@@ -345,6 +418,12 @@ async function showSession(): Promise<void> {
       ...user,
       role: isAdministrator ? "administrator" : "user",
     });
+  if (accountMenu) {
+    await loadAccountNickname({
+      ...user,
+      role: isAdministrator ? "administrator" : "user",
+    });
+  }
   if (isAdminPage && isAdministrator) await foundationFeaturesReady;
   if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
   if (adminDenied) adminDenied.hidden = isAdministrator;

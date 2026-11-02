@@ -691,6 +691,15 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
       },
     }),
   );
+  await page.route("**/api/player/account/profile", async (route) => {
+    expect(route.request().headers().authorization).toBe(
+      "Bearer verified-test-token",
+    );
+    if (route.request().method() === "PUT") {
+      expect(route.request().postDataJSON()).toEqual({ displayName: "Baja" });
+    }
+    await route.fulfill({ json: { ok: true, value: { displayName: "Baja" } } });
+  });
   await page.route("**/api/player/account/hunts", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",

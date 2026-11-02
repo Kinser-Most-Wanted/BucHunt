@@ -219,6 +219,77 @@ test("player profiles persist separately by Google account", async () => {
   }
 });
 
+test("verified Baja account migrates legacy hunt ownership and keeps new hunts account-linked", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-owner-migration-"));
+  const hunts = new HuntStore(join(directory, "hunts.json"));
+  const legacyOwnerA = `browser:${"a".repeat(64)}`;
+  const legacyOwnerB = `browser:${"b".repeat(64)}`;
+  const oldHunts = await Promise.all([
+    hunts.create(input, legacyOwnerA),
+    hunts.create({ ...input, name: "Another legacy hunt" }, legacyOwnerB),
+  ]);
+  const app = createApplication({
+    dataDirectory: directory,
+    verifyGoogleIdentity: async (token) => ({
+      subject: token,
+      email:
+        token === "outsider-subject"
+          ? "other@example.com"
+          : "codepro1012@gmail.com",
+      emailVerified: token !== "unverified",
+    }),
+  });
+  try {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const unverified = await fetch(base + "/api/admin/session", {
+      headers: { Authorization: "Bearer unverified" },
+    });
+    expect(unverified.status).toBe(200);
+    expect((await hunts.get(oldHunts[0].id)).ownerId).toBe(legacyOwnerA);
+
+    const outsider = await fetch(base + "/api/admin/session", {
+      headers: { Authorization: "Bearer outsider-subject" },
+    });
+    expect((await outsider.json()).value.identityType).toBe("google-account");
+    expect((await hunts.get(oldHunts[0].id)).ownerId).toBe(legacyOwnerA);
+
+    const response = await fetch(base + "/api/admin/session", {
+      headers: { Authorization: "Bearer baja-subject" },
+    });
+    const session = (await response.json()).value;
+    expect(session.identityType).toBe("google-account");
+    expect(session.id).toMatch(/^google-[a-f0-9]{64}$/);
+    for (const oldHunt of oldHunts)
+      expect((await hunts.get(oldHunt.id)).ownerId).toBe(session.id);
+
+    const listed = await fetch(base + "/api/admin/hunts", {
+      headers: { Authorization: "Bearer baja-subject" },
+    });
+    expect((await listed.json()).value).toHaveLength(2);
+    const created = await fetch(base + "/api/admin/hunts", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer baja-subject",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+    expect((await created.json()).value.ownerId).toBe(session.id);
+    await fetch(base + "/api/admin/session", {
+      headers: { Authorization: "Bearer baja-subject" },
+    });
+    expect((await hunts.list()).map((hunt) => hunt.ownerId)).toEqual([
+      session.id,
+      session.id,
+      session.id,
+    ]);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("creator ownership, contributor grants, privacy and restart persistence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-api-"));
   let app = createApplication({ dataDirectory: directory });

@@ -30,7 +30,13 @@ interface ServerOptions {
   googleClientId?: string;
   // Tests inject the identity verifier; production always uses Google's verifier.
   verifyPlayerToken?: (token: string) => Promise<string>;
+  verifyGoogleIdentity?: (token: string) => Promise<{
+    subject: string;
+    email: string;
+    emailVerified: boolean;
+  }>;
 }
+const MIGRATION_OWNER_EMAIL = "codepro1012@gmail.com";
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css",
@@ -139,6 +145,45 @@ export function createApplication(options: ServerOptions = {}) {
       return null;
     }
     return "google-" + createHash("sha256").update(subject).digest("hex");
+  }
+  async function googleCreator(request: IncomingMessage): Promise<{
+    id: string;
+    email: string;
+  } | null> {
+    const match = /^Bearer ([^\s]{1,16384})$/.exec(
+      request.headers.authorization ?? "",
+    );
+    if (!match) return null;
+    try {
+      let subject: string;
+      let email: string;
+      let emailVerified: boolean;
+      if (options.verifyGoogleIdentity) {
+        const identity = await options.verifyGoogleIdentity(match[1]);
+        subject = identity.subject;
+        email = identity.email;
+        emailVerified = identity.emailVerified;
+      } else {
+        if (!options.googleClientId) return null;
+        const ticket = await google.verifyIdToken({
+          idToken: match[1],
+          audience: options.googleClientId,
+        });
+        const claims = ticket.getPayload();
+        if (!claims?.sub || typeof claims.email !== "string") return null;
+        subject = claims.sub;
+        email = claims.email;
+        emailVerified = claims.email_verified === true;
+        if (claims.azp && claims.azp !== options.googleClientId) return null;
+      }
+      if (!subject || !email || !emailVerified) return null;
+      return {
+        id: "google-" + createHash("sha256").update(subject).digest("hex"),
+        email: email.toLowerCase(),
+      };
+    } catch {
+      return null;
+    }
   }
   async function playerHunt(
     player: string,
@@ -340,8 +385,6 @@ export function createApplication(options: ServerOptions = {}) {
         return;
       }
       if (path.startsWith("/api/admin/")) {
-        // Google identity will replace this temporary browser identity. The
-        // opaque cookie is private; its public hash can safely identify owners.
         const origin = request.headers.origin;
         if (
           request.headers["sec-fetch-site"] === "cross-site" ||
@@ -357,7 +400,22 @@ export function createApplication(options: ServerOptions = {}) {
         let secret = /(?:^|;\s*)buchunt-creator=([a-f0-9]{64})(?:;|$)/.exec(
           request.headers.cookie ?? "",
         )?.[1];
+        const account = await googleCreator(request);
+        const legacyCreatorId = secret
+          ? "browser:" + createHash("sha256").update(secret).digest("hex")
+          : null;
         if (path === "/api/admin/session" && method === "GET") {
+          if (account) {
+            if (legacyCreatorId)
+              await contributors.linkLegacyCreator(legacyCreatorId, account.id);
+            if (account.email === MIGRATION_OWNER_EMAIL)
+              await hunts.migrateLegacyOwners(account.id);
+            json(response, 200, {
+              ok: true,
+              value: { id: account.id, identityType: "google-account" },
+            });
+            return;
+          }
           secret ??= randomBytes(32).toString("hex");
           response.setHeader(
             "Set-Cookie",
@@ -374,15 +432,18 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (!secret) {
-          json(response, 401, {
-            ok: false,
-            code: "unauthorized",
-            message: "Open Hunt Studio to start your creator session.",
-          });
-          return;
+          if (!account) {
+            json(response, 401, {
+              ok: false,
+              code: "unauthorized",
+              message: "Sign in with Google to manage hunts.",
+            });
+            return;
+          }
         }
         const creatorId =
-          "browser:" + createHash("sha256").update(secret).digest("hex");
+          account?.id ??
+          "browser:" + createHash("sha256").update(secret!).digest("hex");
         if (path === "/api/admin/hunts" && method === "POST") {
           json(response, 201, {
             ok: true,
@@ -412,7 +473,7 @@ export function createApplication(options: ServerOptions = {}) {
             path,
           );
         const match =
-          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/(browser:[a-f0-9]{64}))?)?$/.exec(
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})))?)?$/.exec(
             path,
           );
         if (match || taskMatch) {

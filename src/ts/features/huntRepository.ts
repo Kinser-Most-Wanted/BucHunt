@@ -8,10 +8,31 @@ import type {
 
 export interface CreatorIdentity {
   id: string;
-  identityType: "temporary-browser";
+  identityType: "temporary-browser" | "google-account";
 }
 let creatorSession: Promise<OperationResult<CreatorIdentity>> | undefined;
+let creatorSessionToken: string | null | undefined;
+const PLAYER_SESSION_KEY = "buchunt.player-session";
+function storedGoogleToken(): string | null {
+  try {
+    const session = JSON.parse(
+      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+    ) as { provider?: unknown; idToken?: unknown } | null;
+    return session?.provider === "google" &&
+      typeof session.idToken === "string" &&
+      session.idToken !== "verified-server-session"
+      ? session.idToken
+      : null;
+  } catch {
+    return null;
+  }
+}
 export function getCreatorSession(): Promise<OperationResult<CreatorIdentity>> {
+  const token = storedGoogleToken();
+  if (token !== creatorSessionToken) {
+    creatorSession = undefined;
+    creatorSessionToken = token;
+  }
   creatorSession ??= request<CreatorIdentity>("/api/admin/session");
   return creatorSession.then((result) => {
     if (!result.ok) creatorSession = undefined;
@@ -24,9 +45,15 @@ export async function request<T>(
   method?: string,
 ): Promise<OperationResult<T>> {
   try {
+    const token = path.startsWith("/api/admin/") ? storedGoogleToken() : null;
     const response = await fetch(path, {
       method: method ?? (input === undefined ? "GET" : "POST"),
-      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       ...(input === undefined ? {} : { body: JSON.stringify(input) }),
     });
     const result = await response.json();

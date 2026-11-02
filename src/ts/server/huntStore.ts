@@ -187,6 +187,18 @@ export class HuntStore {
   async list(): Promise<HuntDefinition[]> {
     return (await this.file.get()).hunts;
   }
+  async migrateLegacyOwners(accountId: string): Promise<number> {
+    return this.file.update((data) => {
+      let migrated = 0;
+      for (const hunt of data.hunts) {
+        if (/^browser:[a-f0-9]{64}$/.test(hunt.ownerId)) {
+          hunt.ownerId = accountId;
+          migrated += 1;
+        }
+      }
+      return migrated;
+    });
+  }
   async get(id: string): Promise<HuntDefinition> {
     const hunt = (await this.file.get()).hunts.find((item) => item.id === id);
     if (!hunt) throw new StoreError("not-found", "Hunt not found.");
@@ -301,7 +313,9 @@ function contributorFile(value: unknown): ContributorFile {
       !/^[a-zA-Z0-9-]+$/.test(huntId) ||
       !Array.isArray(members) ||
       members.some(
-        (id) => typeof id !== "string" || !/^browser:[a-f0-9]{64}$/.test(id),
+        (id) =>
+          typeof id !== "string" ||
+          !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(id),
       )
     )
       throw new Error("Invalid contributor configuration");
@@ -309,7 +323,6 @@ function contributorFile(value: unknown): ContributorFile {
   return data;
 }
 // Keep membership separate so existing version-1 hunt definitions remain valid.
-// Future account integration must explicitly map these temporary creator IDs.
 export class ContributorStore {
   private file: JsonFile<ContributorFile>;
   constructor(path: string) {
@@ -326,10 +339,25 @@ export class ContributorStore {
     const all = await this.all();
     return Object.hasOwn(all, huntId) ? all[huntId] : [];
   }
+  async linkLegacyCreator(legacyId: string, accountId: string): Promise<void> {
+    if (
+      !/^browser:[a-f0-9]{64}$/.test(legacyId) ||
+      !/^google-[a-f0-9]{64}$/.test(accountId)
+    )
+      return;
+    await this.file.update((data) => {
+      for (const members of Object.values(data.contributors)) {
+        if (!members.includes(legacyId)) continue;
+        const remaining = members.filter((id) => id !== legacyId);
+        if (!remaining.includes(accountId)) remaining.push(accountId);
+        members.splice(0, members.length, ...remaining);
+      }
+    });
+  }
   async add(huntId: string, creatorId: unknown): Promise<void> {
     if (
       typeof creatorId !== "string" ||
-      !/^browser:[a-f0-9]{64}$/.test(creatorId)
+      !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(creatorId)
     )
       throw new StoreError(
         "validation",

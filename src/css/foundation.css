@@ -1577,22 +1577,38 @@ body:is([data-page="player"], [data-page="admin"])
 }
 body:is([data-page="player"], [data-page="admin"])
   .player-account-dropdown
-  .player-sensitive-detail {
+  .account-name-edit-toggle {
+  width: 100%;
   margin: 0;
-  padding: 0.7rem;
+  text-align: left;
+}
+body:is([data-page="player"], [data-page="admin"])
+  .player-account-dropdown
+  .account-name-edit-form {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
   border-radius: 0.65rem;
   background: rgb(255 255 255 / 4%);
 }
 body:is([data-page="player"], [data-page="admin"])
   .player-account-dropdown
-  .player-sensitive-detail
-  button {
-  margin-top: 0;
+  .account-name-edit-form label {
+  margin: 0;
+  color: #cbd1dc;
 }
 body:is([data-page="player"], [data-page="admin"])
-  .player-sensitive-detail
-  output {
-  color: #ffc72c;
+  .player-account-dropdown
+  .account-name-edit-form input {
+  margin: 0;
+  border-color: rgb(255 255 255 / 14%);
+  background: #0b203d;
+  color: #f4f5f9;
+}
+body:is([data-page="player"], [data-page="admin"])
+  .player-account-dropdown
+  .account-name-edit-form button {
+  margin: 0.25rem 0 0;
 }
 body:is([data-page="player"], [data-page="admin"]) .player-account-sign-out {
   width: 100%;

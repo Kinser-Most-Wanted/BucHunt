@@ -30,81 +30,41 @@
             Signed in as <strong data-testid="admin-display-name"></strong>
           </summary>
           <div class="player-account-dropdown">
-            <div
-              data-testid="admin-google-email"
-              class="player-sensitive-detail"
+            <button
+              type="button"
+              class="account-name-edit-toggle"
+              data-testid="admin-change-display-name"
+              aria-expanded="false"
+              aria-controls="admin-account-name-form"
+            >
+              Change display name
+            </button>
+            <form
+              id="admin-account-name-form"
+              class="account-name-edit-form"
+              data-testid="admin-account-name-form"
               hidden
             >
-              <button
-                type="button"
-                data-testid="admin-email-toggle"
-                aria-expanded="false"
-                aria-controls="admin-email-value"
-              >
-                Show Google account email
+              <label for="admin-account-name-input">New display name</label>
+              <input
+                id="admin-account-name-input"
+                data-testid="admin-account-name-input"
+                name="displayName"
+                autocomplete="nickname"
+                maxlength="40"
+                required
+              />
+              <button type="submit" class="primary-button">
+                Save display name
               </button>
-              <output
-                id="admin-email-value"
-                data-testid="admin-email-value"
+              <p
+                data-testid="admin-account-status"
+                class="player-account-status"
+                role="status"
+                aria-live="polite"
                 hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="admin-copy-email"
-                aria-label="Copy Google account email"
-                title="Copy email"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <div
-              data-testid="admin-google-account-id"
-              class="player-sensitive-detail"
-              hidden
-            >
-              <button
-                type="button"
-                data-testid="admin-id-toggle"
-                aria-expanded="false"
-                aria-controls="admin-id-value"
-              >
-                Show Google account ID
-              </button>
-              <output
-                id="admin-id-value"
-                data-testid="admin-id-value"
-                hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="admin-copy-id"
-                aria-label="Copy Google account ID"
-                title="Copy account ID"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <p
-              data-testid="admin-account-status"
-              class="player-account-status"
-              role="status"
-              aria-live="polite"
-              hidden
-            ></p>
+              ></p>
+            </form>
             <button
               id="sign-out"
               data-testid="admin-sign-out"

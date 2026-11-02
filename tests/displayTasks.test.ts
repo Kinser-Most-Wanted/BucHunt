@@ -164,12 +164,22 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   };
   const savedHunts = [hunt, endingSoonHunt, futureHunt, pastHunt, tasklessHunt];
   let huntListRequests = 0;
+  let profileDisplayName = "";
   await page.route("**/api/player/account/**", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",
     );
     expect(route.request().headers().cookie).toBeUndefined();
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      if (route.request().method() === "PUT") {
+        profileDisplayName = route.request().postDataJSON().displayName;
+      }
+      await route.fulfill({
+        json: { ok: true, value: { displayName: profileDisplayName } },
+      });
+      return;
+    }
     if (path.endsWith("/join")) {
       expect(route.request().method()).toBe("POST");
       expect(route.request().postDataJSON()).toEqual({
@@ -218,37 +228,17 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   );
   await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
   await page.getByTestId("player-account").click();
-  await expect(page.getByTestId("player-google-email")).toBeVisible();
-  await expect(page.getByTestId("player-email")).toBeHidden();
-  await expect(page.getByTestId("copy-email")).toBeHidden();
-  await page.getByTestId("email-toggle").click();
-  await expect(page.getByTestId("player-email")).toHaveText(
-    "player@example.com",
+  await expect(page.getByTestId("player-google-email")).toHaveCount(0);
+  await expect(page.getByTestId("player-google-account-id")).toHaveCount(0);
+  await expect(page.getByTestId("player-account-name-form")).toBeHidden();
+  await page.getByTestId("player-change-display-name").click();
+  await expect(page.getByTestId("player-account-name-form")).toBeVisible();
+  await page.getByTestId("player-account-name-input").fill("Baja Two");
+  await page.getByRole("button", { name: "Save display name" }).click();
+  await expect(page.getByTestId("player-display-name")).toHaveText(
+    "Baja Two (Player)",
   );
-  await expect(page.getByTestId("copy-email")).toBeVisible();
-  await page.getByTestId("copy-email").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => sessionStorage.getItem("test-copied-value")),
-    )
-    .toBe("player@example.com");
-  await expect(page.getByTestId("account-id-value")).toBeHidden();
-  await expect(page.getByTestId("account-id-toggle")).toHaveText(
-    "Show Google account ID",
-  );
-  await page.getByTestId("account-id-toggle").click();
-  await expect(page.getByTestId("account-id-value")).toHaveText(
-    "google-account-123",
-  );
-  await expect(page.getByTestId("copy-account-id")).toBeVisible();
-  await page.getByTestId("copy-account-id").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => sessionStorage.getItem("test-copied-value")),
-    )
-    .toBe("google-account-123");
-  await page.getByTestId("account-id-toggle").click();
-  await expect(page.getByTestId("account-id-value")).toBeHidden();
+  expect(profileDisplayName).toBe("Baja Two");
   await expect(page.getByTestId("google-sign-in-host")).toBeHidden();
   await expect(page.getByTestId("google-sign-in-host")).toHaveAttribute(
     "inert",
@@ -691,14 +681,17 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
       },
     }),
   );
+  let profileDisplayName = "Baja";
   await page.route("**/api/player/account/profile", async (route) => {
     expect(route.request().headers().authorization).toBe(
       "Bearer verified-test-token",
     );
     if (route.request().method() === "PUT") {
-      expect(route.request().postDataJSON()).toEqual({ displayName: "Baja" });
+      profileDisplayName = route.request().postDataJSON().displayName;
     }
-    await route.fulfill({ json: { ok: true, value: { displayName: "Baja" } } });
+    await route.fulfill({
+      json: { ok: true, value: { displayName: profileDisplayName } },
+    });
   });
   await page.route("**/api/player/account/hunts", async (route) => {
     expect(route.request().headers().authorization).toBe(
@@ -713,6 +706,16 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
     "Baja (Player)",
   );
   await expect(page.locator("#admin-denied")).toBeVisible();
+  await page.getByTestId("admin-account").click();
+  await expect(page.getByTestId("admin-google-email")).toHaveCount(0);
+  await expect(page.getByTestId("admin-google-account-id")).toHaveCount(0);
+  await page.getByTestId("admin-change-display-name").click();
+  await page.getByTestId("admin-account-name-input").fill("Baja Revamped");
+  await page.getByRole("button", { name: "Save display name" }).click();
+  await expect(page.getByTestId("admin-display-name")).toHaveText(
+    "Baja Revamped (Player)",
+  );
+  expect(profileDisplayName).toBe("Baja Revamped");
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -724,7 +727,9 @@ test("player sign-in survives visiting Hunt Studio and returning", async ({
 
   await page.goto("/player.html");
   await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
-  await expect(page.getByTestId("player-account")).toContainText("Baja");
+  await expect(page.getByTestId("player-account")).toContainText(
+    "Baja Revamped",
+  );
   await expect(page.getByTestId("player-task-status")).toContainText(
     "Your dashboard is ready",
   );

@@ -673,7 +673,8 @@ export function mountDisplayTasks(
     signOut.hidden = false;
     nameInput.value = "";
     nameInput.focus();
-    status.textContent = "Choose a display name for your player profile.";
+    status.hidden = true;
+    status.textContent = "";
   };
 
   nameForm.addEventListener("submit", (event) => {

@@ -101,6 +101,21 @@ type PastHuntFilter =
   | "last-30-days"
   | "over-30-days";
 
+const pastHuntFilterNotes: Record<PastHuntFilter, string> = {
+  "recent-3":
+    "Showing up to 3 recent Past Hunts. Choose a filter to browse older hunts.",
+  all: "Showing all past Hunts, newest first.",
+  completed: "Showing all past Hunts that were completed, newest first.",
+  incomplete: "Showing all past Hunts that were not completed, newest first.",
+  "no-tasks": "Showing all past Hunts that have no Tasks",
+  "last-7-days":
+    "Showing all past Hunts that ended in the last 7 days, newest first.",
+  "last-30-days":
+    "Showing all past Hunts that ended in the last 30 days, newest first.",
+  "over-30-days":
+    "Showing all past Hunts that ended over 30 days ago, newest first.",
+};
+
 function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
   if (
     hunt.status === "archived" ||
@@ -510,22 +525,7 @@ export function mountDisplayTasks(
               matchesPastHuntFilter(hunt, pastHuntFilter, now),
             );
       renderHunts(pastList, matchingPastHunts, now, true);
-      pastFilterNote.textContent = {
-        "recent-3":
-          "Showing up to 3 recent Past Hunts. Choose a filter to browse older hunts.",
-        all: "Showing all past Hunts, newest first.",
-        completed:
-          "Showing all past Hunts that were completed, newest first.",
-        incomplete:
-          "Showing all past Hunts that were not completed, newest first.",
-        "no-tasks": "Showing all past Hunts that have no Tasks",
-        "last-7-days":
-          "Showing all past Hunts that ended in the last 7 days, newest first.",
-        "last-30-days":
-          "Showing all past Hunts that ended in the last 30 days, newest first.",
-        "over-30-days":
-          "Showing all past Hunts that ended over 30 days ago, newest first.",
-      }[pastHuntFilter];
+      pastFilterNote.textContent = pastHuntFilterNotes[pastHuntFilter];
       activeHuntCount.textContent = `(${groups.active.length})`;
       activeHuntCount.setAttribute(
         "aria-label",

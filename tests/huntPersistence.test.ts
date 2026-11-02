@@ -249,9 +249,12 @@ test("account nicknames persist by verified Google identity across server restar
     expect((await (await request("GET")).json()).value).toEqual({
       displayName: "Baja",
     });
-    expect(
-      (await (await request("GET", "a-different-google-subject")).json()).value,
-    ).toEqual({ displayName: null });
+    const otherAccountResponse = await request(
+      "GET",
+      "a-different-google-subject",
+    );
+    const otherAccount = await otherAccountResponse.json();
+    expect(otherAccount.value).toEqual({ displayName: null });
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });

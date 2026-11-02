@@ -33,9 +33,6 @@ export function mountCreateHunt(
   );
   if (!form || !status || !createDialog || !manageDialog || !managerView)
     return;
-  const profile = document.querySelector<HTMLElement>(
-    '[data-testid="creator-id"]',
-  )!;
   const workspaceStatus = document.querySelector<HTMLElement>(
     '[data-testid="creator-status"]',
   )!;
@@ -108,12 +105,20 @@ export function mountCreateHunt(
     memberList.replaceChildren();
     creators?.replaceChildren();
     for (const creatorId of result.value) {
+      const invitation = creatorId.startsWith("invite:");
+      const identifier = invitation
+        ? creatorId.slice("invite:".length)
+        : creatorId;
       const item = document.createElement("li");
       const label = document.createElement("span");
-      label.textContent = creatorId;
+      label.textContent = invitation
+        ? `Invitation pending · ${identifier}`
+        : "Google account contributor";
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.textContent = "Remove contributor";
+      remove.textContent = invitation
+        ? "Cancel invitation"
+        : "Remove contributor";
       remove.addEventListener("click", async () => {
         remove.disabled = true;
         const result = await request<string[]>(
@@ -127,14 +132,18 @@ export function mountCreateHunt(
           remove.disabled = false;
           return;
         }
-        memberStatus.textContent = "Contributor removed.";
+        memberStatus.textContent = invitation
+          ? "Invitation canceled."
+          : "Contributor removed.";
         await renderContributors();
       });
       item.append(label, remove);
       memberList.append(item);
       const chip = document.createElement("li");
       chip.className = "creator-chip";
-      chip.textContent = `Contributor · ${creatorId}`;
+      chip.textContent = invitation
+        ? `Invitation pending · ${identifier}`
+        : "Contributor · Google account";
       creators?.append(chip);
     }
     if (contributorsStatus) {
@@ -177,7 +186,6 @@ export function mountCreateHunt(
       workspaceStatus.textContent = session.message;
       return;
     }
-    profile.textContent = session.value.id;
     const result = await request<HuntSummary[]>("/api/admin/hunts");
     if (!result.ok) {
       workspaceStatus.textContent = result.message;
@@ -253,42 +261,26 @@ export function mountCreateHunt(
       .querySelector<HTMLButtonElement>('[data-testid="edit-hunt-link"]')
       ?.click();
   });
-  document
-    .querySelector('[data-testid="copy-creator-id"]')
-    ?.addEventListener("click", async () => {
-      const session = await getCreatorSession();
-      if (!session.ok) {
-        workspaceStatus.textContent = session.message;
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(session.value.id);
-        workspaceStatus.textContent = "Creator ID copied.";
-      } catch {
-        workspaceStatus.textContent = "Select and copy your creator ID above.";
-      }
-    });
   memberForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!selected || selected.role !== "owner") return;
     const id = selected.id;
-    const creatorId = String(
-      new FormData(memberForm).get("creatorId") ?? "",
-    ).trim();
+    const email = String(new FormData(memberForm).get("email") ?? "")
+      .trim()
+      .toLowerCase();
     const button = memberForm.querySelector<HTMLButtonElement>("button")!;
     button.disabled = true;
     try {
       const result = await request<string[]>(
         `/api/admin/hunts/${id}/contributors`,
-        { creatorId },
+        { email },
       );
       if (selected?.id !== id) return;
       if (!result.ok) {
         memberStatus.textContent = result.message;
         return;
       }
-      memberStatus.textContent =
-        "Contributor added. They can refresh My hunts to get started.";
+      memberStatus.textContent = `Invitation saved for ${email}. They can access this Hunt Studio after signing in with Google.`;
       memberForm.reset();
       await renderContributors();
     } finally {

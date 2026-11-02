@@ -16,7 +16,7 @@ pnpm serve
 
 Open `http://127.0.0.1:3000/admin.html` (Hunt Studio). No API token or AWS access is needed. Create a hunt, add tasks, and follow the player link. Use **My hunts** to reopen hunts you own or contribute to.
 
-For collaboration, a contributor opens Hunt Studio and copies their creator ID while signed in. The hunt owner selects the hunt and adds that ID under **Contributors**. The ID is derived from the verified Google account and works across browsers and devices. Contributors can add tasks; only the owner can grant or remove contributor access.
+To collaborate, the hunt owner enters the contributor's Google email under **Contributors**. The invite becomes active when that person signs in with the same verified email. BucHunt does not send an email, so share the site link with them. Contributors can add tasks; only the owner can grant, cancel, or remove access.
 
 Existing hunts owned by temporary browser IDs are reassigned to Baja Blast's verified Google account (`codepro1012@gmail.com`) the first time that account opens Hunt Studio in each deployment. The migration updates only legacy `browser:` ownership IDs; hunt IDs, tasks, codes, and progress remain unchanged. Each deployment has its own private `DATA_DIRECTORY`, so sign in at each environment that contains hunts to migrate. New hunts are owned by the signed-in Google account. Runtime JSON files store hunt definitions, contributor grants, profiles, and progress separately.
 

@@ -404,6 +404,8 @@ export function createApplication(options: ServerOptions = {}) {
         const legacyCreatorId = secret
           ? "browser:" + createHash("sha256").update(secret).digest("hex")
           : null;
+        if (account)
+          await contributors.acceptInvitations(account.email, account.id);
         if (path === "/api/admin/session" && method === "GET") {
           if (account) {
             if (legacyCreatorId)
@@ -473,7 +475,7 @@ export function createApplication(options: ServerOptions = {}) {
             path,
           );
         const match =
-          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})))?)?$/.exec(
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64}|invite:[^/]+)))?)?$/.exec(
             path,
           );
         if (match || taskMatch) {
@@ -535,20 +537,22 @@ export function createApplication(options: ServerOptions = {}) {
             if (method === "GET" && !match[3]) {
               json(response, 200, {
                 ok: true,
-                value: await contributors.members(hunt.id),
+                value: await contributors.entries(hunt.id),
               });
               return;
             }
             if (method === "POST" && !match[3]) {
               const input = await body(request);
-              const id =
+              const fields =
                 input && typeof input === "object"
-                  ? (input as Record<string, unknown>).creatorId
-                  : undefined;
-              await contributors.add(hunt.id, id);
+                  ? (input as Record<string, unknown>)
+                  : {};
+              if (typeof fields.email === "string")
+                await contributors.invite(hunt.id, fields.email);
+              else await contributors.add(hunt.id, fields.creatorId);
               json(response, 200, {
                 ok: true,
-                value: await contributors.members(hunt.id),
+                value: await contributors.entries(hunt.id),
               });
               return;
             }
@@ -556,7 +560,7 @@ export function createApplication(options: ServerOptions = {}) {
               await contributors.remove(hunt.id, match[3]);
               json(response, 200, {
                 ok: true,
-                value: await contributors.members(hunt.id),
+                value: await contributors.entries(hunt.id),
               });
               return;
             }

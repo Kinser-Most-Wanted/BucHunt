@@ -756,6 +756,8 @@ export function mountDisplayTasks(
         } catch {
           // The account profile is authoritative; browser storage is only a cache.
         }
+        accountNameEditToggle.setAttribute("aria-expanded", "false");
+        accountNameForm.hidden = true;
         accountNameStatus.textContent = "Display name updated.";
         accountNameStatus.hidden = false;
       })

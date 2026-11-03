@@ -527,7 +527,7 @@ test("only owners and contributors can configure a hunt through the creator work
   browser,
   baseURL,
 }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(120_000);
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
@@ -602,7 +602,14 @@ test("only owners and contributors can configure a hunt through the creator work
     await page
       .getByRole("button", { name: "Shared hunt (owner)", exact: true })
       .click();
+    await expect(page.getByTestId("hunt-detail-name")).toHaveText(
+      "Shared hunt",
+    );
     await page.getByTestId("contributors-panel").locator("summary").click();
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Google account contributor",
+      { timeout: 15_000 },
+    );
     await member.getByTestId("refresh-my-hunts").click();
     await member
       .getByRole("button", { name: "Shared hunt (contributor)", exact: true })

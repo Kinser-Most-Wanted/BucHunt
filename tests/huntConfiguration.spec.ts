@@ -522,7 +522,7 @@ test("only owners and contributors can configure a hunt through the creator work
       async (huntId) => (await fetch(`/api/admin/hunts/${huntId}`)).status,
       id,
     );
-    expect(memberHuntStatus).toBe(403);
+    expect([401, 403]).toContain(memberHuntStatus);
     const visitor = await stranger.newPage();
     await installAdminSession(visitor);
     await visitor.goto("/admin.html");

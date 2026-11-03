@@ -583,9 +583,17 @@ export function createApplication(options: ServerOptions = {}) {
                 input && typeof input === "object"
                   ? (input as Record<string, unknown>)
                   : {};
-              if (typeof fields.email === "string")
+              if (typeof fields.email === "string") {
+                if (
+                  account?.email &&
+                  fields.email.trim().toLowerCase() === account.email
+                )
+                  throw new StoreError(
+                    "validation",
+                    "You cannot invite your own account as a collaborator.",
+                  );
                 await contributors.invite(hunt.id, fields.email);
-              else await contributors.add(hunt.id, fields.creatorId);
+              } else await contributors.add(hunt.id, fields.creatorId);
               json(response, 200, {
                 ok: true,
                 value: await contributors.entries(hunt.id),

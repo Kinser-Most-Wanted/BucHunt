@@ -469,6 +469,10 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page.getByTestId("hunt-id-toggle").click();
   await expect(idControl.getByTestId("hunt-detail-id")).toHaveText(id);
   await expect(idControl.getByTestId("hunt-detail-id")).toBeVisible();
+  await expect(page.getByTestId("hunt-id-toggle")).toHaveCSS(
+    "color",
+    "rgba(0, 0, 0, 0)",
+  );
   await expect(idControl).toHaveCSS("position", "relative");
   await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(

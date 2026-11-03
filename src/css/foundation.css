@@ -3483,6 +3483,13 @@ body[data-page="admin"]
   output[hidden] {
   display: none;
 }
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .hunt-id-control:has(output:not([hidden]))
+  .hunt-id-toggle {
+  color: transparent;
+  text-shadow: none;
+}
 body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin-top: 1.35rem;
 }

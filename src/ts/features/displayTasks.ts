@@ -1239,6 +1239,7 @@ export function mountDisplayTasks(
           if (result.code === "unauthorized") void preparePlayerSignIn();
           return;
         }
+        huntInput.value = "";
         if (isSharedLinkJoin) {
           await loadHunts(
             identity,

@@ -300,6 +300,50 @@ test("verified Baja account migrates legacy hunt ownership and keeps new hunts a
   }
 });
 
+test("Google hunt owners cannot invite their own email as a collaborator", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-self-invite-"));
+  const app = createApplication({
+    dataDirectory: directory,
+    verifyGoogleIdentity: async (token) => ({
+      subject: token,
+      email: "owner@example.com",
+      emailVerified: true,
+    }),
+  });
+  try {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const headers = {
+      Authorization: "Bearer owner-token",
+      "Content-Type": "application/json",
+    };
+    const created = await fetch(base + "/api/admin/hunts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(input),
+    });
+    const hunt = (await created.json()).value;
+    const invited = await fetch(
+      base + `/api/admin/hunts/${hunt.id}/contributors`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: " OWNER@example.com " }),
+      },
+    );
+    expect(invited.status).toBe(400);
+    expect((await invited.json()).message).toContain("own account");
+    const contributors = await fetch(
+      base + `/api/admin/hunts/${hunt.id}/contributors`,
+      { headers },
+    );
+    expect((await contributors.json()).value).toEqual([]);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("creator ownership, contributor grants, privacy and restart persistence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-api-"));
   let app = createApplication({ dataDirectory: directory });
@@ -958,6 +1002,7 @@ test("account browser answers tasks and restores progress in another browser", a
         await expect(page.getByTestId("player-hunt-name")).toHaveText(
           input.name,
         );
+        await expect(page.getByLabel("Access code")).toHaveValue("");
         await page.getByLabel("Answer for Fountain").fill("bucky");
         await page
           .getByRole("button", { name: "Submit answer" })

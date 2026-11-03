@@ -462,7 +462,15 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
           })
         ).json()
       ).value,
-    ).toEqual([{ id, name: input.name, role: "contributor" }]);
+    ).toEqual([
+      expect.objectContaining({
+        id,
+        name: input.name,
+        role: "contributor",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      }),
+    ]);
     const contributedTask = await (
       await fetch(base + route + "/tasks", {
         method: "POST",

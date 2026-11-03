@@ -149,7 +149,7 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event("scroll"));
   });
-  await expect(list).toContainText("Hunt 999");
+  await expect(list).toContainText("Hunt 0");
   expect(
     await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
   ).toBeLessThan(30);

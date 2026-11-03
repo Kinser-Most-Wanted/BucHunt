@@ -141,6 +141,18 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     3,
   );
   await expect(list).toContainText("Hunt 999");
+  const firstHunt = list.locator("button.hunt-list-link").first();
+  await firstHunt.hover();
+  await expect
+    .poll(() =>
+      firstHunt.evaluate((element) => getComputedStyle(element).transform),
+    )
+    .toBe("none");
+  await expect
+    .poll(() =>
+      firstHunt.evaluate((element) => getComputedStyle(element).filter),
+    )
+    .toBe("none");
   await expect(page.getByTestId("manage-hunts-filter-note")).toContainText(
     "3 most recently edited",
   );
@@ -155,6 +167,16 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     .poll(() => list.evaluate((element) => getComputedStyle(element).overflowY))
     .toBe("visible");
   expect(huntRequests).toBe(1);
+  await page.getByTestId("manage-hunts-search").fill("Hunt 42");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    1,
+  );
+  await expect(list).toContainText("Hunt 42");
+  await page.getByTestId("manage-hunts-search").fill("Hunt 4");
+  await expect
+    .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())
+    .toBeGreaterThan(1);
+  await page.getByTestId("manage-hunts-search").fill("");
   await page.getByTestId("manage-hunts-filter").selectOption("all");
   await expect
     .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())

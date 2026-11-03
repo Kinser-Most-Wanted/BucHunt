@@ -50,6 +50,12 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
     );
     const restarted = new HuntStore(path);
     expect((await restarted.get(hunt.id)).tasks).toHaveLength(12);
+    const detached = await restarted.get(hunt.id);
+    detached.name = "Changed outside the store";
+    expect((await restarted.get(hunt.id)).name).toBe("Campus");
+    const summary = (await restarted.listSummaries())[0];
+    expect(summary).toMatchObject({ id: hunt.id, name: "Campus" });
+    expect(summary).not.toHaveProperty("tasks");
     const original = (await restarted.get(hunt.id)).tasks[0];
     const updated = await store.updateTask(hunt.id, original.id, {
       ...task,
@@ -268,7 +274,9 @@ test("verified Baja account migrates legacy hunt ownership and keeps new hunts a
     const listed = await fetch(base + "/api/admin/hunts", {
       headers: { Authorization: "Bearer baja-subject" },
     });
-    expect((await listed.json()).value).toHaveLength(2);
+    const listResult = await listed.json();
+    expect(listResult.value).toHaveLength(2);
+    expect(listResult.value[0]).not.toHaveProperty("tasks");
     const created = await fetch(base + "/api/admin/hunts", {
       method: "POST",
       headers: {

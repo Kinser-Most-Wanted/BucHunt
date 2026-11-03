@@ -1399,7 +1399,7 @@ body[data-page="admin"] [data-testid="my-hunts"] button {
 body[data-page="admin"] .manage-hunts-filter-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
   margin-top: 1rem;
   padding: 0.7rem 0.85rem;
@@ -1415,7 +1415,7 @@ body[data-page="admin"] .manage-hunts-filter {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  flex: 1;
+  flex: 0 1 auto;
   margin: 0;
   color: #e8ebf0;
 }
@@ -1426,6 +1426,26 @@ body[data-page="admin"] .manage-hunts-filter select {
   padding: 0.55rem 2rem 0.55rem 0.75rem;
   border-radius: 0.65rem;
   background-color: #10294a;
+  font-size: 0.9rem;
+}
+body[data-page="admin"] .manage-hunts-search {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  color: #e8ebf0;
+}
+body[data-page="admin"] .manage-hunts-search input {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-color: rgb(255 255 255 / 12%);
+  border-radius: 0.65rem;
+  background: #10294a;
+  color: #f4f5f9;
   font-size: 0.9rem;
 }
 body[data-page="admin"] .manage-hunts-filter-note {
@@ -1498,6 +1518,16 @@ body[data-page="admin"] button:hover:not(:disabled),
 body[data-page="player"] button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-1px);
+}
+body[data-page="admin"] dialog.hunt-details-dialog button {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+body[data-page="admin"] dialog.hunt-details-dialog button:hover:not(:disabled) {
+  filter: none;
+  transform: none;
 }
 body[data-page="admin"] .primary-button,
 body[data-page="admin"] #create-hunt button[type="submit"],
@@ -2086,6 +2116,8 @@ body[data-page="admin"] [data-testid="my-hunts"] button.hunt-list-link:hover {
   border-color: rgb(255 199 44 / 28%);
   background: rgb(255 199 44 / 5%);
   color: #ffc72c;
+  filter: none;
+  transform: none;
 }
 body[data-page="admin"] .hunt-list-link span {
   padding: 0.25rem 0.55rem;
@@ -2124,8 +2156,19 @@ body[data-page="admin"] dialog.hunt-details-dialog::-webkit-scrollbar {
   body[data-page="admin"] .manage-hunts-filter {
     gap: 0.55rem;
   }
+  body[data-page="admin"] .manage-hunts-filter-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
   body[data-page="admin"] .manage-hunts-filter select {
     min-width: 0;
+    max-width: 72%;
+  }
+  body[data-page="admin"] .manage-hunts-search {
+    justify-content: space-between;
+  }
+  body[data-page="admin"] .manage-hunts-search input {
     max-width: 72%;
   }
 }

@@ -63,6 +63,9 @@ export function mountCreateHunt(
   const listFilter = manageDialog.querySelector<HTMLSelectElement>(
     '[data-testid="manage-hunts-filter"]',
   )!;
+  const listSearch = manageDialog.querySelector<HTMLInputElement>(
+    '[data-testid="manage-hunts-search"]',
+  )!;
   const listFilterNote = manageDialog.querySelector<HTMLElement>(
     '[data-testid="manage-hunts-filter-note"]',
   )!;
@@ -144,13 +147,14 @@ export function mountCreateHunt(
 
   function updateFilteredHunts(reset = true): void {
     const mode = listFilter.value as HuntListFilter;
+    const query = listSearch.value.trim().toLocaleLowerCase();
     let matching = [...availableHunts];
     switch (mode) {
       case "recent-3":
       case "all":
       case "edited":
         matching = sortByEdited(matching);
-        if (mode === "recent-3") matching = matching.slice(0, 3);
+        if (mode === "recent-3" && !query) matching = matching.slice(0, 3);
         break;
       case "created":
         matching.sort(
@@ -176,10 +180,22 @@ export function mountCreateHunt(
         );
         break;
     }
+    if (query)
+      matching = matching.filter((hunt) =>
+        hunt.name.toLocaleLowerCase().includes(query),
+      );
     filteredHunts = matching;
-    listFilterNote.textContent = huntFilterNotes[mode];
+    const filterDescription =
+      query && mode === "recent-3"
+        ? "Showing matches ordered by last edit."
+        : huntFilterNotes[mode];
+    listFilterNote.textContent = query
+      ? `${matching.length} ${matching.length === 1 ? "hunt" : "hunts"} found. ${filterDescription}`
+      : filterDescription;
     if (availableHunts.length && !matching.length)
-      listFilterNote.textContent = "No hunts match this filter.";
+      listFilterNote.textContent = query
+        ? "No hunts match your search and filter."
+        : "No hunts match this filter.";
     renderHuntWindow(reset);
   }
 
@@ -247,6 +263,7 @@ export function mountCreateHunt(
     passive: true,
   });
   listFilter.addEventListener("change", () => updateFilteredHunts());
+  listSearch.addEventListener("input", () => updateFilteredHunts());
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;

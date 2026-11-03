@@ -459,11 +459,14 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (path === "/api/admin/hunts" && method === "GET") {
-          const membership = await contributors.all();
-          const accessible = (await hunts.list()).filter(
+          const [sharedHuntIds, summaries] = await Promise.all([
+            contributors.huntIdsFor(creatorId),
+            hunts.listSummaries(),
+          ]);
+          const accessible = summaries.filter(
             (hunt) =>
               hunt.ownerId === creatorId ||
-              membership[hunt.id]?.includes(creatorId),
+              sharedHuntIds.has(hunt.id),
           );
           json(response, 200, {
             ok: true,

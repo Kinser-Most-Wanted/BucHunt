@@ -271,3 +271,54 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     tasks,
   };
 }
+
+export async function downloadHuntResults(
+  huntId: string,
+  format: "pdf" | "csv",
+): Promise<OperationResult<{ downloaded: true }>> {
+  const session = await getCreatorSession();
+  if (!session.ok) return session;
+  try {
+    const token = storedGoogleToken();
+    const response = await fetch(
+      `/api/admin/hunts/${encodeURIComponent(huntId)}/results/${format}`,
+      {
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(
+        typeof error.message === "string"
+          ? error.message
+          : "The export could not be downloaded.",
+      );
+    }
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (
+      !contentType.startsWith(format === "pdf" ? "application/pdf" : "text/csv")
+    )
+      throw new Error("The service returned an invalid export.");
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `hunt-${huntId}-results.${format}`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Give the browser time to start reading the object URL before releasing it.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return { ok: true, value: { downloaded: true } };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "network",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The export could not be downloaded. Try again.",
+    };
+  }
+}

@@ -22,6 +22,11 @@ import {
 } from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 import { PlayerProfileStore } from "./playerProfileStore.js";
+import {
+  buildHuntResults,
+  resultsCsv,
+  resultsPdf,
+} from "./huntResultsExport.js";
 
 interface ServerOptions {
   dataDirectory?: string;
@@ -478,6 +483,10 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const exportMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
+            path,
+          );
         const taskMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/tasks\/([a-zA-Z0-9-]+)$/.exec(
             path,
@@ -486,8 +495,10 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64}|invite:[^/]+)))?)?$/.exec(
             path,
           );
-        if (match || taskMatch) {
-          const hunt = await hunts.get(match?.[1] ?? taskMatch![1]);
+        if (match || taskMatch || exportMatch) {
+          const hunt = await hunts.get(
+            match?.[1] ?? taskMatch?.[1] ?? exportMatch![1],
+          );
           const owner = hunt.ownerId === creatorId;
           if (
             !owner &&
@@ -499,6 +510,40 @@ export function createApplication(options: ServerOptions = {}) {
               message:
                 "Only this hunt's owner and contributors can access its configuration.",
             });
+            return;
+          }
+          if (exportMatch && method === "GET") {
+            const [accounts, legacy] = await Promise.all([
+              accountProgress.participants(hunt.id),
+              progress.participants(hunt.id),
+            ]);
+            const participants = await Promise.all(
+              accounts.map(async (player) => ({
+                ...player,
+                displayName: (await accountProfiles.get(player.playerId))
+                  .displayName,
+              })),
+            );
+            const results = buildHuntResults(hunt, [
+              ...participants,
+              ...legacy,
+            ]);
+            const format = exportMatch[2];
+            const content =
+              format === "pdf"
+                ? Buffer.from(await resultsPdf(results))
+                : Buffer.from(resultsCsv(results), "utf8");
+            response.writeHead(200, {
+              "Content-Type":
+                format === "pdf"
+                  ? "application/pdf"
+                  : "text/csv; charset=utf-8",
+              "Content-Disposition": `attachment; filename="hunt-${hunt.id}-results.${format}"`,
+              "Content-Length": content.length,
+              "Cache-Control": "no-store",
+              "X-Content-Type-Options": "nosniff",
+            });
+            response.end(content);
             return;
           }
           if (match && !match[2] && method === "DELETE") {

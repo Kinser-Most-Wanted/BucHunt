@@ -1356,6 +1356,13 @@ body[data-page="admin"] [data-testid="contributor-list"] {
   padding: 0;
   list-style: none;
 }
+body[data-page="admin"] [data-testid="my-hunts"] {
+  max-height: min(58dvh, 42rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+  gap: 0.25rem;
+}
 body[data-page="admin"] [data-testid="my-hunts"] > li,
 body[data-page="admin"] [data-testid="contributor-list"] > li {
   padding: 0.9rem 1rem;
@@ -1363,6 +1370,23 @@ body[data-page="admin"] [data-testid="contributor-list"] > li {
   border-radius: 0.75rem;
   background: rgb(255 255 255 / 3%);
   color: #e8ebf0;
+}
+body[data-page="admin"] [data-testid="my-hunts"] > li:not(.hunt-list-spacer) {
+  box-sizing: border-box;
+  height: 76px;
+  min-height: 76px;
+  overflow: hidden;
+}
+body[data-page="admin"] [data-testid="my-hunts"] > li.hunt-list-spacer {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+body[data-page="admin"] [data-testid="my-hunts"] .hunt-list-link {
+  white-space: nowrap;
+  overflow: hidden;
 }
 body[data-page="admin"] [data-testid="my-hunts"] button {
   margin: 0.35rem 0.35rem 0 0;
@@ -1705,6 +1729,16 @@ body[data-page="admin"] .hunt-list-link span {
 }
 body[data-page="admin"] .hunt-list-link:hover {
   color: #ffc72c;
+}
+body[data-page="admin"] .delete-hunt-button {
+  border-color: rgb(248 113 113 / 45%);
+  color: #fecaca;
+  background: rgb(127 29 29 / 22%);
+}
+body[data-page="admin"] .delete-hunt-button:hover:not(:disabled) {
+  border-color: #f87171;
+  color: #fff;
+  background: rgb(127 29 29 / 55%);
 }
 body[data-page="admin"] [data-testid="contributors-panel"] {
   margin: 0;
@@ -2410,6 +2444,17 @@ body[data-page="player"].player-hunt-modal-open {
   letter-spacing: -0.04em;
   overflow-wrap: anywhere;
   text-wrap: balance;
+}
+.player-hunt-details .player-leave-hunt {
+  margin-top: 0.9rem;
+  border-color: rgb(248 113 113 / 42%);
+  color: #fecaca;
+  background: rgb(127 29 29 / 20%);
+}
+.player-hunt-details .player-leave-hunt:hover:not(:disabled) {
+  border-color: #f87171;
+  color: #fff;
+  background: rgb(127 29 29 / 52%);
 }
 .player-hunt-details .player-hunt-intro > h2[data-content-length="medium"] {
   font-size: clamp(1.75rem, 3.5vw, 2.3rem);

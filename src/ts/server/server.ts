@@ -334,6 +334,11 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
+          if (method === "DELETE" && !accountMatch[2]) {
+            await accountProgress.leave(player, hunt.id);
+            json(response, 200, { ok: true, value: { left: true } });
+            return;
+          }
           if (method === "POST" && accountMatch[2]) {
             if (!isHuntActive(hunt)) {
               const message =
@@ -491,6 +496,34 @@ export function createApplication(options: ServerOptions = {}) {
               message:
                 "Only this hunt's owner and contributors can access its configuration.",
             });
+            return;
+          }
+          if (match && !match[2] && method === "DELETE") {
+            if (!owner) {
+              json(response, 403, {
+                ok: false,
+                code: "unauthorized",
+                message: "Only the hunt owner can delete this hunt.",
+              });
+              return;
+            }
+            const input = await body(request);
+            const confirmationName =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).confirmationName
+                : undefined;
+            if (confirmationName !== hunt.name)
+              throw new StoreError(
+                "validation",
+                "Enter the exact hunt name to confirm deletion.",
+              );
+            await Promise.all([
+              contributors.removeHunt(hunt.id),
+              progress.removeHunt(hunt.id),
+              accountProgress.removeHunt(hunt.id),
+            ]);
+            await hunts.delete(hunt.id);
+            json(response, 200, { ok: true, value: { deleted: true } });
             return;
           }
           if (taskMatch && method === "PATCH") {

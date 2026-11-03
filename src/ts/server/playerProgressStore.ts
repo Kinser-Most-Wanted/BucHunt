@@ -99,6 +99,35 @@ export class PlayerProgressStore {
         data.players[player][hunt] = [];
     });
   }
+  async leave(player: string, hunt: string): Promise<void> {
+    await this.file.update((data) => {
+      if (Object.hasOwn(data.players, player)) {
+        delete data.players[player][hunt];
+        if (Object.keys(data.players[player]).length === 0)
+          delete data.players[player];
+      }
+      if (data.incorrectChoices?.[player]) {
+        delete data.incorrectChoices[player][hunt];
+        if (Object.keys(data.incorrectChoices[player]).length === 0)
+          delete data.incorrectChoices[player];
+      }
+    });
+  }
+  async removeHunt(hunt: string): Promise<void> {
+    await this.file.update((data) => {
+      for (const [player, hunts] of Object.entries(data.players)) {
+        delete hunts[hunt];
+        if (Object.keys(hunts).length === 0) delete data.players[player];
+      }
+      for (const [player, hunts] of Object.entries(
+        data.incorrectChoices ?? {},
+      )) {
+        delete hunts[hunt];
+        if (Object.keys(hunts).length === 0)
+          delete data.incorrectChoices![player];
+      }
+    });
+  }
   async complete(player: string, hunt: string, task: string): Promise<void> {
     if (![player, hunt, task].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
       throw new StoreError("validation", "Invalid progress identifier.");

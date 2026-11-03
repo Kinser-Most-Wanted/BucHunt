@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
@@ -9,6 +10,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApplication } from "../src/ts/server/server.js";
 import {
+  ContributorStore,
   HuntStore,
   isHuntActive,
   isHuntJoinable,
@@ -826,6 +828,56 @@ test("account task progress survives restart without cookies and isolates player
   }
 });
 
+test("hunt deletion requires the owner and clears related saved records", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-delete-hunt-"));
+  const app = createApplication({ dataDirectory: directory });
+  try {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const ownerSession = await fetch(base + "/api/admin/session");
+    const owner = (await ownerSession.json()).value;
+    const ownerCookie = ownerSession.headers.get("set-cookie")!.split(";")[0];
+    const outsiderSession = await fetch(base + "/api/admin/session");
+    const outsiderCookie = outsiderSession.headers
+      .get("set-cookie")!
+      .split(";")[0];
+    const store = new HuntStore(join(directory, "hunts.json"));
+    const hunt = await store.create(input, owner.id);
+    const playerId = `google-${"a".repeat(64)}`;
+    const accountProgress = new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    );
+    const legacyProgress = new PlayerProgressStore(
+      join(directory, "player-progress.json"),
+    );
+    const contributors = new ContributorStore(
+      join(directory, "hunt-contributors.json"),
+    );
+    await accountProgress.join(playerId, hunt.id);
+    await legacyProgress.join(playerId, hunt.id);
+    await contributors.add(hunt.id, `google-${"b".repeat(64)}`);
+    const deleteRequest = (cookie: string, confirmationName: string) =>
+      fetch(base + `/api/admin/hunts/${hunt.id}`, {
+        method: "DELETE",
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirmationName }),
+      });
+    expect((await deleteRequest(outsiderCookie, hunt.name)).status).toBe(403);
+    expect((await deleteRequest(ownerCookie, "Wrong name")).status).toBe(400);
+    expect((await deleteRequest(ownerCookie, hunt.name)).status).toBe(200);
+    await expect(store.get(hunt.id)).rejects.toThrow("Hunt not found");
+    expect(await accountProgress.huntsWithProgress(playerId)).toEqual([]);
+    expect(await legacyProgress.huntsWithProgress(playerId)).toEqual([]);
+    expect(await contributors.members(hunt.id)).toEqual([]);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("account browser answers tasks and restores progress in another browser", async ({
   browser,
 }) => {
@@ -1120,6 +1172,42 @@ test("access code joins persist before answers and reject unavailable hunts and 
     );
     expect(answerResponse.status).toBe(400);
     expect((await answerResponse.json()).message).toContain("Hunt Ended");
+    const playerId = `google-${createHash("sha256").update("google-subject-a").digest("hex")}`;
+    const accountProgress = new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    );
+    await accountProgress.rejectChoice(
+      playerId,
+      empty.id,
+      "task-attempt",
+      "wrong",
+    );
+    expect(
+      (
+        await fetch(base + `/api/player/account/hunts/${empty.id}`, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer player-b" },
+        })
+      ).status,
+    ).toBe(403);
+    const leaveResponse = await fetch(
+      base + `/api/player/account/hunts/${empty.id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: "Bearer player-a" },
+      },
+    );
+    expect(leaveResponse.status).toBe(200);
+    expect(await accountProgress.huntsWithProgress(playerId)).not.toContain(
+      empty.id,
+    );
+    expect(await accountProgress.incorrect(playerId, empty.id)).toEqual({});
+    const remainingHunts = await fetch(base + "/api/player/account/hunts", {
+      headers: { Authorization: "Bearer player-a" },
+    });
+    expect((await remainingHunts.json()).value).not.toContainEqual(
+      expect.objectContaining({ id: empty.id }),
+    );
     const path = join(directory, "hunts.json");
     const legacy = JSON.parse(await readFile(path, "utf8"));
     legacy.hunts[0].accessCode = null;

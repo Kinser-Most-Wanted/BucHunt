@@ -875,7 +875,31 @@ export function mountDisplayTasks(
     const intro = document.createElement("div");
     intro.className = "player-hunt-intro";
     huntName.before(intro);
-    intro.append(huntName, huntDescription, huntStatus);
+    const leaveHuntButton = document.createElement("button");
+    leaveHuntButton.type = "button";
+    leaveHuntButton.className = "action player-leave-hunt";
+    leaveHuntButton.dataset.testid = "leave-hunt";
+    leaveHuntButton.textContent = "Leave Hunt";
+    leaveHuntButton.addEventListener("click", async () => {
+      const identity = activeIdentity ?? storedIdentity();
+      if (!selectedHuntId || !identity) return;
+      const currentHuntName =
+        displayedHunts.find((item) => item.id === selectedHuntId)?.name ??
+        huntName.textContent?.trim() ??
+        "this hunt";
+      if (!window.confirm(`Leave “${currentHuntName}”?`)) return;
+      leaveHuntButton.disabled = true;
+      huntStatus.textContent = "Leaving hunt…";
+      const result = await repository.leaveHunt(selectedHuntId, identity);
+      if (!result.ok) {
+        huntStatus.textContent = result.message;
+        leaveHuntButton.disabled = false;
+        return;
+      }
+      closeDetails();
+      await loadHunts(identity, currentNickname);
+    });
+    intro.append(huntName, huntDescription, huntStatus, leaveHuntButton);
 
     let huntRequest = 0;
     const addFact = (labelText: string, valueText: string): void => {

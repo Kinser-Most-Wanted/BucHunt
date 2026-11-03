@@ -116,6 +116,70 @@ async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
   );
 }
 
+test("manage hunts virtualizes long lists and owner deletion requires the hunt name", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  const hunts = Array.from({ length: 1000 }, (_, index) => ({
+    id: `hunt-${index}`,
+    name: `Hunt ${index}`,
+    role: "owner" as const,
+  }));
+  await page.route("**/api/admin/hunts", (route) =>
+    route.fulfill({ json: { ok: true, value: hunts } }),
+  );
+  await page.goto("/admin.html");
+  await page.getByTestId("open-manage-hunts").click();
+  const list = page.getByTestId("my-hunts");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    19,
+  );
+  await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect(list).toContainText("Hunt 999");
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(30);
+});
+
+test("owners must type the exact hunt name before deleting a hunt", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  await page
+    .getByLabel("Hunt name", { exact: true })
+    .fill("Delete verification");
+  await page.getByLabel("Description", { exact: true }).fill("Temporary hunt");
+  await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
+  await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Delete verification (owner)" })
+    .click();
+  const huntId = await page
+    .locator('#define-task [name="huntId"]')
+    .inputValue();
+  const wrongNameResponse = await page.request.delete(
+    `/api/admin/hunts/${huntId}`,
+    { data: { confirmationName: "Wrong name" } },
+  );
+  expect(wrongNameResponse.status()).toBe(400);
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("prompt");
+    await dialog.accept("Delete verification");
+  });
+  await page.getByTestId("delete-hunt").click();
+  await expect(page.getByTestId("my-hunts")).not.toContainText(
+    "Delete verification",
+  );
+  await expect(page.getByTestId("creator-status")).toContainText("was deleted");
+});
+
 test("create hunt, save task and reload configuration", async ({ page }) => {
   await installMapMock(page.context());
   await page.route("https://accounts.google.com/gsi/client", (route) =>
@@ -464,6 +528,13 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-name")).toHaveText(
       "Shared hunt",
     );
+    expect(
+      (
+        await member.request.delete(`/api/admin/hunts/${id}`, {
+          data: { confirmationName: "Shared hunt" },
+        })
+      ).status(),
+    ).toBe(403);
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);

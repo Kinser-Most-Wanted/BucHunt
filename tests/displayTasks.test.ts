@@ -1,5 +1,65 @@
 import { expect, test } from "@playwright/test";
 
+test("players can leave a saved hunt from its overview", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-leave",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.google-account-leave", "Baja");
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  const hunt = {
+    id: "hunt-leave",
+    name: "Optional Hunt",
+    description: "A hunt the player can leave.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  let joined = true;
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Baja" } },
+      });
+    } else if (path.endsWith("/hunts") && route.request().method() === "GET") {
+      await route.fulfill({ json: { ok: true, value: joined ? [hunt] : [] } });
+    } else if (
+      path.endsWith("/hunt-leave") &&
+      route.request().method() === "DELETE"
+    ) {
+      joined = false;
+      await route.fulfill({ json: { ok: true, value: { left: true } } });
+    } else {
+      await route.fulfill({ json: { ok: true, value: hunt } });
+    }
+  });
+  await page.goto("/player.html");
+  await page.getByTestId("player-hunt-list").getByText("Optional Hunt").click();
+  await expect(page.getByTestId("leave-hunt")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("leave-hunt").click();
+  await expect(page.getByTestId("player-hunt-list")).not.toContainText(
+    "Optional Hunt",
+  );
+  await expect(page.getByTestId("player-task-status")).toContainText(
+    "dashboard is ready",
+  );
+});
+
 test("empty player dashboard points players to the join card above", async ({
   page,
 }) => {

@@ -53,9 +53,22 @@ export function mountCreateHunt(
   const selector = document.querySelector<HTMLSelectElement>(
     '[data-testid="edit-hunt-selector"]',
   )!;
+  const detailsActions =
+    manageDialog.querySelector<HTMLElement>(".details-actions");
+  const deleteHuntButton = document.createElement("button");
+  deleteHuntButton.type = "button";
+  deleteHuntButton.className = "action delete-hunt-button";
+  deleteHuntButton.dataset.testid = "delete-hunt";
+  deleteHuntButton.textContent = "Delete Hunt";
+  deleteHuntButton.hidden = true;
+  detailsActions?.append(deleteHuntButton);
   const editTitle = document.querySelector<HTMLElement>("#hunt-edit-title")!;
   let selected: HuntSummary | undefined;
   let availableHunts: HuntSummary[] = [];
+  const huntRowHeight = 80;
+  const huntWindowSize = 24;
+  const huntWindowOverscan = 5;
+  let renderedHuntWindow = "";
   let querySelectionApplied = false;
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
@@ -81,6 +94,51 @@ export function mountCreateHunt(
     if (!manageDialog!.open) manageDialog!.showModal();
     void refresh();
   }
+
+  function renderHuntWindow(reset = false): void {
+    if (reset) {
+      list.scrollTop = 0;
+      renderedHuntWindow = "";
+    }
+    const firstVisible = Math.floor(list.scrollTop / huntRowHeight);
+    const start = Math.max(0, firstVisible - huntWindowOverscan);
+    const end = Math.min(
+      availableHunts.length,
+      firstVisible + huntWindowSize - huntWindowOverscan,
+    );
+    const windowKey = `${start}:${end}`;
+    if (windowKey === renderedHuntWindow) return;
+    renderedHuntWindow = windowKey;
+    const fragment = document.createDocumentFragment();
+    const spacer = (rows: number): HTMLLIElement => {
+      const item = document.createElement("li");
+      item.className = "hunt-list-spacer";
+      item.setAttribute("aria-hidden", "true");
+      item.style.height = `${rows * huntRowHeight}px`;
+      return item;
+    };
+    if (start > 0) fragment.append(spacer(start));
+    for (const hunt of availableHunts.slice(start, end)) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hunt-list-link";
+      button.textContent = hunt.name;
+      const role = document.createElement("span");
+      role.textContent = `(${hunt.role})`;
+      button.append(role);
+      button.addEventListener("click", () => {
+        select(hunt);
+        void openHuntDetails(hunt.id, hunt.role);
+      });
+      item.append(button);
+      fragment.append(item);
+    }
+    if (end < availableHunts.length)
+      fragment.append(spacer(availableHunts.length - end));
+    list.replaceChildren(fragment);
+  }
+  list.addEventListener("scroll", () => renderHuntWindow(), { passive: true });
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
@@ -154,6 +212,7 @@ export function mountCreateHunt(
   }
   function select(hunt: HuntSummary, loadContributors = true): void {
     selected = hunt;
+    deleteHuntButton.hidden = hunt.role !== "owner";
     taskHunt.value = hunt.id;
     editTitle.textContent = "Editing " + hunt.name;
     populateHuntSelector();
@@ -167,6 +226,35 @@ export function mountCreateHunt(
     memberStatus.textContent = "";
     if (loadContributors && hunt.role === "owner") void renderContributors();
   }
+  deleteHuntButton.addEventListener("click", async () => {
+    if (!selected || selected.role !== "owner") return;
+    const hunt = selected;
+    const confirmation = window.prompt(
+      `Permanently delete “${hunt.name}”? Type the hunt name to confirm.`,
+    );
+    if (confirmation !== hunt.name) return;
+    deleteHuntButton.disabled = true;
+    workspaceStatus.textContent = `Deleting ${hunt.name}…`;
+    try {
+      const result = await repository.deleteHunt(hunt.id, confirmation);
+      if (selected?.id !== hunt.id) return;
+      if (!result.ok) {
+        workspaceStatus.textContent = result.message;
+        return;
+      }
+      selected = undefined;
+      taskHunt.value = "";
+      managerView.hidden = false;
+      if (overviewView) overviewView.hidden = true;
+      if (editorView) editorView.hidden = true;
+      if (mode) mode.textContent = "YOUR ADVENTURES";
+      manageDialog.setAttribute("aria-labelledby", "manage-hunts-title");
+      await refresh();
+      workspaceStatus.textContent = `${hunt.name} was deleted.`;
+    } finally {
+      deleteHuntButton.disabled = false;
+    }
+  });
   document.addEventListener("hunt-details-edit", (event: Event) => {
     const detail = (
       event as CustomEvent<{ huntId?: string; tasks?: unknown[] }>
@@ -192,26 +280,10 @@ export function mountCreateHunt(
       return;
     }
     availableHunts = result.value;
-    list.replaceChildren();
+    renderHuntWindow(true);
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
       : "No hunts yet. Create one to get started.";
-    for (const hunt of result.value) {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "hunt-list-link";
-      button.textContent = hunt.name;
-      const role = document.createElement("span");
-      role.textContent = `(${hunt.role})`;
-      button.append(role);
-      button.addEventListener("click", () => {
-        select(hunt);
-        void openHuntDetails(hunt.id, hunt.role);
-      });
-      item.append(button);
-      list.append(item);
-    }
     populateHuntSelector();
     if (!querySelectionApplied && requestedHuntId) {
       const requestedHunt = result.value.find(

@@ -214,6 +214,14 @@ export class HuntStore {
       return saved;
     });
   }
+  async delete(id: string): Promise<{ deleted: true }> {
+    return this.file.update((data) => {
+      const index = data.hunts.findIndex((item) => item.id === id);
+      if (index < 0) throw new StoreError("not-found", "Hunt not found.");
+      data.hunts.splice(index, 1);
+      return { deleted: true as const };
+    });
+  }
   async findByAccessCode(code: string): Promise<HuntDefinition | undefined> {
     return (await this.list()).find((hunt) => hunt.accessCode === code);
   }
@@ -452,6 +460,12 @@ export class ContributorStore {
         data.contributors[huntId] = data.contributors[huntId].filter(
           (id) => id !== creatorId,
         );
+    });
+  }
+  async removeHunt(huntId: string): Promise<void> {
+    await this.file.update((data) => {
+      delete data.contributors[huntId];
+      delete data.invitations[huntId];
     });
   }
 }

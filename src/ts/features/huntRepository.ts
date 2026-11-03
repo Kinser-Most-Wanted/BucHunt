@@ -103,6 +103,12 @@ export function createHuntRepository(): HuntRepository {
         undefined,
         "DELETE",
       ),
+    deleteHunt: (id, confirmationName) =>
+      creatorRequest(
+        `/api/admin/hunts/${encodeURIComponent(id)}`,
+        { confirmationName },
+        "DELETE",
+      ),
     getAdminHunt: (id) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
     getPlayerHunt: (id) =>
@@ -113,6 +119,13 @@ export function createHuntRepository(): HuntRepository {
       accountRequest(
         `/api/player/account/hunts/${encodeURIComponent(id)}`,
         identity,
+      ),
+    leaveHunt: (id, identity) =>
+      accountRequest(
+        `/api/player/account/hunts/${encodeURIComponent(id)}`,
+        identity,
+        undefined,
+        "DELETE",
       ),
     answerAccountTask: (id, taskId, answer, identity) =>
       accountRequest(

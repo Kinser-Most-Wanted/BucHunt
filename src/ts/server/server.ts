@@ -334,6 +334,11 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
+          if (method === "DELETE" && !accountMatch[2]) {
+            await accountProgress.leave(player, hunt.id);
+            json(response, 200, { ok: true, value: { left: true } });
+            return;
+          }
           if (method === "POST" && accountMatch[2]) {
             if (!isHuntActive(hunt)) {
               const message =
@@ -454,11 +459,12 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (path === "/api/admin/hunts" && method === "GET") {
-          const membership = await contributors.all();
-          const accessible = (await hunts.list()).filter(
-            (hunt) =>
-              hunt.ownerId === creatorId ||
-              membership[hunt.id]?.includes(creatorId),
+          const [sharedHuntIds, summaries] = await Promise.all([
+            contributors.huntIdsFor(creatorId),
+            hunts.listSummaries(),
+          ]);
+          const accessible = summaries.filter(
+            (hunt) => hunt.ownerId === creatorId || sharedHuntIds.has(hunt.id),
           );
           json(response, 200, {
             ok: true,
@@ -466,6 +472,8 @@ export function createApplication(options: ServerOptions = {}) {
               id: hunt.id,
               name: hunt.name,
               role: hunt.ownerId === creatorId ? "owner" : "contributor",
+              createdAt: hunt.createdAt,
+              updatedAt: hunt.updatedAt,
             })),
           });
           return;
@@ -491,6 +499,34 @@ export function createApplication(options: ServerOptions = {}) {
               message:
                 "Only this hunt's owner and contributors can access its configuration.",
             });
+            return;
+          }
+          if (match && !match[2] && method === "DELETE") {
+            if (!owner) {
+              json(response, 403, {
+                ok: false,
+                code: "unauthorized",
+                message: "Only the hunt owner can delete this hunt.",
+              });
+              return;
+            }
+            const input = await body(request);
+            const confirmationName =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).confirmationName
+                : undefined;
+            if (confirmationName !== hunt.name)
+              throw new StoreError(
+                "validation",
+                "Enter the exact hunt name to confirm deletion.",
+              );
+            await Promise.all([
+              contributors.removeHunt(hunt.id),
+              progress.removeHunt(hunt.id),
+              accountProgress.removeHunt(hunt.id),
+            ]);
+            await hunts.delete(hunt.id);
+            json(response, 200, { ok: true, value: { deleted: true } });
             return;
           }
           if (taskMatch && method === "PATCH") {
@@ -547,9 +583,17 @@ export function createApplication(options: ServerOptions = {}) {
                 input && typeof input === "object"
                   ? (input as Record<string, unknown>)
                   : {};
-              if (typeof fields.email === "string")
+              if (typeof fields.email === "string") {
+                if (
+                  account?.email &&
+                  fields.email.trim().toLowerCase() === account.email
+                )
+                  throw new StoreError(
+                    "validation",
+                    "You cannot invite your own account as a collaborator.",
+                  );
                 await contributors.invite(hunt.id, fields.email);
-              else await contributors.add(hunt.id, fields.creatorId);
+              } else await contributors.add(hunt.id, fields.creatorId);
               json(response, 200, {
                 ok: true,
                 value: await contributors.entries(hunt.id),

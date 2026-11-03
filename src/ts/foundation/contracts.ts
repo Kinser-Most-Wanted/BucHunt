@@ -38,9 +38,15 @@ export interface HuntRepository {
     huntId: string,
     taskId: string,
   ): Promise<OperationResult<{ deleted: true }>>;
+  deleteHunt(
+    huntId: string,
+    confirmationName: string,
+  ): Promise<OperationResult<{ deleted: true }>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
-  getAccountProfile(identity: PlayerIdentity): Promise<OperationResult<PlayerProfile>>;
+  getAccountProfile(
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerProfile>>;
   saveAccountProfile(
     displayName: string,
     identity: PlayerIdentity,
@@ -53,6 +59,10 @@ export interface HuntRepository {
     huntId: string,
     identity: PlayerIdentity,
   ): Promise<OperationResult<PlayerHunt>>;
+  leaveHunt(
+    huntId: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ left: true }>>;
   answerAccountTask(
     huntId: string,
     taskId: string,

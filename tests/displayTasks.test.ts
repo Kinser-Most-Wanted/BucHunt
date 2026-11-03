@@ -1,5 +1,95 @@
 import { expect, test } from "@playwright/test";
 
+test("players can leave and rejoin a hunt from the saved overview or admin link", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-leave",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.google-account-leave", "Baja");
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  const hunt = {
+    id: "hunt-leave",
+    name: "Optional Hunt",
+    description: "A hunt the player can leave.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    accessCode: "ABCD1234",
+    tasks: [],
+  };
+  let joined = true;
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Baja" } },
+      });
+    } else if (path.endsWith("/join")) {
+      joined = true;
+      await route.fulfill({
+        json: { ok: true, value: { huntId: hunt.id } },
+      });
+    } else if (path.endsWith("/hunts") && route.request().method() === "GET") {
+      await route.fulfill({ json: { ok: true, value: joined ? [hunt] : [] } });
+    } else if (
+      path.endsWith("/hunt-leave") &&
+      route.request().method() === "DELETE"
+    ) {
+      joined = false;
+      await route.fulfill({ json: { ok: true, value: { left: true } } });
+    } else {
+      await route.fulfill({ json: { ok: true, value: hunt } });
+    }
+  });
+  await page.goto("/player.html");
+  const leaveCard = page.getByTestId("leave-hunt-card");
+  await expect(leaveCard).toBeVisible();
+  await leaveCard.click();
+  await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();
+  await expect(page.getByTestId("leave-hunt-name")).toHaveText("Optional Hunt");
+  await expect(page.getByTestId("confirm-leave-hunt")).toBeVisible();
+  await page.getByTestId("cancel-leave-hunt").click();
+  await page.getByTestId("player-hunt-list").getByText("Optional Hunt").click();
+  await expect(page.getByTestId("leave-hunt")).toBeVisible();
+  expect(
+    await page
+      .getByTestId("leave-hunt")
+      .evaluate(
+        (button) =>
+          button.parentElement?.matches("dialog.player-hunt-details") &&
+          button === button.parentElement.lastElementChild,
+      ),
+  ).toBe(true);
+  await page.getByTestId("leave-hunt").click();
+  await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();
+  await page.getByTestId("confirm-leave-hunt").click();
+  await expect(page.getByTestId("player-hunt-list")).not.toContainText(
+    "Optional Hunt",
+  );
+  await expect(page.getByTestId("player-task-status")).toContainText(
+    "You left Optional Hunt.",
+  );
+  await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Optional Hunt",
+  );
+  await expect(page.getByTestId("player-hunt-details")).toBeHidden();
+});
+
 test("empty player dashboard points players to the join card above", async ({
   page,
 }) => {
@@ -54,25 +144,110 @@ test("admin join links do not fill the access-code form", async ({ page }) => {
       json: { error: "Administrator access required." },
     }),
   );
+  const hunt = {
+    id: "hunt-1",
+    name: "Shared link hunt",
+    description: "A hunt joined from an admin link.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  let joined = false;
   let joins = 0;
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/join")) {
+    if (path.endsWith("/profile")) {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Baja" } },
+      });
+    } else if (path.endsWith("/join")) {
       joins += 1;
       expect(route.request().postDataJSON()).toEqual({
         accessCode: "ABCD1234",
       });
+      joined = true;
       await route.fulfill({ json: { ok: true, value: { huntId: "hunt-1" } } });
-      return;
+    } else if (path.endsWith("/hunts")) {
+      await route.fulfill({ json: { ok: true, value: joined ? [hunt] : [] } });
+    } else {
+      await route.fulfill({ json: { ok: true, value: hunt } });
     }
-    await route.fulfill({ json: { ok: true, value: [] } });
   });
 
   await page.goto("/player.html?accessCode=ABCD1234&autoJoin=1");
-  await expect(page.getByTestId("player-hunt-lookup")).toBeVisible();
   await expect(page.locator('[name="accessCode"]')).toHaveValue("");
   await expect.poll(() => joins).toBe(1);
-  await expect(page.getByTestId("player-heading")).toHaveText("Your Hunts");
+  await expect(page.getByTestId("player-hunt-list")).toContainText(
+    "Shared link hunt",
+  );
+  await expect(page.getByTestId("player-hunt-details")).toBeHidden();
+});
+
+test("manual access-code joins remain in the hunt list after closing details", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "admin@example.com",
+        accountId: "google-account-manual-join",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem(
+      "buchunt.player-profile.google-account-manual-join",
+      "Baja",
+    );
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  const hunt = {
+    id: "hunt-manual-join",
+    name: "Manual code hunt",
+    description: "A hunt joined using its access code.",
+    beginsAt: "2020-01-01T00:00:00.000Z",
+    endsAt: null,
+    status: "published",
+    tasks: [],
+  };
+  let joined = false;
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Baja" } },
+      });
+    } else if (path.endsWith("/join")) {
+      joined = true;
+      await route.fulfill({
+        json: { ok: true, value: { huntId: hunt.id } },
+      });
+    } else if (path.endsWith("/hunts")) {
+      await route.fulfill({ json: { ok: true, value: joined ? [hunt] : [] } });
+    } else {
+      await route.fulfill({ json: { ok: true, value: hunt } });
+    }
+  });
+
+  await page.goto("/player.html");
+  await expect(page.getByTestId("player-hunt-list")).not.toContainText(
+    hunt.name,
+  );
+  await page.getByLabel("Access code").fill("ABCD1234");
+  await page.getByRole("button", { name: "Join Hunt", exact: true }).click();
+  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
+  await expect(page.getByTestId("player-hunt-name")).toHaveText(hunt.name);
+  await page.getByTestId("close-player-hunt-details").click();
+  await expect(page.getByTestId("player-hunt-list")).toContainText(hunt.name);
+  await page.reload();
+  await expect(page.getByTestId("player-hunt-list")).toContainText(hunt.name);
 });
 
 test("Google sign-in lets a player open and revisit saved progress", async ({
@@ -244,7 +419,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "inert",
     "",
   );
-  await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
+  await expect(page.getByLabel("Access code")).toHaveValue("");
   await expect(page.getByTestId("player-hunt-list")).toContainText("test");
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Time remaining",

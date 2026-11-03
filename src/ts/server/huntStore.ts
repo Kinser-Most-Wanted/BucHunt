@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { validateHunt } from "../validation/huntValidation.js";
 import type {
   HuntConfigurationFile,
@@ -21,19 +21,58 @@ export class StoreError extends Error {
 
 // One process owns each file. Keep read/modify/write in the same queue so
 // concurrent requests cannot overwrite each other's updates.
+interface FileSnapshot {
+  value: unknown;
+  modifiedAt: number;
+  changedAt: number;
+  size: number;
+}
+const fileSnapshots = new Map<string, FileSnapshot>();
+const fileQueues = new Map<string, Promise<unknown>>();
+
 export class JsonFile<T> {
-  private tail: Promise<unknown> = Promise.resolve();
+  private readonly key: string;
   constructor(
     private path: string,
     private initial: () => T,
     private validate: (value: unknown) => T,
-  ) {}
+  ) {
+    this.key = resolve(path);
+  }
   private async read(): Promise<T> {
     try {
-      return this.validate(JSON.parse(await readFile(this.path, "utf8")));
+      const details = await stat(this.path);
+      const cached = fileSnapshots.get(this.key);
+      if (
+        cached &&
+        cached.modifiedAt === details.mtimeMs &&
+        cached.changedAt === details.ctimeMs &&
+        cached.size === details.size
+      )
+        return cached.value as T;
+      const value = this.validate(
+        JSON.parse(await readFile(this.path, "utf8")),
+      );
+      fileSnapshots.set(this.key, {
+        value,
+        modifiedAt: details.mtimeMs,
+        changedAt: details.ctimeMs,
+        size: details.size,
+      });
+      return value;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return this.initial();
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const cached = fileSnapshots.get(this.key);
+        if (cached?.modifiedAt === -1) return cached.value as T;
+        const value = this.validate(this.initial());
+        fileSnapshots.set(this.key, {
+          value,
+          modifiedAt: -1,
+          changedAt: -1,
+          size: 0,
+        });
+        return value;
+      }
       throw new StoreError(
         "storage",
         "Stored data could not be read or is invalid. It has not been overwritten.",
@@ -41,12 +80,17 @@ export class JsonFile<T> {
     }
   }
   async get(): Promise<T> {
-    await this.tail;
-    return this.read();
+    await fileQueues.get(this.key);
+    return structuredClone(await this.read());
+  }
+  async query<R>(project: (value: Readonly<T>) => R): Promise<R> {
+    await fileQueues.get(this.key);
+    return project(await this.read());
   }
   update<R>(operation: (value: T) => R): Promise<R> {
-    const task = this.tail.then(async () => {
-      const value = await this.read();
+    const previous = fileQueues.get(this.key) ?? Promise.resolve();
+    const task = previous.then(async () => {
+      const value = structuredClone(await this.read());
       const result = operation(value);
       this.validate(value);
       await mkdir(dirname(this.path), { recursive: true });
@@ -60,6 +104,13 @@ export class JsonFile<T> {
           await file.close();
         }
         await rename(temporary, this.path);
+        const details = await stat(this.path);
+        fileSnapshots.set(this.key, {
+          value: structuredClone(value),
+          modifiedAt: details.mtimeMs,
+          changedAt: details.ctimeMs,
+          size: details.size,
+        });
         // POSIX directory fsync makes the rename durable. Windows does not
         // support opening directories this way; the file itself is still synced.
         if (process.platform !== "win32") {
@@ -75,7 +126,10 @@ export class JsonFile<T> {
       }
       return result;
     });
-    this.tail = task.catch(() => undefined);
+    fileQueues.set(
+      this.key,
+      task.catch(() => undefined),
+    );
     return task;
   }
 }
@@ -187,6 +241,22 @@ export class HuntStore {
   async list(): Promise<HuntDefinition[]> {
     return (await this.file.get()).hunts;
   }
+  async listSummaries(): Promise<
+    Pick<
+      HuntDefinition,
+      "id" | "name" | "ownerId" | "createdAt" | "updatedAt"
+    >[]
+  > {
+    return this.file.query((data) =>
+      data.hunts.map(({ id, name, ownerId, createdAt, updatedAt }) => ({
+        id,
+        name,
+        ownerId,
+        createdAt,
+        updatedAt,
+      })),
+    );
+  }
   async migrateLegacyOwners(accountId: string): Promise<number> {
     return this.file.update((data) => {
       let migrated = 0;
@@ -212,6 +282,14 @@ export class HuntStore {
       if (!saved) throw new StoreError("not-found", "Hunt not found.");
       saved.accessCode ??= newAccessCode(data.hunts);
       return saved;
+    });
+  }
+  async delete(id: string): Promise<{ deleted: true }> {
+    return this.file.update((data) => {
+      const index = data.hunts.findIndex((item) => item.id === id);
+      if (index < 0) throw new StoreError("not-found", "Hunt not found.");
+      data.hunts.splice(index, 1);
+      return { deleted: true as const };
     });
   }
   async findByAccessCode(code: string): Promise<HuntDefinition | undefined> {
@@ -357,6 +435,16 @@ export class ContributorStore {
   async all(): Promise<Record<string, string[]>> {
     return (await this.file.get()).contributors;
   }
+  async huntIdsFor(memberId: string): Promise<Set<string>> {
+    return this.file.query(
+      (data) =>
+        new Set(
+          Object.entries(data.contributors)
+            .filter(([, members]) => members.includes(memberId))
+            .map(([huntId]) => huntId),
+        ),
+    );
+  }
   async members(huntId: string): Promise<string[]> {
     const all = await this.all();
     return Object.hasOwn(all, huntId) ? all[huntId] : [];
@@ -452,6 +540,12 @@ export class ContributorStore {
         data.contributors[huntId] = data.contributors[huntId].filter(
           (id) => id !== creatorId,
         );
+    });
+  }
+  async removeHunt(huntId: string): Promise<void> {
+    await this.file.update((data) => {
+      delete data.contributors[huntId];
+      delete data.invitations[huntId];
     });
   }
 }

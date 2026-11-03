@@ -1356,6 +1356,13 @@ body[data-page="admin"] [data-testid="contributor-list"] {
   padding: 0;
   list-style: none;
 }
+body[data-page="admin"] [data-testid="my-hunts"] {
+  display: block;
+  overflow: visible;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 2%);
+}
 body[data-page="admin"] [data-testid="my-hunts"] > li,
 body[data-page="admin"] [data-testid="contributor-list"] > li {
   padding: 0.9rem 1rem;
@@ -1364,8 +1371,92 @@ body[data-page="admin"] [data-testid="contributor-list"] > li {
   background: rgb(255 255 255 / 3%);
   color: #e8ebf0;
 }
+body[data-page="admin"] [data-testid="my-hunts"] > li:not(.hunt-list-spacer) {
+  box-sizing: border-box;
+  height: 76px;
+  min-height: 76px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+body[data-page="admin"] [data-testid="my-hunts"] > li.hunt-list-spacer {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+body[data-page="admin"] [data-testid="my-hunts"] .hunt-list-link {
+  white-space: nowrap;
+  overflow: hidden;
+}
 body[data-page="admin"] [data-testid="my-hunts"] button {
-  margin: 0.35rem 0.35rem 0 0;
+  margin: 0;
+}
+body[data-page="admin"] .manage-hunts-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 3%);
+  color: #aeb8c8;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+body[data-page="admin"] .manage-hunts-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex: 0 1 auto;
+  margin: 0;
+  color: #e8ebf0;
+}
+body[data-page="admin"] .manage-hunts-filter select {
+  width: auto;
+  min-width: 13rem;
+  margin: 0;
+  padding: 0.55rem 2rem 0.55rem 0.75rem;
+  border-radius: 0.65rem;
+  background-color: #10294a;
+  font-size: 0.9rem;
+}
+body[data-page="admin"] .manage-hunts-search {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  color: #e8ebf0;
+}
+body[data-page="admin"] .manage-hunts-search input {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-color: rgb(255 255 255 / 12%);
+  border-radius: 0.65rem;
+  background: #10294a;
+  color: #f4f5f9;
+  font-size: 0.9rem;
+}
+body[data-page="admin"] .manage-hunts-filter-note {
+  margin: 0.55rem 0 0.15rem;
+  color: #9ca5b4;
+  font-size: 0.85rem;
+}
+body[data-page="admin"]
+  .hunt-manager-view
+  > [data-testid="creator-status"]:empty {
+  display: none;
 }
 body[data-page="admin"] .hunt-editor-panel {
   min-width: 0;
@@ -1427,6 +1518,16 @@ body[data-page="admin"] button:hover:not(:disabled),
 body[data-page="player"] button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-1px);
+}
+body[data-page="admin"] dialog.hunt-details-dialog button {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+body[data-page="admin"] dialog.hunt-details-dialog button:hover:not(:disabled) {
+  filter: none;
+  transform: none;
 }
 body[data-page="admin"] .primary-button,
 body[data-page="admin"] #create-hunt button[type="submit"],
@@ -1705,6 +1806,113 @@ body[data-page="admin"] .hunt-list-link span {
 }
 body[data-page="admin"] .hunt-list-link:hover {
   color: #ffc72c;
+}
+body[data-page="admin"] .delete-hunt-button {
+  border-color: rgb(248 113 113 / 45%);
+  color: #fecaca;
+  background: rgb(127 29 29 / 22%);
+}
+body[data-page="admin"] .delete-hunt-button:hover:not(:disabled) {
+  border-color: #f87171;
+  color: #fff;
+  background: rgb(127 29 29 / 55%);
+}
+body[data-page="admin"] dialog.hunt-delete-dialog {
+  position: fixed;
+  width: min(34rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(90dvh, 42rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid rgb(248 113 113 / 58%);
+  border-radius: 1.15rem;
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgb(248 113 113 / 13%),
+      transparent 19rem
+    ),
+    linear-gradient(145deg, #17263b, #0c1b30);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 68%);
+  color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-delete-dialog::backdrop {
+  background: rgb(4 9 17 / 84%);
+}
+body[data-page="admin"] .hunt-delete-form {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.25rem, 5vw, 2rem);
+}
+body[data-page="admin"] .hunt-delete-form > .eyebrow {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+body[data-page="admin"] .hunt-delete-form h2 {
+  margin: -0.65rem 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  letter-spacing: -0.04em;
+}
+body[data-page="admin"] .hunt-delete-warning {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgb(248 113 113 / 42%);
+  border-left: 4px solid #f87171;
+  border-radius: 0.75rem;
+  background: rgb(127 29 29 / 28%);
+  color: #fee2e2;
+  line-height: 1.55;
+}
+body[data-page="admin"] .hunt-delete-form label {
+  margin: 0;
+  color: #e8ebf0;
+}
+body[data-page="admin"] .hunt-delete-form label strong {
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+body[data-page="admin"] .hunt-delete-form input {
+  margin: -0.65rem 0 0;
+  border-color: rgb(255 255 255 / 16%);
+  background: #09172a;
+  color: #fff;
+}
+body[data-page="admin"] .hunt-delete-form input:focus-visible {
+  border-color: #f87171;
+  outline-color: #f87171;
+}
+body[data-page="admin"] .hunt-delete-status {
+  margin: -0.5rem 0 0;
+  color: #fecaca;
+}
+body[data-page="admin"] .hunt-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  margin-top: 0.2rem;
+}
+body[data-page="admin"] .hunt-delete-actions button {
+  margin: 0;
+}
+body[data-page="admin"] .hunt-delete-confirm {
+  border-color: rgb(248 113 113 / 75%);
+  background: #b4232e;
+  color: white;
+}
+body[data-page="admin"] .hunt-delete-confirm:hover:not(:disabled) {
+  background: #d12d39;
+}
+body[data-page="admin"] .hunt-delete-confirm:disabled {
+  border-color: rgb(248 113 113 / 25%);
+  background: rgb(127 29 29 / 38%);
+  color: #fca5a5;
+  opacity: 0.7;
 }
 body[data-page="admin"] [data-testid="contributors-panel"] {
   margin: 0;
@@ -1990,7 +2198,10 @@ body[data-page="hunt-details"] > footer {
 }
 
 body[data-page="admin"] [data-testid="my-hunts"] button.hunt-list-link {
+  box-sizing: border-box;
   width: 100%;
+  height: 76px;
+  min-height: 76px;
   justify-content: space-between;
   padding: 0.8rem 0.9rem;
   margin: 0;
@@ -2002,6 +2213,8 @@ body[data-page="admin"] [data-testid="my-hunts"] button.hunt-list-link:hover {
   border-color: rgb(255 199 44 / 28%);
   background: rgb(255 199 44 / 5%);
   color: #ffc72c;
+  filter: none;
+  transform: none;
 }
 body[data-page="admin"] .hunt-list-link span {
   padding: 0.25rem 0.55rem;
@@ -2020,7 +2233,8 @@ body[data-page="admin"] dialog.hunt-details-dialog {
   padding: clamp(1rem, 3vw, 2rem);
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.2rem;
   background:
@@ -2028,6 +2242,32 @@ body[data-page="admin"] dialog.hunt-details-dialog {
     linear-gradient(145deg, #10294a, #0b203d);
   box-shadow: 0 20px 60px rgb(0 0 0 / 45%);
   color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-details-dialog::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] .manage-hunts-filter-row {
+    padding: 0.6rem 0.7rem;
+  }
+  body[data-page="admin"] .manage-hunts-filter {
+    gap: 0.55rem;
+  }
+  body[data-page="admin"] .manage-hunts-filter-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  body[data-page="admin"] .manage-hunts-filter select {
+    min-width: 0;
+    max-width: 72%;
+  }
+  body[data-page="admin"] .manage-hunts-search {
+    justify-content: space-between;
+  }
+  body[data-page="admin"] .manage-hunts-search input {
+    max-width: 72%;
+  }
 }
 body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
   background: rgb(6 9 14 / 76%);
@@ -2304,6 +2544,131 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
 .player-hunt-progress {
   font-size: 0.9rem;
 }
+.player-hunt-card-status {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.45rem;
+}
+.player-hunt .player-hunt-open {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.player-hunt .player-hunt-open:focus-visible {
+  outline: 2px solid #ffc72c;
+  outline-offset: 3px;
+}
+.player-hunt .player-leave-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.15rem;
+  margin: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgb(248 113 113 / 42%);
+  border-radius: 0.65rem;
+  background: rgb(127 29 29 / 20%);
+  color: #ff9289;
+  cursor: pointer;
+}
+.player-hunt .player-leave-card:hover,
+.player-hunt .player-leave-card:focus-visible {
+  border-color: #f87171;
+  background: rgb(127 29 29 / 48%);
+  color: #fff;
+}
+.player-leave-card svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.player-leave-dialog {
+  position: fixed;
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid rgb(248 113 113 / 58%);
+  border-radius: 1.15rem;
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgb(248 113 113 / 13%),
+      transparent 19rem
+    ),
+    linear-gradient(145deg, #17263b, #0c1b30);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 68%);
+  color: #f4f5f9;
+}
+.player-leave-dialog::backdrop {
+  background: rgb(4 9 17 / 84%);
+}
+.player-leave-content {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.25rem, 5vw, 2rem);
+}
+.player-leave-content > .eyebrow {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.player-leave-content h2,
+.player-leave-warning,
+.player-leave-status {
+  margin: 0;
+}
+.player-leave-content h2 {
+  color: #fff;
+}
+.player-leave-warning {
+  color: #c8d2df;
+  line-height: 1.65;
+}
+.player-leave-warning strong {
+  color: #fff;
+}
+.player-leave-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.player-leave-actions button {
+  min-height: 2.8rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 0.7rem;
+  background: #15345d;
+  color: #f4f5f9;
+  cursor: pointer;
+}
+.player-leave-actions .player-leave-confirm {
+  border-color: rgb(248 113 113 / 58%);
+  background: #8b2525;
+  color: #fff;
+  font-weight: 800;
+}
+.player-leave-actions .player-leave-confirm:hover:not(:disabled) {
+  background: #aa3030;
+}
+.player-leave-status {
+  color: #ffaaa3;
+}
 .player-hunt button,
 .player-hunt-details .details-actions button {
   margin: 0.25rem 0 0;
@@ -2410,6 +2775,21 @@ body[data-page="player"].player-hunt-modal-open {
   letter-spacing: -0.04em;
   overflow-wrap: anywhere;
   text-wrap: balance;
+}
+.player-hunt-details .player-leave-hunt {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  justify-content: center;
+  margin: 1.2rem auto 0;
+  border-color: rgb(248 113 113 / 42%);
+  color: #fecaca;
+  background: rgb(127 29 29 / 20%);
+}
+.player-hunt-details .player-leave-hunt:hover:not(:disabled) {
+  border-color: #f87171;
+  color: #fff;
+  background: rgb(127 29 29 / 52%);
 }
 .player-hunt-details .player-hunt-intro > h2[data-content-length="medium"] {
   font-size: clamp(1.75rem, 3.5vw, 2.3rem);
@@ -2867,7 +3247,7 @@ body[data-page="admin"] .hunt-manager-heading {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: 0.25rem 0 1rem;
+  margin: 0.25rem 0 0;
 }
 body[data-page="admin"] .hunt-manager-heading h2 {
   margin: 0.15rem 0 0;
@@ -2875,7 +3255,31 @@ body[data-page="admin"] .hunt-manager-heading h2 {
 }
 body[data-page="admin"] .hunt-manager-heading .refresh-button {
   margin: 0;
-  white-space: nowrap;
+}
+body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #dce4ef;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh:hover {
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+}
+body[data-page="admin"] .manage-hunts-subtitle {
+  margin: 0.4rem 0 0.8rem;
+  color: #aab3c1;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 body[data-page="admin"] .hunt-manager-view > [data-testid="creator-status"] {
   color: #aab3c1;
@@ -3031,10 +3435,11 @@ body[data-page="admin"] .contributor-management > p:first-child {
 
 /* Keep the revealed hunt ID attached to its control in the admin action row. */
 body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control {
-  display: grid;
+  position: relative;
+  display: flex;
   flex: 0 1 auto;
-  gap: 0.45rem;
-  min-width: min(100%, 13rem);
+  width: min(100%, 24rem);
+  min-width: min(100%, 24rem);
   margin-left: auto;
 }
 body[data-page="admin"]
@@ -3043,15 +3448,47 @@ body[data-page="admin"]
   .hunt-id-toggle {
   order: initial;
   width: 100%;
+  min-height: 2.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   border-color: rgb(255 255 255 / 10%);
   background: #15345d;
   color: #f4f5f9;
 }
 body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control output {
-  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   margin: 0;
+  padding: 0.55rem 0.75rem;
+  overflow-wrap: anywhere;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.65rem;
+  background: #15345d;
+  color: #f4f5f9;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .hunt-id-control
+  output[hidden] {
+  display: none;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .hunt-id-control:has(output:not([hidden]))
+  .hunt-id-toggle {
+  color: transparent;
+  text-shadow: none;
 }
 body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin-top: 1.35rem;

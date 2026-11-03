@@ -224,13 +224,51 @@
               </div>
               <button
                 type="button"
-                class="refresh-button"
+                class="refresh-button manage-hunts-refresh"
                 data-testid="refresh-my-hunts"
+                aria-label="Refresh hunt list"
+                title="Refresh hunt list"
               >
-                ↻ Refresh
+                ↻
               </button>
             </div>
+            <p class="manage-hunts-subtitle">
+              Open a hunt to manage its details and contributors.
+            </p>
             <p role="status" data-testid="creator-status"></p>
+            <div class="manage-hunts-filter-row">
+              <label class="manage-hunts-filter" for="manage-hunts-filter">
+                Browse
+                <select
+                  id="manage-hunts-filter"
+                  data-testid="manage-hunts-filter"
+                >
+                  <option value="recent-3">Recently edited (3)</option>
+                  <option value="all">All hunts</option>
+                  <option value="edited">Recently edited</option>
+                  <option value="created">Recently created</option>
+                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-desc">Name (Z–A)</option>
+                  <option value="owned">Owned by me</option>
+                  <option value="shared">Shared with me</option>
+                </select>
+              </label>
+              <label class="manage-hunts-search" for="manage-hunts-search">
+                Search hunts
+                <input
+                  id="manage-hunts-search"
+                  data-testid="manage-hunts-search"
+                  type="search"
+                  placeholder="Find a hunt by name"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+            <p
+              class="manage-hunts-filter-note"
+              data-testid="manage-hunts-filter-note"
+              role="status"
+            ></p>
             <ul data-testid="my-hunts" aria-label="My hunts"></ul>
           </div>
           <div data-testid="hunt-details-overview">
@@ -677,6 +715,55 @@
         </dialog>
       </div>
     </main>
+    <dialog
+      class="hunt-delete-dialog"
+      data-testid="delete-hunt-dialog"
+      aria-labelledby="delete-hunt-title"
+      aria-describedby="delete-hunt-warning"
+    >
+      <form data-testid="delete-hunt-form" class="hunt-delete-form">
+        <p class="eyebrow">PERMANENT ACTION</p>
+        <h2 id="delete-hunt-title">Delete this hunt?</h2>
+        <p
+          id="delete-hunt-warning"
+          data-testid="delete-hunt-warning"
+          class="hunt-delete-warning"
+        >
+          <strong>This cannot be undone.</strong> Deleting this hunt also
+          removes its tasks, contributors, and saved player progress.
+        </p>
+        <label for="delete-hunt-name">
+          Type <strong data-testid="delete-hunt-name"></strong> to confirm
+        </label>
+        <input
+          id="delete-hunt-name"
+          data-testid="delete-hunt-name-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <p
+          class="hunt-delete-status"
+          data-testid="delete-hunt-status"
+          role="alert"
+          hidden
+        ></p>
+        <div class="hunt-delete-actions">
+          <button type="button" data-testid="cancel-delete-hunt">
+            Keep hunt
+          </button>
+          <button
+            type="submit"
+            class="hunt-delete-confirm"
+            data-testid="confirm-delete-hunt"
+            disabled
+          >
+            Delete permanently
+          </button>
+        </div>
+      </form>
+    </dialog>
     <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>
     <script type="module" src="./js/admin.js"></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>

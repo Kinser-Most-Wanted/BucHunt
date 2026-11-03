@@ -184,23 +184,23 @@ export function mountCreateHunt(
   }
 
   function renderHuntWindow(reset = false): void {
+    const dialog = manageDialog!;
     if (reset) {
-      manageDialog.scrollTop = 0;
+      dialog.scrollTop = 0;
       renderedHuntWindow = "";
     }
     const listTop =
       list.getBoundingClientRect().top -
-      manageDialog.getBoundingClientRect().top +
-      manageDialog.scrollTop;
+      dialog.getBoundingClientRect().top +
+      dialog.scrollTop;
     const firstVisible = Math.max(
       0,
-      Math.floor((manageDialog.scrollTop - listTop) / huntRowHeight),
+      Math.floor((dialog.scrollTop - listTop) / huntRowHeight),
     );
     const lastVisible = Math.max(
       0,
       Math.ceil(
-        (manageDialog.scrollTop + manageDialog.clientHeight - listTop) /
-          huntRowHeight,
+        (dialog.scrollTop + dialog.clientHeight - listTop) / huntRowHeight,
       ),
     );
     const start = Math.max(0, firstVisible - huntWindowOverscan);

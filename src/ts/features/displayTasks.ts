@@ -931,7 +931,7 @@ export function mountDisplayTasks(
       leaveDialog.close();
       closeDetails();
       await loadHunts(identity, currentNickname);
-      status.textContent = `You left ${currentHuntName}.`;
+      status!.textContent = `You left ${currentHuntName}.`;
       confirmLeaveHunt.disabled = false;
     }
     function showLeaveConfirmation(huntId: string, name: string) {

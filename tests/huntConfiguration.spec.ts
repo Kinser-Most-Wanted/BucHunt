@@ -251,7 +251,9 @@ test("owners must type the exact hunt name before deleting a hunt", async ({
   await expect(page.getByTestId("my-hunts")).not.toContainText(
     "Delete verification",
   );
-  await expect(page.getByTestId("creator-status")).toContainText("was deleted");
+  await expect(page.getByTestId("creator-status")).toContainText(
+    "was permanently deleted",
+  );
 });
 
 test("create hunt, save task and reload configuration", async ({ page }) => {

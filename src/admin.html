@@ -231,6 +231,27 @@
               </button>
             </div>
             <p role="status" data-testid="creator-status"></p>
+            <label class="manage-hunts-filter" for="manage-hunts-filter">
+              Filter hunts
+              <select
+                id="manage-hunts-filter"
+                data-testid="manage-hunts-filter"
+              >
+                <option value="recent-3">Recently edited (3)</option>
+                <option value="all">All hunts</option>
+                <option value="edited">Recently edited</option>
+                <option value="created">Recently created</option>
+                <option value="name-asc">Name (A–Z)</option>
+                <option value="name-desc">Name (Z–A)</option>
+                <option value="owned">Owned by me</option>
+                <option value="shared">Shared with me</option>
+              </select>
+            </label>
+            <p
+              class="manage-hunts-filter-note"
+              data-testid="manage-hunts-filter-note"
+              role="status"
+            ></p>
             <ul data-testid="my-hunts" aria-label="My hunts"></ul>
           </div>
           <div data-testid="hunt-details-overview">

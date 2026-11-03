@@ -125,6 +125,8 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     id: `hunt-${index}`,
     name: `Hunt ${index}`,
     role: "owner" as const,
+    createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 1000 - index)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
   }));
   await page.route("**/api/admin/hunts", (route) =>
     route.fulfill({ json: { ok: true, value: hunts } }),
@@ -132,6 +134,14 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   await page.goto("/admin.html");
   await page.getByTestId("open-manage-hunts").click();
   const list = page.getByTestId("my-hunts");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    3,
+  );
+  await expect(list).toContainText("Hunt 999");
+  await expect(page.getByTestId("manage-hunts-filter-note")).toContainText(
+    "3 most recently edited",
+  );
+  await page.getByTestId("manage-hunts-filter").selectOption("all");
   await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
     19,
   );
@@ -143,6 +153,11 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   expect(
     await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
   ).toBeLessThan(30);
+  await page.getByTestId("manage-hunts-filter").selectOption("created");
+  await expect(list).toContainText("Hunt 0");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    19,
+  );
 });
 
 test("owners must type the exact hunt name before deleting a hunt", async ({

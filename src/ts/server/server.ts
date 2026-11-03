@@ -471,6 +471,8 @@ export function createApplication(options: ServerOptions = {}) {
               id: hunt.id,
               name: hunt.name,
               role: hunt.ownerId === creatorId ? "owner" : "contributor",
+              createdAt: hunt.createdAt,
+              updatedAt: hunt.updatedAt,
             })),
           });
           return;

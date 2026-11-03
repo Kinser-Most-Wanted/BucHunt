@@ -5,7 +5,30 @@ interface HuntSummary {
   id: string;
   name: string;
   role: "owner" | "contributor";
+  createdAt?: string;
+  updatedAt?: string;
 }
+type HuntListFilter =
+  | "recent-3"
+  | "all"
+  | "edited"
+  | "created"
+  | "name-asc"
+  | "name-desc"
+  | "owned"
+  | "shared";
+
+const huntFilterNotes: Record<HuntListFilter, string> = {
+  "recent-3":
+    "Showing the 3 most recently edited hunts. Choose a filter to browse more.",
+  all: "Showing all hunts, most recently edited first.",
+  edited: "Showing all hunts by last edit time.",
+  created: "Showing all hunts by creation date.",
+  "name-asc": "Showing all hunts from A to Z.",
+  "name-desc": "Showing all hunts from Z to A.",
+  owned: "Showing hunts you own, most recently edited first.",
+  shared: "Showing hunts shared with you, most recently edited first.",
+};
 
 export function mountCreateHunt(
   root: HTMLElement,
@@ -37,6 +60,12 @@ export function mountCreateHunt(
     '[data-testid="creator-status"]',
   )!;
   const list = document.querySelector<HTMLElement>('[data-testid="my-hunts"]')!;
+  const listFilter = manageDialog.querySelector<HTMLSelectElement>(
+    '[data-testid="manage-hunts-filter"]',
+  )!;
+  const listFilterNote = manageDialog.querySelector<HTMLElement>(
+    '[data-testid="manage-hunts-filter-note"]',
+  )!;
   const panel = document.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   )!;
@@ -65,10 +94,11 @@ export function mountCreateHunt(
   const editTitle = document.querySelector<HTMLElement>("#hunt-edit-title")!;
   let selected: HuntSummary | undefined;
   let availableHunts: HuntSummary[] = [];
-  const huntRowHeight = 80;
+  const huntRowHeight = 76;
   const huntWindowSize = 24;
   const huntWindowOverscan = 5;
   let renderedHuntWindow = "";
+  let filteredHunts: HuntSummary[] = [];
   let querySelectionApplied = false;
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
@@ -95,6 +125,54 @@ export function mountCreateHunt(
     void refresh();
   }
 
+  function sortByEdited(hunts: HuntSummary[]): HuntSummary[] {
+    return hunts.sort(
+      (left, right) =>
+        Date.parse(right.updatedAt ?? "") - Date.parse(left.updatedAt ?? ""),
+    );
+  }
+
+  function updateFilteredHunts(reset = true): void {
+    const mode = listFilter.value as HuntListFilter;
+    let matching = [...availableHunts];
+    switch (mode) {
+      case "recent-3":
+      case "all":
+      case "edited":
+        matching = sortByEdited(matching);
+        if (mode === "recent-3") matching = matching.slice(0, 3);
+        break;
+      case "created":
+        matching.sort(
+          (left, right) =>
+            Date.parse(right.createdAt ?? "") -
+            Date.parse(left.createdAt ?? ""),
+        );
+        break;
+      case "name-asc":
+        matching.sort((left, right) => left.name.localeCompare(right.name));
+        break;
+      case "name-desc":
+        matching.sort((left, right) => right.name.localeCompare(left.name));
+        break;
+      case "owned":
+        matching = sortByEdited(
+          matching.filter((hunt) => hunt.role === "owner"),
+        );
+        break;
+      case "shared":
+        matching = sortByEdited(
+          matching.filter((hunt) => hunt.role === "contributor"),
+        );
+        break;
+    }
+    filteredHunts = matching;
+    listFilterNote.textContent = huntFilterNotes[mode];
+    if (availableHunts.length && !matching.length)
+      listFilterNote.textContent = "No hunts match this filter.";
+    renderHuntWindow(reset);
+  }
+
   function renderHuntWindow(reset = false): void {
     if (reset) {
       list.scrollTop = 0;
@@ -103,7 +181,7 @@ export function mountCreateHunt(
     const firstVisible = Math.floor(list.scrollTop / huntRowHeight);
     const start = Math.max(0, firstVisible - huntWindowOverscan);
     const end = Math.min(
-      availableHunts.length,
+      filteredHunts.length,
       firstVisible + huntWindowSize - huntWindowOverscan,
     );
     const windowKey = `${start}:${end}`;
@@ -118,7 +196,7 @@ export function mountCreateHunt(
       return item;
     };
     if (start > 0) fragment.append(spacer(start));
-    for (const hunt of availableHunts.slice(start, end)) {
+    for (const hunt of filteredHunts.slice(start, end)) {
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
@@ -137,11 +215,12 @@ export function mountCreateHunt(
       item.append(button);
       fragment.append(item);
     }
-    if (end < availableHunts.length)
-      fragment.append(spacer(availableHunts.length - end));
+    if (end < filteredHunts.length)
+      fragment.append(spacer(filteredHunts.length - end));
     list.replaceChildren(fragment);
   }
   list.addEventListener("scroll", () => renderHuntWindow(), { passive: true });
+  listFilter.addEventListener("change", () => updateFilteredHunts());
 
   async function renderContributors(): Promise<void> {
     if (!selected || selected.role !== "owner") return;
@@ -282,7 +361,7 @@ export function mountCreateHunt(
       return;
     }
     availableHunts = result.value;
-    renderHuntWindow(true);
+    updateFilteredHunts();
     workspaceStatus.textContent = result.value.length
       ? "Choose a hunt to continue."
       : "No hunts yet. Create one to get started.";

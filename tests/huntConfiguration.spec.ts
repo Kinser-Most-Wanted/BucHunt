@@ -413,7 +413,11 @@ test("only owners and contributors can configure a hunt through the creator work
       "Shared hunt",
     );
     expect(
-      (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
+      await member.evaluate(
+        async (huntId) =>
+          (await fetch(`/api/admin/hunts/${huntId}`)).status,
+        id,
+      ),
     ).toBe(403);
     const visitor = await stranger.newPage();
     await installAdminSession(visitor);
@@ -424,7 +428,11 @@ test("only owners and contributors can configure a hunt through the creator work
       "Shared hunt",
     );
     expect(
-      (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
+      await visitor.evaluate(
+        async (huntId) =>
+          (await fetch(`/api/admin/hunts/${huntId}`)).status,
+        id,
+      ),
     ).toBe(403);
     const memberSession = await (
       await contributor.request.get("/api/admin/session")

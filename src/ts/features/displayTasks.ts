@@ -280,7 +280,12 @@ function renderHunts(
     const header = document.createElement("div");
     header.className = "player-hunt-card-heading";
     const heading = document.createElement("h3");
-    heading.textContent = hunt.name;
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = "player-hunt-open";
+    openButton.textContent = hunt.name;
+    openButton.setAttribute("aria-label", `Open ${hunt.name}`);
+    heading.append(openButton);
     const badge = document.createElement("span");
     badge.className = "hunt-state-badge";
     const presentation = huntStatusPresentation(hunt, now);
@@ -300,11 +305,19 @@ function renderHunts(
     progress.textContent = hunt.tasks.length
       ? `${completed} of ${hunt.tasks.length} tasks completed`
       : "No tasks added yet";
+    const leaveButton = document.createElement("button");
+    leaveButton.type = "button";
+    leaveButton.className = "player-leave-card";
+    leaveButton.dataset.testid = "leave-hunt-card";
+    leaveButton.setAttribute("aria-label", `Leave ${hunt.name}`);
+    leaveButton.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M2 20h20M10 20v-5a2 2 0 0 1 4 0v5m1-10h.01"/></svg><span>Leave Hunt</span>';
+    const statusActions = document.createElement("div");
+    statusActions.className = "player-hunt-card-status";
+    statusActions.append(badge, leaveButton);
+    header.append(heading, statusActions);
     item.dataset.huntId = hunt.id;
     updateHuntCardStatus(item, hunt, now);
-    item.tabIndex = 0;
-    item.setAttribute("role", "button");
-    item.setAttribute("aria-label", `Open ${hunt.name}`);
     item.append(header, description, countdown, progress);
     list.append(item);
   }
@@ -362,6 +375,21 @@ export function mountDisplayTasks(
   );
   const huntDetails = root.querySelector<HTMLDialogElement>(
     '[data-testid="player-hunt-details"]',
+  );
+  const leaveDialog = root.querySelector<HTMLDialogElement>(
+    '[data-testid="leave-hunt-dialog"]',
+  );
+  const leaveHuntName = leaveDialog?.querySelector<HTMLElement>(
+    '[data-testid="leave-hunt-name"]',
+  );
+  const leaveHuntStatus = leaveDialog?.querySelector<HTMLElement>(
+    '[data-testid="leave-hunt-status"]',
+  );
+  const confirmLeaveHunt = leaveDialog?.querySelector<HTMLButtonElement>(
+    '[data-testid="confirm-leave-hunt"]',
+  );
+  const cancelLeaveHunt = leaveDialog?.querySelector<HTMLButtonElement>(
+    '[data-testid="cancel-leave-hunt"]',
   );
   const googleSignIn = root.querySelector<HTMLButtonElement>(
     '[data-testid="google-sign-in"]',
@@ -563,9 +591,7 @@ export function mountDisplayTasks(
     if (!card) return;
     updateHuntCardStatus(card, hunt, now);
     card.setAttribute("aria-label", `Open ${hunt.name}`);
-    const name = card.querySelector<HTMLElement>(
-      ".player-hunt-card-heading h3",
-    );
+    const name = card.querySelector<HTMLElement>(".player-hunt-open");
     if (name) name.textContent = hunt.name;
     const description = card.querySelector<HTMLElement>(
       ".player-hunt-description",
@@ -880,26 +906,50 @@ export function mountDisplayTasks(
     leaveHuntButton.className = "action player-leave-hunt";
     leaveHuntButton.dataset.testid = "leave-hunt";
     leaveHuntButton.textContent = "Leave Hunt";
-    leaveHuntButton.addEventListener("click", async () => {
+    const openLeaveConfirmation = (): void => {
       const identity = activeIdentity ?? storedIdentity();
       if (!selectedHuntId || !identity) return;
       const currentHuntName =
         displayedHunts.find((item) => item.id === selectedHuntId)?.name ??
         huntName.textContent?.trim() ??
         "this hunt";
-      if (!window.confirm(`Leave “${currentHuntName}”?`)) return;
-      leaveHuntButton.disabled = true;
-      huntStatus.textContent = "Leaving hunt…";
-      const result = await repository.leaveHunt(selectedHuntId, identity);
+      showLeaveConfirmation(selectedHuntId, currentHuntName);
+    };
+    leaveHuntButton.addEventListener("click", openLeaveConfirmation);
+    async function leaveHunt(huntId: string, currentHuntName: string) {
+      const identity = activeIdentity ?? storedIdentity();
+      if (!identity || !leaveDialog || !confirmLeaveHunt) return;
+      confirmLeaveHunt.disabled = true;
+      leaveHuntStatus!.hidden = true;
+      const result = await repository.leaveHunt(huntId, identity);
       if (!result.ok) {
-        huntStatus.textContent = result.message;
-        leaveHuntButton.disabled = false;
+        leaveHuntStatus!.textContent = result.message;
+        leaveHuntStatus!.hidden = false;
+        confirmLeaveHunt.disabled = false;
         return;
       }
+      leaveDialog.close();
       closeDetails();
       await loadHunts(identity, currentNickname);
+      status.textContent = `You left ${currentHuntName}.`;
+      confirmLeaveHunt.disabled = false;
+    }
+    function showLeaveConfirmation(huntId: string, name: string) {
+      if (!leaveDialog || !leaveHuntName) return;
+      leaveHuntName.textContent = name;
+      leaveHuntStatus!.hidden = true;
+      leaveHuntStatus!.textContent = "";
+      leaveDialog.dataset.huntId = huntId;
+      if (!leaveDialog.open) leaveDialog.showModal();
+    }
+    confirmLeaveHunt?.addEventListener("click", () => {
+      const huntId = leaveDialog?.dataset.huntId;
+      const huntName = leaveHuntName?.textContent ?? "this Hunt";
+      if (huntId) void leaveHunt(huntId, huntName);
     });
-    intro.append(huntName, huntDescription, huntStatus, leaveHuntButton);
+    cancelLeaveHunt?.addEventListener("click", () => leaveDialog?.close());
+    intro.append(huntName, huntDescription, huntStatus);
+    huntDetails.append(leaveHuntButton);
 
     let huntRequest = 0;
     const addFact = (labelText: string, valueText: string): void => {
@@ -1206,9 +1256,16 @@ export function mountDisplayTasks(
       }
     });
     const openHuntFromCard = (target: EventTarget | null): void => {
-      const card = (target as HTMLElement | null)?.closest<HTMLElement>(
-        ".player-hunt[data-hunt-id]",
-      );
+      const element = target as HTMLElement | null;
+      if (element?.closest(".player-leave-card")) {
+        const card = element.closest<HTMLElement>(".player-hunt[data-hunt-id]");
+        const hunt = displayedHunts.find(
+          (item) => item.id === card?.dataset.huntId,
+        );
+        if (hunt) showLeaveConfirmation(hunt.id, hunt.name);
+        return;
+      }
+      const card = element?.closest<HTMLElement>(".player-hunt[data-hunt-id]");
       if (card) void loadHunt(card.dataset.huntId ?? "");
     };
     categories.addEventListener("click", (event) => {
@@ -1217,7 +1274,8 @@ export function mountDisplayTasks(
     categories.addEventListener("keydown", (event) => {
       if (
         event.target instanceof HTMLElement &&
-        event.target.closest(".player-hunt[data-hunt-id]") &&
+        !event.target.closest(".player-leave-card") &&
+        event.target.matches(".player-hunt-open") &&
         (event.key === "Enter" || event.key === " ")
       ) {
         event.preventDefault();
@@ -1228,6 +1286,10 @@ export function mountDisplayTasks(
       selectedHuntId = null;
       document.body.classList.remove("player-hunt-modal-open");
       renderCategories();
+    });
+    leaveDialog?.addEventListener("close", () => {
+      delete leaveDialog.dataset.huntId;
+      if (confirmLeaveHunt) confirmLeaveHunt.disabled = false;
     });
     const timer = window.setInterval(() => {
       if (!huntDetails.open) renderCategories();

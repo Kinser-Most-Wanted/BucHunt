@@ -333,6 +333,39 @@
             </p>
           </section>
         </dialog>
+        <dialog
+          class="player-leave-dialog"
+          data-testid="leave-hunt-dialog"
+          aria-labelledby="leave-hunt-title"
+          aria-describedby="leave-hunt-warning"
+        >
+          <div class="player-leave-content">
+            <p class="eyebrow">LEAVE THIS ADVENTURE</p>
+            <h2 id="leave-hunt-title">Leave this Hunt?</h2>
+            <p id="leave-hunt-warning" class="player-leave-warning">
+              You will leave <strong data-testid="leave-hunt-name"></strong>
+              and it will be removed from your Hunts. You can join again later.
+            </p>
+            <p
+              class="player-leave-status"
+              data-testid="leave-hunt-status"
+              role="alert"
+              hidden
+            ></p>
+            <div class="player-leave-actions">
+              <button type="button" data-testid="cancel-leave-hunt">
+                Stay in Hunt
+              </button>
+              <button
+                type="button"
+                class="player-leave-confirm"
+                data-testid="confirm-leave-hunt"
+              >
+                Leave Hunt
+              </button>
+            </div>
+          </div>
+        </dialog>
       </section>
     </main>
     <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>

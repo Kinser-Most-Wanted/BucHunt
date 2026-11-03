@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("players can leave a saved hunt from its overview", async ({ page }) => {
+test("players can leave a saved hunt from its overview or card", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     sessionStorage.setItem(
       "buchunt.player-session",
@@ -48,10 +50,27 @@ test("players can leave a saved hunt from its overview", async ({ page }) => {
     }
   });
   await page.goto("/player.html");
+  const leaveCard = page.getByTestId("leave-hunt-card");
+  await expect(leaveCard).toBeVisible();
+  await leaveCard.click();
+  await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();
+  await expect(page.getByTestId("leave-hunt-name")).toHaveText("Optional Hunt");
+  await expect(page.getByTestId("confirm-leave-hunt")).toBeVisible();
+  await page.getByTestId("cancel-leave-hunt").click();
   await page.getByTestId("player-hunt-list").getByText("Optional Hunt").click();
   await expect(page.getByTestId("leave-hunt")).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
+  expect(
+    await page
+      .getByTestId("leave-hunt")
+      .evaluate(
+        (button) =>
+          button.parentElement?.matches("dialog.player-hunt-details") &&
+          button === button.parentElement.lastElementChild,
+      ),
+  ).toBe(true);
   await page.getByTestId("leave-hunt").click();
+  await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();
+  await page.getByTestId("confirm-leave-hunt").click();
   await expect(page.getByTestId("player-hunt-list")).not.toContainText(
     "Optional Hunt",
   );

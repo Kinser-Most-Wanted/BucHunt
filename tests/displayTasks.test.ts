@@ -87,10 +87,7 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Optional Hunt",
   );
-  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
-  await expect(page.getByTestId("player-hunt-name")).toHaveText(
-    "Optional Hunt",
-  );
+  await expect(page.getByTestId("player-hunt-details")).toBeHidden();
 });
 
 test("empty player dashboard points players to the join card above", async ({
@@ -184,10 +181,7 @@ test("admin join links do not fill the access-code form", async ({ page }) => {
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Shared link hunt",
   );
-  await expect(page.getByTestId("player-hunt-details")).toBeVisible();
-  await expect(page.getByTestId("player-hunt-name")).toHaveText(
-    "Shared link hunt",
-  );
+  await expect(page.getByTestId("player-hunt-details")).toBeHidden();
 });
 
 test("manual access-code joins remain in the hunt list after closing details", async ({

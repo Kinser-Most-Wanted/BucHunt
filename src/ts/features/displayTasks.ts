@@ -1244,10 +1244,11 @@ export function mountDisplayTasks(
           identity,
           storedDisplayName(identity.accountId) ?? identity.email,
         );
-        await loadHunt(result.value.huntId);
         if (isSharedLinkJoin) {
           huntStatus.textContent =
             "You joined the Hunt. It is now in your list.";
+        } else {
+          await loadHunt(result.value.huntId);
         }
       } catch {
         huntStatus.textContent = "The Hunt service could not be reached.";

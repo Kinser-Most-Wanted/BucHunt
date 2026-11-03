@@ -75,7 +75,7 @@ test("players can leave a saved hunt from its overview or card", async ({
     "Optional Hunt",
   );
   await expect(page.getByTestId("player-task-status")).toContainText(
-    "dashboard is ready",
+    "You left Optional Hunt.",
   );
 });
 

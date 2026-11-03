@@ -459,22 +459,28 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (path === "/api/admin/hunts" && method === "GET") {
-          const [sharedHuntIds, summaries] = await Promise.all([
-            contributors.huntIdsFor(creatorId),
-            hunts.listSummaries(),
-          ]);
-          const accessible = summaries.filter(
-            (hunt) => hunt.ownerId === creatorId || sharedHuntIds.has(hunt.id),
+          const summaries = await hunts.listSummaries();
+          const accessible = await Promise.all(
+            summaries.map(async (hunt) => ({
+              hunt,
+              role: await contributors.roleFor(
+                hunt.id,
+                creatorId,
+                hunt.ownerId,
+              ),
+            })),
           );
           json(response, 200, {
             ok: true,
-            value: accessible.map((hunt) => ({
-              id: hunt.id,
-              name: hunt.name,
-              role: hunt.ownerId === creatorId ? "owner" : "contributor",
-              createdAt: hunt.createdAt,
-              updatedAt: hunt.updatedAt,
-            })),
+            value: accessible
+              .filter(({ role }) => role !== undefined)
+              .map(({ hunt, role }) => ({
+                id: hunt.id,
+                name: hunt.name,
+                role,
+                createdAt: hunt.createdAt,
+                updatedAt: hunt.updatedAt,
+              })),
           });
           return;
         }
@@ -486,27 +492,36 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64}|invite:[^/]+)))?)?$/.exec(
             path,
           );
-        if (match || taskMatch) {
-          const hunt = await hunts.get(match?.[1] ?? taskMatch![1]);
-          const owner = hunt.ownerId === creatorId;
-          if (
-            !owner &&
-            !(await contributors.members(hunt.id)).includes(creatorId)
-          ) {
+        const roleMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/contributors\/(browser:[a-f0-9]{64}|google-[a-f0-9]{64})\/role$/.exec(
+            path,
+          );
+        if (match || taskMatch || roleMatch) {
+          const hunt = await hunts.get(
+            match?.[1] ?? taskMatch?.[1] ?? roleMatch![1],
+          );
+          const requesterRole = await contributors.roleFor(
+            hunt.id,
+            creatorId,
+            hunt.ownerId,
+          );
+          if (!requesterRole) {
             json(response, 403, {
               ok: false,
-              code: "unauthorized",
-              message:
-                "Only this hunt's owner and contributors can access its configuration.",
+              code: "forbidden",
+              message: "You do not have access to this hunt.",
             });
             return;
           }
+          const canEdit =
+            requesterRole === "owner" || requesterRole === "officer";
+          const canManage = requesterRole === "owner";
           if (match && !match[2] && method === "DELETE") {
-            if (!owner) {
+            if (!canManage) {
               json(response, 403, {
                 ok: false,
-                code: "unauthorized",
-                message: "Only the hunt owner can delete this hunt.",
+                code: "forbidden",
+                message: "Only hunt owners can delete this hunt.",
               });
               return;
             }
@@ -530,6 +545,14 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (taskMatch && method === "PATCH") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 200, {
               ok: true,
               value: await hunts.updateTask(
@@ -541,6 +564,14 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (taskMatch && method === "DELETE") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 200, {
               ok: true,
               value: await hunts.deleteTask(hunt.id, taskMatch[2]),
@@ -548,13 +579,30 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && !match[2] && method === "GET") {
+            const configuration = await hunts.getWithAccessCode(hunt.id);
             json(response, 200, {
               ok: true,
-              value: await hunts.getWithAccessCode(hunt.id),
+              value:
+                requesterRole === "contributor"
+                  ? {
+                      ...configuration,
+                      ownerId: "",
+                      accessCode: null,
+                      tasks: [],
+                    }
+                  : configuration,
             });
             return;
           }
           if (match && match[2] === "tasks" && !match[3] && method === "POST") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 201, {
               ok: true,
               value: await hunts.addTask(hunt.id, await body(request)),
@@ -562,18 +610,18 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && match[2] === "contributors") {
-            if (!owner) {
+            if (!canManage) {
               json(response, 403, {
                 ok: false,
-                code: "unauthorized",
-                message: "Only the hunt owner can manage contributors.",
+                code: "forbidden",
+                message: "Only hunt owners can manage contributors.",
               });
               return;
             }
             if (method === "GET" && !match[3]) {
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributors.entries(hunt.id, hunt.ownerId),
               });
               return;
             }
@@ -593,21 +641,59 @@ export function createApplication(options: ServerOptions = {}) {
                     "You cannot invite your own account as a collaborator.",
                   );
                 await contributors.invite(hunt.id, fields.email);
-              } else await contributors.add(hunt.id, fields.creatorId);
+              } else {
+                if (fields.creatorId === hunt.ownerId)
+                  throw new StoreError(
+                    "validation",
+                    "The original hunt owner already has full access.",
+                  );
+                await contributors.add(hunt.id, fields.creatorId);
+              }
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributors.entries(hunt.id, hunt.ownerId),
               });
               return;
             }
             if (method === "DELETE" && match[3]) {
+              if (match[3] === hunt.ownerId)
+                throw new StoreError(
+                  "forbidden",
+                  "The original hunt owner cannot be removed.",
+                );
               await contributors.remove(hunt.id, match[3]);
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributors.entries(hunt.id, hunt.ownerId),
               });
               return;
             }
+          }
+          if (roleMatch && method === "PATCH") {
+            if (!canManage) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Only hunt owners can change contributor roles.",
+              });
+              return;
+            }
+            const input = await body(request);
+            const role =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).role
+                : undefined;
+            await contributors.setRole(
+              hunt.id,
+              roleMatch[2],
+              role,
+              hunt.ownerId,
+            );
+            json(response, 200, {
+              ok: true,
+              value: await contributors.entries(hunt.id, hunt.ownerId),
+            });
+            return;
           }
         }
       }
@@ -746,7 +832,13 @@ export function createApplication(options: ServerOptions = {}) {
         );
       json(
         response,
-        code === "not-found" ? 404 : code === "validation" ? 400 : 500,
+        code === "not-found"
+          ? 404
+          : code === "validation"
+            ? 400
+            : code === "forbidden"
+              ? 403
+              : 500,
         {
           ok: false,
           code,

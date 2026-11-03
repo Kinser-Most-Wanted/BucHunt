@@ -1,12 +1,19 @@
 import type { HuntRepository } from "../foundation/contracts.js";
+import type { HuntRole } from "../foundation/types.js";
 import { getCreatorSession, request } from "./huntRepository.js";
 import { openHuntDetails } from "./huntDetails.js";
 interface HuntSummary {
   id: string;
   name: string;
-  role: "owner" | "contributor";
+  role: HuntRole;
   createdAt?: string;
   updatedAt?: string;
+}
+interface HuntContributor {
+  id: string;
+  role: HuntRole;
+  pending: boolean;
+  originalOwner: boolean;
 }
 type HuntListFilter =
   | "recent-3"
@@ -195,7 +202,7 @@ export function mountCreateHunt(
         break;
       case "shared":
         matching = sortByEdited(
-          matching.filter((hunt) => hunt.role === "contributor"),
+          matching.filter((hunt) => hunt.role !== "owner"),
         );
         break;
     }
@@ -295,7 +302,7 @@ export function mountCreateHunt(
     );
     if (contributorsStatus)
       contributorsStatus.textContent = "Loading contributors…";
-    const result = await request<string[]>(
+    const result = await request<HuntContributor[]>(
       `/api/admin/hunts/${encodeURIComponent(id)}/contributors`,
     );
     if (selected?.id !== id) return;
@@ -306,24 +313,60 @@ export function mountCreateHunt(
     }
     memberList.replaceChildren();
     creators?.replaceChildren();
-    for (const creatorId of result.value) {
-      const invitation = creatorId.startsWith("invite:");
-      const identifier = invitation
-        ? creatorId.slice("invite:".length)
-        : creatorId;
+    for (const contributor of result.value) {
+      const invitation = contributor.pending;
+      const creatorId = contributor.id;
+      const identifier = invitation ? creatorId.slice("invite:".length) : "";
       const item = document.createElement("li");
       const label = document.createElement("span");
-      label.textContent = invitation
-        ? `Invitation pending · ${identifier}`
-        : "Google account contributor";
+      label.textContent = contributor.originalOwner
+        ? "Original hunt owner"
+        : invitation
+          ? `Invitation pending · ${identifier} · Contributor`
+          : `${contributor.email ?? "Google account"} · ${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)}`;
+      if (!invitation && !contributor.originalOwner) {
+        const role = document.createElement("select");
+        role.setAttribute(
+          "aria-label",
+          `Role for ${contributor.email ?? "Google account"}`,
+        );
+        for (const [value, name] of [
+          ["contributor", "Contributor"],
+          ["officer", "Officer"],
+          ["owner", "Owner"],
+        ]) {
+          const option = document.createElement("option");
+          option.value = value!;
+          option.textContent = name!;
+          role.append(option);
+        }
+        role.value = contributor.role;
+        role.addEventListener("change", async () => {
+          role.disabled = true;
+          const updated = await request<HuntContributor[]>(
+            `/api/admin/hunts/${id}/contributors/${encodeURIComponent(creatorId)}/role`,
+            { role: role.value },
+            "PATCH",
+          );
+          if (selected?.id !== id) return;
+          if (!updated.ok) {
+            role.value = contributor.role;
+            memberStatus.textContent = updated.message;
+          } else {
+            memberStatus.textContent = `Role changed to ${role.options[role.selectedIndex]?.text}.`;
+            await renderContributors();
+          }
+          role.disabled = false;
+        });
+        item.append(role);
+      }
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.textContent = invitation
-        ? "Cancel invitation"
-        : "Remove contributor";
+      remove.textContent = invitation ? "Cancel invitation" : "Remove access";
+      remove.hidden = contributor.originalOwner;
       remove.addEventListener("click", async () => {
         remove.disabled = true;
-        const result = await request<string[]>(
+        const result = await request<HuntContributor[]>(
           `/api/admin/hunts/${id}/contributors/${encodeURIComponent(creatorId)}`,
           undefined,
           "DELETE",
@@ -343,9 +386,11 @@ export function mountCreateHunt(
       memberList.append(item);
       const chip = document.createElement("li");
       chip.className = "creator-chip";
-      chip.textContent = invitation
-        ? `Invitation pending · ${identifier}`
-        : "Contributor · Google account";
+      chip.textContent = contributor.originalOwner
+        ? "Original owner"
+        : invitation
+          ? `Invitation pending · ${identifier} · Contributor`
+          : `${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)} · ${contributor.email ?? "Google account"}`;
       creators?.append(chip);
     }
     if (contributorsStatus) {
@@ -362,8 +407,8 @@ export function mountCreateHunt(
     document
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
-    panel.hidden = false;
     panel.open = false;
+    panel.hidden = hunt.role !== "owner";
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
@@ -538,7 +583,7 @@ export function mountCreateHunt(
         memberStatus.textContent = result.message;
         return;
       }
-      memberStatus.textContent = `Invitation saved for ${email}. They can access this Hunt Studio after signing in with Google.`;
+      memberStatus.textContent = `Invitation saved for ${email}. They will start as a Contributor after signing in with Google.`;
       memberForm.reset();
       await renderContributors();
     } finally {

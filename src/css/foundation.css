@@ -1371,6 +1371,18 @@ body[data-page="admin"] [data-testid="contributor-list"] > li {
   background: rgb(255 255 255 / 3%);
   color: #e8ebf0;
 }
+body[data-page="admin"] [data-testid="contributor-list"] > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+body[data-page="admin"] [data-testid="contributor-list"] select {
+  width: auto;
+  min-width: 9rem;
+  margin: 0;
+}
 body[data-page="admin"] [data-testid="my-hunts"] > li:not(.hunt-list-spacer) {
   box-sizing: border-box;
   height: 76px;

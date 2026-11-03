@@ -1,4 +1,8 @@
-import type { HuntDefinition, TaskDefinition } from "../foundation/types.js";
+import type {
+  HuntDefinition,
+  HuntRole,
+  TaskDefinition,
+} from "../foundation/types.js";
 import { createHuntRepository } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
@@ -151,18 +155,41 @@ function resetDialog(): void {
     '[data-testid="contributors-load-status"]',
   );
   if (contributorsStatus) contributorsStatus.textContent = "";
+  const contributorsPanel = dialog?.querySelector<HTMLDetailsElement>(
+    '[data-testid="contributors-panel"]',
+  );
+  if (contributorsPanel) contributorsPanel.hidden = true;
+  const taskSection = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-tasks-section"]',
+  );
+  if (taskSection) taskSection.hidden = true;
+  const editButton = dialog?.querySelector<HTMLButtonElement>(
+    '[data-testid="edit-hunt-link"]',
+  );
+  if (editButton) editButton.hidden = true;
+  const playerLink = dialog?.querySelector<HTMLAnchorElement>(
+    '[data-testid="player-hunt-link"]',
+  );
+  if (playerLink) playerLink.hidden = true;
+  const accessCodeSection =
+    dialog?.querySelector<HTMLElement>(".hunt-access-code");
+  if (accessCodeSection) accessCodeSection.hidden = true;
 }
 
-function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
+function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   );
   if (contributorsPanel) {
-    contributorsPanel.hidden = false;
+    contributorsPanel.hidden = role !== "owner";
     contributorsPanel.open = false;
   }
+  const editButton = dialog.querySelector<HTMLButtonElement>(
+    '[data-testid="edit-hunt-link"]',
+  );
+  if (editButton) editButton.hidden = role === "contributor";
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-name"]',
   )!.textContent = hunt.name;
@@ -184,6 +211,7 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   const playerLink = dialog.querySelector<HTMLAnchorElement>(
     '[data-testid="player-hunt-link"]',
   )!;
+  playerLink.hidden = role === "contributor";
   const encodedAccessCode = encodeURIComponent(hunt.accessCode ?? "");
   playerLink.href = `./player.html?accessCode=${encodedAccessCode}&autoJoin=1`;
 
@@ -204,6 +232,9 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
     '[data-testid="hunt-access-code"]',
   )!;
   accessCode.textContent = hunt.accessCode || "Not set";
+  const accessCodeSection =
+    accessCode.closest<HTMLElement>(".hunt-access-code");
+  if (accessCodeSection) accessCodeSection.hidden = role === "contributor";
   if (copyAccessCodeButton) {
     copyAccessCodeButton.hidden = !hunt.accessCode;
     copyAccessCodeButton.setAttribute(
@@ -216,22 +247,32 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
     '[data-testid="hunt-owner"]',
   )!;
   ownerLabel.textContent =
-    role === "owner" ? "You own this hunt" : "Shared with you";
+    role === "owner"
+      ? "You own this hunt"
+      : role === "officer"
+        ? "Officer access"
+        : "Contributor access";
 
   const contributorsStatus = dialog.querySelector<HTMLElement>(
     '[data-testid="contributors-load-status"]',
   )!;
   if (role !== "owner") {
     contributorsStatus.textContent =
-      "Contributor details are visible to the hunt owner.";
+      role === "officer"
+        ? "Officers can edit and create hunt tasks."
+        : "Contributors can view basic hunt details. Ask a hunt owner for a promotion to edit.";
   }
 
   const taskList = dialog.querySelector<HTMLOListElement>(
     '[data-testid="hunt-detail-tasks"]',
   )!;
+  const taskSection = dialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-tasks-section"]',
+  );
   const emptyTasks = dialog.querySelector<HTMLElement>(
     '[data-testid="empty-tasks"]',
   )!;
+  if (taskSection) taskSection.hidden = role === "contributor";
   for (const task of [...hunt.tasks].sort(
     (left, right) => left.order - right.order,
   )) {
@@ -241,7 +282,9 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-detail-status"]',
   )!.textContent =
-    `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
+    role === "contributor"
+      ? `Contributor access · basic hunt details · ${hunt.status}`
+      : `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
 }
 
 dialog
@@ -268,7 +311,7 @@ dialog?.addEventListener("click", (event) => {
 
 export async function openHuntDetails(
   huntId: string,
-  role: "owner" | "contributor",
+  role: HuntRole,
 ): Promise<void> {
   if (!dialog) return;
   const requestId = ++activeRequest;

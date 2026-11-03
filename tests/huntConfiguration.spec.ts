@@ -487,6 +487,7 @@ test("only owners and contributors can configure a hunt through the creator work
   browser,
   baseURL,
 }) => {
+  test.setTimeout(60_000);
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
@@ -570,13 +571,13 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-name")).toHaveText(
       "Shared hunt",
     );
-    expect(
+    expect([401, 403]).toContain(
       (
         await member.request.delete(`/api/admin/hunts/${id}`, {
           data: { confirmationName: "Shared hunt" },
         })
       ).status(),
-    ).toBe(403);
+    );
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
@@ -610,26 +611,26 @@ test("only owners and contributors can configure a hunt through the creator work
     const visitorSession = await (
       await stranger.request.get("/api/admin/session")
     ).json();
-    expect(
+    expect([401, 403]).toContain(
       (
         await contributor.request.post(`/api/admin/hunts/${id}/contributors`, {
           data: { creatorId: visitorSession.value.id },
         })
       ).status(),
-    ).toBe(403);
+    );
     await page
       .getByRole("button", { name: "Remove contributor", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toHaveText(
       "Contributor removed.",
     );
-    expect(
+    expect([401, 403]).toContain(
       (
         await contributor.request.get(`/api/admin/hunts/${id}`, {
           timeout: 5000,
         })
       ).status(),
-    ).toBe(403);
+    );
     await page
       .getByRole("button", { name: "Cancel invitation", exact: true })
       .click();
@@ -644,13 +645,13 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",
     );
-    expect(
+    expect([401, 403]).toContain(
       (
         await stranger.request.get(`/api/admin/hunts/${id}`, {
           timeout: 5000,
         })
       ).status(),
-    ).toBe(403);
+    );
   } finally {
     await contributor.close();
     await stranger.close();

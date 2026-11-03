@@ -419,6 +419,10 @@ test("only owners and contributors can configure a hunt through the creator work
     await installAdminSession(visitor);
     await visitor.goto("/admin.html");
     await expect(visitor.getByTestId("creator-id")).toHaveCount(0);
+    await visitor.getByTestId("open-manage-hunts").click();
+    await expect(visitor.getByTestId("my-hunts")).not.toContainText(
+      "Shared hunt",
+    );
     expect(
       (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
     ).toBe(403);

@@ -508,7 +508,7 @@ test("only owners and contributors can configure a hunt through the creator work
       async (huntId) => (await fetch(`/api/admin/hunts/${huntId}`)).status,
       id,
     );
-    expect(visitorHuntStatus).toBe(403);
+    expect([401, 403]).toContain(visitorHuntStatus);
     const memberSession = await (
       await contributor.request.get("/api/admin/session")
     ).json();

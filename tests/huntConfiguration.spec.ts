@@ -141,6 +141,9 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     3,
   );
   await expect(list).toContainText("Hunt 999");
+  await expect(
+    page.getByTestId("edit-hunt-selector").locator("option"),
+  ).toHaveCount(1);
   const firstHunt = list.locator("button.hunt-list-link").first();
   await firstHunt.hover();
   await expect
@@ -233,11 +236,18 @@ test("owners must type the exact hunt name before deleting a hunt", async ({
     { data: { confirmationName: "Wrong name" } },
   );
   expect(wrongNameResponse.status()).toBe(400);
-  page.once("dialog", async (dialog) => {
-    expect(dialog.type()).toBe("prompt");
-    await dialog.accept("Delete verification");
-  });
   await page.getByTestId("delete-hunt").click();
+  await expect(page.getByTestId("delete-hunt-dialog")).toBeVisible();
+  await expect(page.getByTestId("delete-hunt-warning")).toContainText(
+    "cannot be undone",
+  );
+  const confirmation = page.getByTestId("delete-hunt-name-input");
+  const confirmButton = page.getByTestId("confirm-delete-hunt");
+  await confirmation.fill("Wrong name");
+  await expect(confirmButton).toBeDisabled();
+  await confirmation.fill("Delete verification");
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
   await expect(page.getByTestId("my-hunts")).not.toContainText(
     "Delete verification",
   );

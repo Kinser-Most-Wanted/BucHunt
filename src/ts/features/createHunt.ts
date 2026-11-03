@@ -94,8 +94,27 @@ export function mountCreateHunt(
   deleteHuntButton.textContent = "Delete Hunt";
   deleteHuntButton.hidden = true;
   detailsActions?.append(deleteHuntButton);
+  const deleteDialog = document.querySelector<HTMLDialogElement>(
+    '[data-testid="delete-hunt-dialog"]',
+  )!;
+  const deleteForm = deleteDialog.querySelector<HTMLFormElement>(
+    '[data-testid="delete-hunt-form"]',
+  )!;
+  const deleteName = deleteDialog.querySelector<HTMLElement>(
+    '[data-testid="delete-hunt-name"]',
+  )!;
+  const deleteNameInput = deleteDialog.querySelector<HTMLInputElement>(
+    '[data-testid="delete-hunt-name-input"]',
+  )!;
+  const confirmDeleteButton = deleteDialog.querySelector<HTMLButtonElement>(
+    '[data-testid="confirm-delete-hunt"]',
+  )!;
+  const deleteStatus = deleteDialog.querySelector<HTMLElement>(
+    '[data-testid="delete-hunt-status"]',
+  )!;
   const editTitle = document.querySelector<HTMLElement>("#hunt-edit-title")!;
   let selected: HuntSummary | undefined;
+  let pendingDelete: HuntSummary | undefined;
   let availableHunts: HuntSummary[] = [];
   const huntRowHeight = 76;
   const huntWindowOverscan = 5;
@@ -349,31 +368,65 @@ export function mountCreateHunt(
     memberList.replaceChildren();
     memberStatus.textContent = "";
   }
-  deleteHuntButton.addEventListener("click", async () => {
+  deleteHuntButton.addEventListener("click", () => {
     if (!selected || selected.role !== "owner") return;
-    const hunt = selected;
-    const confirmation = window.prompt(
-      `Permanently delete “${hunt.name}”? Type the hunt name to confirm.`,
-    );
-    if (confirmation !== hunt.name) return;
+    pendingDelete = selected;
+    deleteName.textContent = pendingDelete.name;
+    deleteNameInput.value = "";
+    deleteStatus.textContent = "";
+    deleteStatus.hidden = true;
+    confirmDeleteButton.disabled = true;
+    deleteDialog.showModal();
+    deleteNameInput.focus();
+  });
+  deleteNameInput.addEventListener("input", () => {
+    confirmDeleteButton.disabled =
+      deleteNameInput.value !== pendingDelete?.name;
+  });
+  deleteDialog
+    .querySelector<HTMLButtonElement>('[data-testid="cancel-delete-hunt"]')!
+    .addEventListener("click", () => deleteDialog.close());
+  deleteDialog.addEventListener("close", () => {
+    pendingDelete = undefined;
+    deleteNameInput.value = "";
+    confirmDeleteButton.disabled = true;
+  });
+  deleteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const hunt = pendingDelete;
+    if (!hunt || deleteNameInput.value !== hunt.name) return;
+    confirmDeleteButton.disabled = true;
     deleteHuntButton.disabled = true;
+    deleteStatus.hidden = true;
+    deleteStatus.textContent = "";
     workspaceStatus.textContent = `Deleting ${hunt.name}…`;
     try {
-      const result = await repository.deleteHunt(hunt.id, confirmation);
-      if (selected?.id !== hunt.id) return;
+      const result = await repository.deleteHunt(hunt.id, hunt.name);
       if (!result.ok) {
-        workspaceStatus.textContent = result.message;
+        deleteStatus.textContent = result.message;
+        deleteStatus.hidden = false;
+        confirmDeleteButton.disabled = false;
         return;
       }
-      selected = undefined;
-      taskHunt.value = "";
+      availableHunts = availableHunts.filter((item) => item.id !== hunt.id);
+      updateFilteredHunts();
+      if (selected?.id === hunt.id) {
+        selected = undefined;
+        taskHunt.value = "";
+        panel.hidden = true;
+      }
       managerView.hidden = false;
       if (overviewView) overviewView.hidden = true;
       if (editorView) editorView.hidden = true;
       if (mode) mode.textContent = "YOUR ADVENTURES";
       manageDialog.setAttribute("aria-labelledby", "manage-hunts-title");
-      await refresh();
-      workspaceStatus.textContent = `${hunt.name} was deleted.`;
+      deleteDialog.close();
+      workspaceStatus.textContent = `${hunt.name} was permanently deleted.`;
+    } catch {
+      deleteStatus.textContent =
+        "The hunt could not be deleted. Check your connection and try again.";
+      deleteStatus.hidden = false;
+      confirmDeleteButton.disabled = false;
     } finally {
       deleteHuntButton.disabled = false;
     }
@@ -385,6 +438,7 @@ export function mountCreateHunt(
     const hunt = availableHunts.find((item) => item.id === detail?.huntId);
     if (!hunt) return;
     select(hunt);
+    populateHuntSelector();
     document.getElementById("define-task")?.dispatchEvent(
       new CustomEvent("load-hunt-tasks", {
         detail: { tasks: detail.tasks, huntName: hunt.name },
@@ -408,7 +462,6 @@ export function mountCreateHunt(
     workspaceStatus.textContent = result.value.length
       ? ""
       : "No hunts yet. Create one to get started.";
-    populateHuntSelector();
     if (!querySelectionApplied && requestedHuntId) {
       const requestedHunt = result.value.find(
         (hunt) => hunt.id === requestedHuntId,

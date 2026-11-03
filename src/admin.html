@@ -715,6 +715,55 @@
         </dialog>
       </div>
     </main>
+    <dialog
+      class="hunt-delete-dialog"
+      data-testid="delete-hunt-dialog"
+      aria-labelledby="delete-hunt-title"
+      aria-describedby="delete-hunt-warning"
+    >
+      <form data-testid="delete-hunt-form" class="hunt-delete-form">
+        <p class="eyebrow">PERMANENT ACTION</p>
+        <h2 id="delete-hunt-title">Delete this hunt?</h2>
+        <p
+          id="delete-hunt-warning"
+          data-testid="delete-hunt-warning"
+          class="hunt-delete-warning"
+        >
+          <strong>This cannot be undone.</strong> Deleting this hunt also
+          removes its tasks, contributors, and saved player progress.
+        </p>
+        <label for="delete-hunt-name">
+          Type <strong data-testid="delete-hunt-name"></strong> to confirm
+        </label>
+        <input
+          id="delete-hunt-name"
+          data-testid="delete-hunt-name-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <p
+          class="hunt-delete-status"
+          data-testid="delete-hunt-status"
+          role="alert"
+          hidden
+        ></p>
+        <div class="hunt-delete-actions">
+          <button type="button" data-testid="cancel-delete-hunt">
+            Keep hunt
+          </button>
+          <button
+            type="submit"
+            class="hunt-delete-confirm"
+            data-testid="confirm-delete-hunt"
+            disabled
+          >
+            Delete permanently
+          </button>
+        </div>
+      </form>
+    </dialog>
     <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>
     <script type="module" src="./js/admin.js"></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>

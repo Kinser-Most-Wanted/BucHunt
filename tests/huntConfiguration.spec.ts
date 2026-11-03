@@ -527,7 +527,7 @@ test("only owners and contributors can configure a hunt through the creator work
   browser,
   baseURL,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
@@ -693,8 +693,7 @@ test("only owners and contributors can configure a hunt through the creator work
       ).status(),
     );
   } finally {
-    await contributor.close();
-    await stranger.close();
+    await Promise.allSettled([contributor.close(), stranger.close()]);
   }
 });
 

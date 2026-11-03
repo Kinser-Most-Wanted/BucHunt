@@ -395,7 +395,9 @@ export function mountCreateHunt(
       creators?.append(chip);
     }
     if (contributorsStatus) {
-      contributorsStatus.textContent = result.value.length
+      contributorsStatus.textContent = result.value.some(
+        (contributor) => !contributor.originalOwner,
+      )
         ? ""
         : "No contributors have been added yet.";
     }

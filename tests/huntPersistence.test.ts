@@ -903,7 +903,22 @@ test("ownership and contributor grants survive terminating the Node process", as
           )
         ).json()
       ).value,
-    ).toEqual([collaborator]);
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          id: "original-owner",
+          role: "owner",
+          pending: false,
+          originalOwner: true,
+        },
+        {
+          id: collaborator,
+          role: "contributor",
+          pending: false,
+          originalOwner: false,
+        },
+      ]),
+    );
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });

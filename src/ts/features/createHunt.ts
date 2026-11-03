@@ -95,22 +95,31 @@ export function mountCreateHunt(
   let selected: HuntSummary | undefined;
   let availableHunts: HuntSummary[] = [];
   const huntRowHeight = 76;
-  const huntWindowSize = 24;
   const huntWindowOverscan = 5;
   let renderedHuntWindow = "";
   let filteredHunts: HuntSummary[] = [];
+  let huntsLoaded = false;
+  let refreshInFlight: Promise<void> | undefined;
+  let huntSelectorSignature = "";
   let querySelectionApplied = false;
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
   );
 
   function populateHuntSelector(): void {
-    selector.replaceChildren();
-    for (const hunt of availableHunts) {
-      const option = document.createElement("option");
-      option.value = hunt.id;
-      option.textContent = hunt.name + " (" + hunt.role + ")";
-      selector.append(option);
+    const signature = JSON.stringify(
+      availableHunts.map(({ id, name, role }) => [id, name, role]),
+    );
+    if (signature !== huntSelectorSignature) {
+      const options = document.createDocumentFragment();
+      for (const hunt of availableHunts) {
+        const option = document.createElement("option");
+        option.value = hunt.id;
+        option.textContent = `${hunt.name} (${hunt.role})`;
+        options.append(option);
+      }
+      selector.replaceChildren(options);
+      huntSelectorSignature = signature;
     }
     selector.value = selected?.id ?? "";
   }
@@ -122,7 +131,8 @@ export function mountCreateHunt(
     if (mode) mode.textContent = "YOUR ADVENTURES";
     manageDialog!.setAttribute("aria-labelledby", "manage-hunts-title");
     if (!manageDialog!.open) manageDialog!.showModal();
-    void refresh();
+    renderHuntWindow(true);
+    if (!huntsLoaded) void refresh();
   }
 
   function sortByEdited(hunts: HuntSummary[]): HuntSummary[] {
@@ -175,14 +185,28 @@ export function mountCreateHunt(
 
   function renderHuntWindow(reset = false): void {
     if (reset) {
-      list.scrollTop = 0;
+      manageDialog.scrollTop = 0;
       renderedHuntWindow = "";
     }
-    const firstVisible = Math.floor(list.scrollTop / huntRowHeight);
+    const listTop =
+      list.getBoundingClientRect().top -
+      manageDialog.getBoundingClientRect().top +
+      manageDialog.scrollTop;
+    const firstVisible = Math.max(
+      0,
+      Math.floor((manageDialog.scrollTop - listTop) / huntRowHeight),
+    );
+    const lastVisible = Math.max(
+      0,
+      Math.ceil(
+        (manageDialog.scrollTop + manageDialog.clientHeight - listTop) /
+          huntRowHeight,
+      ),
+    );
     const start = Math.max(0, firstVisible - huntWindowOverscan);
     const end = Math.min(
       filteredHunts.length,
-      firstVisible + huntWindowSize - huntWindowOverscan,
+      lastVisible + huntWindowOverscan,
     );
     const windowKey = `${start}:${end}`;
     if (windowKey === renderedHuntWindow) return;
@@ -219,7 +243,9 @@ export function mountCreateHunt(
       fragment.append(spacer(filteredHunts.length - end));
     list.replaceChildren(fragment);
   }
-  list.addEventListener("scroll", () => renderHuntWindow(), { passive: true });
+  manageDialog.addEventListener("scroll", () => renderHuntWindow(), {
+    passive: true,
+  });
   listFilter.addEventListener("change", () => updateFilteredHunts());
 
   async function renderContributors(): Promise<void> {
@@ -297,7 +323,6 @@ export function mountCreateHunt(
     deleteHuntButton.hidden = hunt.role !== "owner";
     taskHunt.value = hunt.id;
     editTitle.textContent = "Editing " + hunt.name;
-    populateHuntSelector();
     document
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
@@ -349,7 +374,7 @@ export function mountCreateHunt(
       }),
     );
   });
-  async function refresh(): Promise<void> {
+  async function loadHunts(): Promise<void> {
     const session = await getCreatorSession();
     if (!session.ok) {
       workspaceStatus.textContent = session.message;
@@ -361,9 +386,10 @@ export function mountCreateHunt(
       return;
     }
     availableHunts = result.value;
+    huntsLoaded = true;
     updateFilteredHunts();
     workspaceStatus.textContent = result.value.length
-      ? "Choose a hunt to continue."
+      ? ""
       : "No hunts yet. Create one to get started.";
     populateHuntSelector();
     if (!querySelectionApplied && requestedHuntId) {
@@ -387,6 +413,15 @@ export function mountCreateHunt(
       document
         .getElementById("define-task")
         ?.dispatchEvent(new Event("hunt-selected"));
+    }
+  }
+  async function refresh(): Promise<void> {
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = loadHunts();
+    try {
+      await refreshInFlight;
+    } finally {
+      refreshInFlight = undefined;
     }
   }
   document
@@ -471,6 +506,7 @@ export function mountCreateHunt(
       }
       status.textContent = `Hunt saved: ${result.value.name}. Open Manage Hunts to add tasks or edit details.`;
       select({ id: result.value.id, name: result.value.name, role: "owner" });
+      huntsLoaded = false;
       form.reset();
       createDialog.close();
       showManagerView();
@@ -481,5 +517,5 @@ export function mountCreateHunt(
       if (button) button.disabled = false;
     }
   });
-  void refresh();
+  if (requestedHuntId) void refresh();
 }

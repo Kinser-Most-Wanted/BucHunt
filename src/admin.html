@@ -224,29 +224,36 @@
               </div>
               <button
                 type="button"
-                class="refresh-button"
+                class="refresh-button manage-hunts-refresh"
                 data-testid="refresh-my-hunts"
+                aria-label="Refresh hunt list"
+                title="Refresh hunt list"
               >
-                ↻ Refresh
+                ↻
               </button>
             </div>
+            <p class="manage-hunts-subtitle">
+              Open a hunt to manage its details and contributors.
+            </p>
             <p role="status" data-testid="creator-status"></p>
-            <label class="manage-hunts-filter" for="manage-hunts-filter">
-              Filter hunts
-              <select
-                id="manage-hunts-filter"
-                data-testid="manage-hunts-filter"
-              >
-                <option value="recent-3">Recently edited (3)</option>
-                <option value="all">All hunts</option>
-                <option value="edited">Recently edited</option>
-                <option value="created">Recently created</option>
-                <option value="name-asc">Name (A–Z)</option>
-                <option value="name-desc">Name (Z–A)</option>
-                <option value="owned">Owned by me</option>
-                <option value="shared">Shared with me</option>
-              </select>
-            </label>
+            <div class="manage-hunts-filter-row">
+              <label class="manage-hunts-filter" for="manage-hunts-filter">
+                Browse
+                <select
+                  id="manage-hunts-filter"
+                  data-testid="manage-hunts-filter"
+                >
+                  <option value="recent-3">Recently edited (3)</option>
+                  <option value="all">All hunts</option>
+                  <option value="edited">Recently edited</option>
+                  <option value="created">Recently created</option>
+                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-desc">Name (Z–A)</option>
+                  <option value="owned">Owned by me</option>
+                  <option value="shared">Shared with me</option>
+                </select>
+              </label>
+            </div>
             <p
               class="manage-hunts-filter-note"
               data-testid="manage-hunts-filter-note"

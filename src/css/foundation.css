@@ -1358,10 +1358,7 @@ body[data-page="admin"] [data-testid="contributor-list"] {
 }
 body[data-page="admin"] [data-testid="my-hunts"] {
   display: block;
-  max-height: min(58dvh, 42rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-behavior: auto;
+  overflow: visible;
   border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 0.85rem;
   background: rgb(255 255 255 / 2%);
@@ -1399,21 +1396,47 @@ body[data-page="admin"] [data-testid="my-hunts"] .hunt-list-link {
 body[data-page="admin"] [data-testid="my-hunts"] button {
   margin: 0;
 }
-body[data-page="admin"] .manage-hunts-filter {
-  display: grid;
-  grid-template-columns: auto minmax(12rem, 18rem);
+body[data-page="admin"] .manage-hunts-filter-row {
+  display: flex;
   align-items: center;
-  gap: 0.8rem;
-  margin: 0.9rem 0 0;
-  color: #cbd1dc;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 3%);
+  color: #aeb8c8;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+body[data-page="admin"] .manage-hunts-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex: 1;
+  margin: 0;
+  color: #e8ebf0;
 }
 body[data-page="admin"] .manage-hunts-filter select {
+  width: auto;
+  min-width: 13rem;
   margin: 0;
+  padding: 0.55rem 2rem 0.55rem 0.75rem;
+  border-radius: 0.65rem;
+  background-color: #10294a;
+  font-size: 0.9rem;
 }
 body[data-page="admin"] .manage-hunts-filter-note {
-  margin: 0.35rem 0 0;
+  margin: 0.55rem 0 0.15rem;
   color: #9ca5b4;
   font-size: 0.85rem;
+}
+body[data-page="admin"]
+  .hunt-manager-view
+  > [data-testid="creator-status"]:empty {
+  display: none;
 }
 body[data-page="admin"] .hunt-editor-panel {
   min-width: 0;
@@ -2081,7 +2104,8 @@ body[data-page="admin"] dialog.hunt-details-dialog {
   padding: clamp(1rem, 3vw, 2rem);
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.2rem;
   background:
@@ -2089,6 +2113,21 @@ body[data-page="admin"] dialog.hunt-details-dialog {
     linear-gradient(145deg, #10294a, #0b203d);
   box-shadow: 0 20px 60px rgb(0 0 0 / 45%);
   color: #f4f5f9;
+}
+body[data-page="admin"] dialog.hunt-details-dialog::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] .manage-hunts-filter-row {
+    padding: 0.6rem 0.7rem;
+  }
+  body[data-page="admin"] .manage-hunts-filter {
+    gap: 0.55rem;
+  }
+  body[data-page="admin"] .manage-hunts-filter select {
+    min-width: 0;
+    max-width: 72%;
+  }
 }
 body[data-page="admin"] dialog.hunt-details-dialog::backdrop {
   background: rgb(6 9 14 / 76%);
@@ -2939,7 +2978,7 @@ body[data-page="admin"] .hunt-manager-heading {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: 0.25rem 0 1rem;
+  margin: 0.25rem 0 0;
 }
 body[data-page="admin"] .hunt-manager-heading h2 {
   margin: 0.15rem 0 0;
@@ -2947,7 +2986,31 @@ body[data-page="admin"] .hunt-manager-heading h2 {
 }
 body[data-page="admin"] .hunt-manager-heading .refresh-button {
   margin: 0;
-  white-space: nowrap;
+}
+body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #dce4ef;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh:hover {
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+}
+body[data-page="admin"] .manage-hunts-subtitle {
+  margin: 0.4rem 0 0.8rem;
+  color: #aab3c1;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 body[data-page="admin"] .hunt-manager-view > [data-testid="creator-status"] {
   color: #aab3c1;

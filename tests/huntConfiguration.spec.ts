@@ -128,10 +128,13 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 1000 - index)).toISOString(),
     updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
   }));
-  await page.route("**/api/admin/hunts", (route) =>
-    route.fulfill({ json: { ok: true, value: hunts } }),
-  );
+  let huntRequests = 0;
+  await page.route("**/api/admin/hunts", (route) => {
+    huntRequests += 1;
+    return route.fulfill({ json: { ok: true, value: hunts } });
+  });
   await page.goto("/admin.html");
+  expect(huntRequests).toBe(0);
   await page.getByTestId("open-manage-hunts").click();
   const list = page.getByTestId("my-hunts");
   await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
@@ -141,11 +144,30 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   await expect(page.getByTestId("manage-hunts-filter-note")).toContainText(
     "3 most recently edited",
   );
+  const dialog = page.getByTestId("hunt-details-dialog");
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(() =>
+      dialog.evaluate((element) => getComputedStyle(element).scrollbarWidth),
+    )
+    .toBe("none");
+  await expect
+    .poll(() => list.evaluate((element) => getComputedStyle(element).overflowY))
+    .toBe("visible");
+  expect(huntRequests).toBe(1);
   await page.getByTestId("manage-hunts-filter").selectOption("all");
-  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
-    19,
-  );
-  await list.evaluate((element) => {
+  await expect
+    .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())
+    .toBeGreaterThan(3);
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(24);
+  await expect
+    .poll(() =>
+      dialog.evaluate((element) => element.scrollHeight > element.clientHeight),
+    )
+    .toBe(true);
+  await dialog.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event("scroll"));
   });
@@ -155,9 +177,14 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   ).toBeLessThan(30);
   await page.getByTestId("manage-hunts-filter").selectOption("created");
   await expect(list).toContainText("Hunt 0");
-  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
-    19,
-  );
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(24);
+  await page.getByTestId("close-hunt-details").click();
+  await page.getByTestId("open-manage-hunts").click();
+  expect(huntRequests).toBe(1);
+  await page.getByTestId("refresh-my-hunts").click();
+  await expect.poll(() => huntRequests).toBe(2);
 });
 
 test("owners must type the exact hunt name before deleting a hunt", async ({

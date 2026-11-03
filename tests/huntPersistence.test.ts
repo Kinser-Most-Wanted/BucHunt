@@ -839,7 +839,7 @@ test("account task progress survives restart without cookies and isolates player
       opened.payload.value.tasks.map(
         (task: { completed: boolean }) => task.completed,
       ),
-    ).toEqual([false, false]);
+    ).toEqual([false]);
     expect(opened.payload.value.tasks[0].description).toBe(task.description);
     expect(JSON.stringify(opened.payload)).not.toMatch(
       /Bucky|ownerId|requiredAnswer/,

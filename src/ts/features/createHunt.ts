@@ -14,6 +14,7 @@ interface HuntContributor {
   role: HuntRole;
   pending: boolean;
   originalOwner: boolean;
+  email?: string;
 }
 type HuntListFilter =
   | "recent-3"

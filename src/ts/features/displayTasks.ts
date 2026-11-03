@@ -311,7 +311,7 @@ function renderHunts(
     leaveButton.dataset.testid = "leave-hunt-card";
     leaveButton.setAttribute("aria-label", `Leave ${hunt.name}`);
     leaveButton.innerHTML =
-      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M2 20h20M10 20v-5a2 2 0 0 1 4 0v5m1-10h.01"/></svg><span>Leave Hunt</span>';
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 17l5-5-5-5M15 12H3M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/></svg><span>Leave Hunt</span>';
     const statusActions = document.createElement("div");
     statusActions.className = "player-hunt-card-status";
     statusActions.append(badge, leaveButton);

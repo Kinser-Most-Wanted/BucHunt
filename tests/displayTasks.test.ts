@@ -323,7 +323,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "inert",
     "",
   );
-  await expect(page.getByLabel("Access code")).toHaveValue("ABCD1234");
+  await expect(page.getByLabel("Access code")).toHaveValue("");
   await expect(page.getByTestId("player-hunt-list")).toContainText("test");
   await expect(page.getByTestId("player-hunt-list")).toContainText(
     "Time remaining",

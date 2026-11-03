@@ -210,7 +210,7 @@ export function mountCreateHunt(
         : "No contributors have been added yet.";
     }
   }
-  function select(hunt: HuntSummary, loadContributors = true): void {
+  function select(hunt: HuntSummary): void {
     selected = hunt;
     deleteHuntButton.hidden = hunt.role !== "owner";
     taskHunt.value = hunt.id;
@@ -224,8 +224,10 @@ export function mountCreateHunt(
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
-    if (loadContributors && hunt.role === "owner") void renderContributors();
   }
+  panel.addEventListener("toggle", () => {
+    if (panel.open && selected?.role === "owner") void renderContributors();
+  });
   deleteHuntButton.addEventListener("click", async () => {
     if (!selected || selected.role !== "owner") return;
     const hunt = selected;
@@ -261,7 +263,7 @@ export function mountCreateHunt(
     ).detail;
     const hunt = availableHunts.find((item) => item.id === detail?.huntId);
     if (!hunt) return;
-    select(hunt, false);
+    select(hunt);
     document.getElementById("define-task")?.dispatchEvent(
       new CustomEvent("load-hunt-tasks", {
         detail: { tasks: detail.tasks, huntName: hunt.name },
@@ -389,10 +391,7 @@ export function mountCreateHunt(
         return;
       }
       status.textContent = `Hunt saved: ${result.value.name}. Open Manage Hunts to add tasks or edit details.`;
-      select(
-        { id: result.value.id, name: result.value.name, role: "owner" },
-        false,
-      );
+      select({ id: result.value.id, name: result.value.name, role: "owner" });
       form.reset();
       createDialog.close();
       showManagerView();

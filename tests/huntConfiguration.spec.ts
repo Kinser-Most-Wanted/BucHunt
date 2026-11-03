@@ -426,8 +426,7 @@ test("only owners and contributors can configure a hunt through the creator work
       "Shared hunt",
     );
     const visitorHuntStatus = await visitor.evaluate(
-      async (huntId) =>
-        (await fetch(`/api/admin/hunts/${huntId}`)).status,
+      async (huntId) => (await fetch(`/api/admin/hunts/${huntId}`)).status,
       id,
     );
     expect(visitorHuntStatus).toBe(403);

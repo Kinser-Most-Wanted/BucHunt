@@ -215,7 +215,8 @@ function renderHunt(hunt: HuntDefinition, role: "owner" | "contributor"): void {
   const ownerLabel = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-owner"]',
   )!;
-  ownerLabel.textContent = `Owner · ${hunt.ownerId || "Creator information unavailable"}`;
+  ownerLabel.textContent =
+    role === "owner" ? "You own this hunt" : "Shared with you";
 
   const contributorsStatus = dialog.querySelector<HTMLElement>(
     '[data-testid="contributors-load-status"]',

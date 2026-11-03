@@ -187,6 +187,18 @@ export class HuntStore {
   async list(): Promise<HuntDefinition[]> {
     return (await this.file.get()).hunts;
   }
+  async migrateLegacyOwners(accountId: string): Promise<number> {
+    return this.file.update((data) => {
+      let migrated = 0;
+      for (const hunt of data.hunts) {
+        if (/^browser:[a-f0-9]{64}$/.test(hunt.ownerId)) {
+          hunt.ownerId = accountId;
+          migrated += 1;
+        }
+      }
+      return migrated;
+    });
+  }
   async get(id: string): Promise<HuntDefinition> {
     const hunt = (await this.file.get()).hunts.find((item) => item.id === id);
     if (!hunt) throw new StoreError("not-found", "Hunt not found.");
@@ -284,6 +296,7 @@ export class HuntStore {
 interface ContributorFile {
   schemaVersion: 1;
   contributors: Record<string, string[]>;
+  invitations: Record<string, string[]>;
 }
 function contributorFile(value: unknown): ContributorFile {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -296,12 +309,35 @@ function contributorFile(value: unknown): ContributorFile {
     Array.isArray(data.contributors)
   )
     throw new Error("Invalid contributor configuration");
+  data.invitations ??= {};
+  if (
+    !data.invitations ||
+    typeof data.invitations !== "object" ||
+    Array.isArray(data.invitations)
+  )
+    throw new Error("Invalid contributor configuration");
   for (const [huntId, members] of Object.entries(data.contributors)) {
     if (
       !/^[a-zA-Z0-9-]+$/.test(huntId) ||
       !Array.isArray(members) ||
       members.some(
-        (id) => typeof id !== "string" || !/^browser:[a-f0-9]{64}$/.test(id),
+        (id) =>
+          typeof id !== "string" ||
+          !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(id),
+      )
+    )
+      throw new Error("Invalid contributor configuration");
+  }
+  for (const [huntId, emails] of Object.entries(data.invitations)) {
+    if (
+      !/^[a-zA-Z0-9-]+$/.test(huntId) ||
+      !Array.isArray(emails) ||
+      emails.some(
+        (email) =>
+          typeof email !== "string" ||
+          email.length > 254 ||
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+          email !== email.toLowerCase(),
       )
     )
       throw new Error("Invalid contributor configuration");
@@ -309,13 +345,12 @@ function contributorFile(value: unknown): ContributorFile {
   return data;
 }
 // Keep membership separate so existing version-1 hunt definitions remain valid.
-// Future account integration must explicitly map these temporary creator IDs.
 export class ContributorStore {
   private file: JsonFile<ContributorFile>;
   constructor(path: string) {
     this.file = new JsonFile(
       path,
-      () => ({ schemaVersion: 1, contributors: {} }),
+      () => ({ schemaVersion: 1, contributors: {}, invitations: {} }),
       contributorFile,
     );
   }
@@ -326,10 +361,71 @@ export class ContributorStore {
     const all = await this.all();
     return Object.hasOwn(all, huntId) ? all[huntId] : [];
   }
+  async entries(huntId: string): Promise<string[]> {
+    const data = await this.file.get();
+    const members = data.contributors[huntId] ?? [];
+    const invites = (data.invitations[huntId] ?? []).map(
+      (email) => `invite:${email}`,
+    );
+    return [...members, ...invites];
+  }
+  async invite(huntId: string, email: unknown): Promise<void> {
+    if (
+      typeof email !== "string" ||
+      email.trim().length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    )
+      throw new StoreError("validation", "Enter a valid collaborator email.");
+    const normalized = email.trim().toLowerCase();
+    await this.file.update((data) => {
+      if (!Object.hasOwn(data.invitations, huntId))
+        data.invitations[huntId] = [];
+      if (!data.invitations[huntId].includes(normalized))
+        data.invitations[huntId].push(normalized);
+    });
+  }
+  async acceptInvitations(email: string, accountId: string): Promise<void> {
+    const normalized = email.toLowerCase();
+    if (!/^google-[a-f0-9]{64}$/.test(accountId)) return;
+    const current = await this.file.get();
+    if (
+      !Object.values(current.invitations).some((invites) =>
+        invites.includes(normalized),
+      )
+    )
+      return;
+    await this.file.update((data) => {
+      for (const [huntId, invites] of Object.entries(data.invitations)) {
+        if (!invites.includes(normalized)) continue;
+        if (!Object.hasOwn(data.contributors, huntId))
+          data.contributors[huntId] = [];
+        if (!data.contributors[huntId].includes(accountId))
+          data.contributors[huntId].push(accountId);
+        data.invitations[huntId] = invites.filter(
+          (invitedEmail) => invitedEmail !== normalized,
+        );
+      }
+    });
+  }
+  async linkLegacyCreator(legacyId: string, accountId: string): Promise<void> {
+    if (
+      !/^browser:[a-f0-9]{64}$/.test(legacyId) ||
+      !/^google-[a-f0-9]{64}$/.test(accountId)
+    )
+      return;
+    await this.file.update((data) => {
+      for (const members of Object.values(data.contributors)) {
+        if (!members.includes(legacyId)) continue;
+        const remaining = members.filter((id) => id !== legacyId);
+        if (!remaining.includes(accountId)) remaining.push(accountId);
+        members.splice(0, members.length, ...remaining);
+      }
+    });
+  }
   async add(huntId: string, creatorId: unknown): Promise<void> {
     if (
       typeof creatorId !== "string" ||
-      !/^browser:[a-f0-9]{64}$/.test(creatorId)
+      !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(creatorId)
     )
       throw new StoreError(
         "validation",
@@ -344,6 +440,14 @@ export class ContributorStore {
   }
   async remove(huntId: string, creatorId: string): Promise<void> {
     await this.file.update((data) => {
+      if (creatorId.startsWith("invite:")) {
+        const email = creatorId.slice("invite:".length).toLowerCase();
+        if (Object.hasOwn(data.invitations, huntId))
+          data.invitations[huntId] = data.invitations[huntId].filter(
+            (invitedEmail) => invitedEmail !== email,
+          );
+        return;
+      }
       if (Object.hasOwn(data.contributors, huntId))
         data.contributors[huntId] = data.contributors[huntId].filter(
           (id) => id !== creatorId,

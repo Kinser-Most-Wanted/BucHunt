@@ -2,7 +2,7 @@
 
 BucHunt is a customizable scavenger hunt platform for the East Tennessee State University community.
 
-The integrated sprint supports creating hunts, defining tasks with answers and coordinates, saving and retrieving server-side JSON configuration, and displaying player tasks with persisted completion. Hunt creators can create hunts immediately, manage their own hunts, and contribute to hunts shared with them. Google account integration and access-code joining remain future work.
+The integrated sprint supports creating hunts, defining tasks with answers and coordinates, saving and retrieving server-side JSON configuration, and displaying player tasks with persisted completion. Google sign-in links hunt ownership, contributor access, player profiles, and progress to stable account identities. Access-code joining is available to signed-in players.
 
 ## Local development
 
@@ -16,9 +16,9 @@ pnpm serve
 
 Open `http://127.0.0.1:3000/admin.html` (Hunt Studio). No API token or AWS access is needed. Create a hunt, add tasks, and follow the player link. Use **My hunts** to reopen hunts you own or contribute to.
 
-For collaboration, a contributor opens Hunt Studio and copies their creator ID. The hunt owner selects the hunt and adds that ID under **Contributors**. Contributors can add tasks; only the owner can grant or remove contributor access.
+To collaborate, the hunt owner enters the contributor's Google email under **Contributors**. The invite becomes active when that person signs in with the same verified email. BucHunt does not send an email, so share the site link with them. Contributors can add tasks; only the owner can grant, cancel, or remove access.
 
-Until Google sign-in is implemented, an automatic private browser cookie identifies each creator. The UI labels this as a temporary profile. Use the same browser profile to return to your hunts; clearing cookies or using another browser creates a different identity. This is not Google authentication. Server saves update `data/hunts.json`; contributor grants and player progress are stored separately. Use `DATA_DIRECTORY` to select a different private data directory.
+Existing hunts owned by temporary browser IDs are reassigned to Baja Blast's verified Google account (`codepro1012@gmail.com`) the first time that account opens Hunt Studio in each deployment. The migration updates only legacy `browser:` ownership IDs; hunt IDs, tasks, codes, and progress remain unchanged. Each deployment has its own private `DATA_DIRECTORY`, so sign in at each environment that contains hunts to migrate. New hunts are owned by the signed-in Google account. Runtime JSON files store hunt definitions, contributor grants, profiles, and progress separately.
 
 ```sh
 pnpm lint
@@ -59,13 +59,13 @@ signed in. Sessions expire without automatic refresh.
 
 Endpoints:
 
-| Method | Path | Behavior |
-| --- | --- | --- |
-| GET | `/api/auth/config` | Returns the public Google client ID and one-use login nonce; sets a browser-bound login cookie |
-| POST | `/api/auth/login` | JSON `{ "credential": "GOOGLE_ID_TOKEN" }`; verifies Google identity and creates a session for any verified Google account |
-| GET | `/api/auth/session` | Returns the authenticated user's subject, email, expiry and current `user` or `administrator` role |
-| POST | `/api/auth/logout` | Deletes the current application session and clears its cookie |
-| GET | `/api/admin/capabilities` | Returns the authenticated administrator and `administrative.access` |
+| Method | Path                      | Behavior                                                                                                                   |
+| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/auth/config`        | Returns the public Google client ID and one-use login nonce; sets a browser-bound login cookie                             |
+| POST   | `/api/auth/login`         | JSON `{ "credential": "GOOGLE_ID_TOKEN" }`; verifies Google identity and creates a session for any verified Google account |
+| GET    | `/api/auth/session`       | Returns the authenticated user's subject, email, expiry and current `user` or `administrator` role                         |
+| POST   | `/api/auth/logout`        | Deletes the current application session and clears its cookie                                                              |
+| GET    | `/api/admin/capabilities` | Returns the authenticated administrator and `administrative.access`                                                        |
 
 Login and session responses use `{ "user": { "subject": "...", "email": "...",
 "expiresAt": 0, "role": "user" } }`, with `administrator` for an allowlisted email

@@ -252,7 +252,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   expect(popupOrder[0]).toBeLessThan(popupOrder[1]);
   expect(popupOrder[1]).toBeLessThan(popupOrder[2]);
   expect(popupOrder[2]).toBeLessThan(popupOrder[3]);
-  await expect(page.getByTestId("hunt-owner")).toContainText("Owner ·");
+  await expect(page.getByTestId("hunt-owner")).toHaveText("You own this hunt");
   await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("contributors-panel")).toBeVisible();
   await expect(page.getByTestId("contributors-panel")).toHaveJSProperty(
@@ -384,9 +384,7 @@ test("only owners and contributors can configure a hunt through the creator work
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
-  await expect(page.getByTestId("creator-id")).toHaveText(
-    /^browser:[a-f0-9]{64}$/,
-  );
+  await expect(page.getByTestId("creator-id")).toHaveCount(0);
   await expect(page.getByLabel("Administrator API token")).toHaveCount(0);
   await page.getByTestId("open-create-hunt").click();
   await page.getByLabel("Hunt name", { exact: true }).fill("Shared hunt");
@@ -409,9 +407,7 @@ test("only owners and contributors can configure a hunt through the creator work
     await installMapMock(contributor);
     await installAdminSession(member);
     await member.goto("/admin.html");
-    await expect(member.getByTestId("creator-id")).toHaveText(
-      /^browser:[a-f0-9]{64}$/,
-    );
+    await expect(member.getByTestId("creator-id")).toHaveCount(0);
     await member.getByTestId("open-manage-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",
@@ -422,21 +418,36 @@ test("only owners and contributors can configure a hunt through the creator work
     const visitor = await stranger.newPage();
     await installAdminSession(visitor);
     await visitor.goto("/admin.html");
-    await expect(visitor.getByTestId("creator-id")).toHaveText(
-      /^browser:[a-f0-9]{64}$/,
-    );
+    await expect(visitor.getByTestId("creator-id")).toHaveCount(0);
     expect(
       (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
     ).toBe(403);
-    const memberId = (await member.getByTestId("creator-id").textContent())!;
+    const memberSession = await (
+      await contributor.request.get("/api/admin/session")
+    ).json();
+    const memberId = memberSession.value.id as string;
     await page.getByTestId("contributors-panel").locator("summary").click();
-    await page.getByLabel("Contributor creator ID").fill(memberId);
+    await page
+      .getByLabel("Collaborator's Google email")
+      .fill("teammate@example.com");
     await page
       .getByRole("button", { name: "Add contributor", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toContainText(
-      "Contributor added",
+      "Invitation saved",
     );
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Invitation pending · teammate@example.com",
+    );
+    await page.request.post(`/api/admin/hunts/${id}/contributors`, {
+      data: { creatorId: memberId },
+    });
+    await page.reload();
+    await page.getByTestId("open-manage-hunts").click();
+    await page
+      .getByRole("button", { name: "Shared hunt (owner)", exact: true })
+      .click();
+    await page.getByTestId("contributors-panel").locator("summary").click();
     await member.getByTestId("refresh-my-hunts").click();
     await member
       .getByRole("button", { name: "Shared hunt (contributor)", exact: true })
@@ -448,7 +459,9 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
-    await expect(member.getByTestId("hunt-owner")).toContainText("Owner ·");
+    await expect(member.getByTestId("hunt-owner")).toHaveText(
+      "Shared with you",
+    );
     await expect(member.getByTestId("hunt-creators")).not.toContainText(
       "Owner",
     );
@@ -473,12 +486,13 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("task-status")).toContainText(
       "was saved and appears",
     );
+    const visitorSession = await (
+      await stranger.request.get("/api/admin/session")
+    ).json();
     expect(
       (
         await contributor.request.post(`/api/admin/hunts/${id}/contributors`, {
-          data: {
-            creatorId: await visitor.getByTestId("creator-id").textContent(),
-          },
+          data: { creatorId: visitorSession.value.id },
         })
       ).status(),
     ).toBe(403);
@@ -495,6 +509,12 @@ test("only owners and contributors can configure a hunt through the creator work
         })
       ).status(),
     ).toBe(403);
+    await page
+      .getByRole("button", { name: "Cancel invitation", exact: true })
+      .click();
+    await expect(page.getByTestId("contributor-status")).toHaveText(
+      "Invitation canceled.",
+    );
     await member.getByTestId("back-to-hunt-details").click();
     await expect(member.getByTestId("hunt-details-overview")).toBeVisible();
     await member.getByTestId("back-to-manage-hunts").click();

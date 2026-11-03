@@ -129,7 +129,10 @@ export function mountCreateHunt(
       button.append(role);
       button.addEventListener("click", () => {
         select(hunt);
-        void openHuntDetails(hunt.id, hunt.role);
+        void openHuntDetails(hunt.id, hunt.role).then(() => {
+          if (selected?.id === hunt.id && hunt.role === "owner")
+            void renderContributors();
+        });
       });
       item.append(button);
       fragment.append(item);
@@ -225,9 +228,6 @@ export function mountCreateHunt(
     memberList.replaceChildren();
     memberStatus.textContent = "";
   }
-  panel.addEventListener("toggle", () => {
-    if (panel.open && selected?.role === "owner") void renderContributors();
-  });
   deleteHuntButton.addEventListener("click", async () => {
     if (!selected || selected.role !== "owner") return;
     const hunt = selected;

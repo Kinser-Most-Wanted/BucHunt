@@ -167,11 +167,11 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     .poll(() => list.evaluate((element) => getComputedStyle(element).overflowY))
     .toBe("visible");
   expect(huntRequests).toBe(1);
-  await page.getByTestId("manage-hunts-search").fill("Hunt 42");
+  await page.getByTestId("manage-hunts-search").fill("Hunt 420");
   await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
     1,
   );
-  await expect(list).toContainText("Hunt 42");
+  await expect(list).toContainText("Hunt 420");
   await page.getByTestId("manage-hunts-search").fill("Hunt 4");
   await expect
     .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())

@@ -50,7 +50,9 @@ export class JsonFile<T> {
         cached.size === details.size
       )
         return cached.value as T;
-      const value = this.validate(JSON.parse(await readFile(this.path, "utf8")));
+      const value = this.validate(
+        JSON.parse(await readFile(this.path, "utf8")),
+      );
       fileSnapshots.set(this.key, {
         value,
         modifiedAt: details.mtimeMs,
@@ -124,7 +126,10 @@ export class JsonFile<T> {
       }
       return result;
     });
-    fileQueues.set(this.key, task.catch(() => undefined));
+    fileQueues.set(
+      this.key,
+      task.catch(() => undefined),
+    );
     return task;
   }
 }
@@ -237,7 +242,10 @@ export class HuntStore {
     return (await this.file.get()).hunts;
   }
   async listSummaries(): Promise<
-    Pick<HuntDefinition, "id" | "name" | "ownerId" | "createdAt" | "updatedAt">[]
+    Pick<
+      HuntDefinition,
+      "id" | "name" | "ownerId" | "createdAt" | "updatedAt"
+    >[]
   > {
     return this.file.query((data) =>
       data.hunts.map(({ id, name, ownerId, createdAt, updatedAt }) => ({

@@ -464,9 +464,7 @@ export function createApplication(options: ServerOptions = {}) {
             hunts.listSummaries(),
           ]);
           const accessible = summaries.filter(
-            (hunt) =>
-              hunt.ownerId === creatorId ||
-              sharedHuntIds.has(hunt.id),
+            (hunt) => hunt.ownerId === creatorId || sharedHuntIds.has(hunt.id),
           );
           json(response, 200, {
             ok: true,

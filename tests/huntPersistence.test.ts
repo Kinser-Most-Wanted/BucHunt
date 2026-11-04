@@ -118,6 +118,12 @@ test("multiple-choice answers persist rejected choices per account and complete 
     requiredAnswer: "Square",
     choices: ["Square", "Circle", "Triangle", "Octagon"],
   });
+  const nextTask = await store.addTask(hunt.id, {
+    ...task,
+    displayLabel: "Library",
+    requiredAnswer: "Bucky",
+    order: 2,
+  });
   expect(
     (await new HuntStore(join(directory, "hunts.json")).get(hunt.id)).tasks[0],
   ).toEqual(saved);
@@ -141,11 +147,14 @@ test("multiple-choice answers persist rejected choices per account and complete 
     });
   const route = `/hunts/${hunt.id}`;
   const answer = route + `/tasks/${saved.id}/answer`;
+  const nextAnswer = route + `/tasks/${nextTask.id}/answer`;
   try {
     expect((await call("/join", { accessCode: hunt.accessCode })).status).toBe(
       200,
     );
     const displayed = (await (await call(route)).json()).value.tasks[0];
+    expect((await (await call(route)).json()).value.tasks).toHaveLength(1);
+    expect((await call(nextAnswer, { answer: "Bucky" })).status).toBe(400);
     expect(displayed.choices).toEqual([
       "Circle",
       "Octagon",
@@ -178,7 +187,12 @@ test("multiple-choice answers persist rejected choices per account and complete 
     expect(
       (await (await call(answer, { answer: "Square" })).json()).value.completed,
     ).toBe(true);
-    expect((await (await call(route)).json()).value.tasks[0].completed).toBe(
+    const advanced = (await (await call(route)).json()).value.tasks;
+    expect(advanced).toHaveLength(2);
+    expect(advanced[0].completed).toBe(true);
+    expect(advanced[1]).toMatchObject({ id: nextTask.id, completed: false });
+    expect((await call(nextAnswer, { answer: "Bucky" })).status).toBe(200);
+    expect((await (await call(route)).json()).value.tasks[1].completed).toBe(
       true,
     );
   } finally {
@@ -337,7 +351,14 @@ test("Google hunt owners cannot invite their own email as a collaborator", async
       base + `/api/admin/hunts/${hunt.id}/contributors`,
       { headers },
     );
-    expect((await contributors.json()).value).toEqual([]);
+    expect((await contributors.json()).value).toEqual([
+      {
+        id: "original-owner",
+        role: "owner",
+        pending: false,
+        originalOwner: true,
+      },
+    ]);
   } finally {
     await new Promise<void>((resolve) => app.close(() => resolve()));
     await rm(directory, { recursive: true, force: true });
@@ -501,7 +522,22 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         body: JSON.stringify({ creatorId: collaborator.id }),
       })
     ).json();
-    expect(grant.value).toEqual([collaborator.id]);
+    expect(grant.value).toEqual(
+      expect.arrayContaining([
+        {
+          id: "original-owner",
+          role: "owner",
+          pending: false,
+          originalOwner: true,
+        },
+        {
+          id: collaborator.id,
+          role: "contributor",
+          pending: false,
+          originalOwner: false,
+        },
+      ]),
+    );
     expect(
       (await fetch(base + route, { headers: headers(collaborator.cookie) }))
         .status,
@@ -523,6 +559,96 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
         updatedAt: expect.any(String),
       }),
     ]);
+    const contributorView = await (
+      await fetch(base + route, { headers: headers(collaborator.cookie) })
+    ).json();
+    expect(contributorView.value.tasks).toEqual([]);
+    expect(contributorView.value.ownerId).toBe("");
+    expect(contributorView.value.accessCode).toBeNull();
+    expect(JSON.stringify(contributorView)).not.toContain(task.requiredAnswer);
+    expect(
+      (
+        await fetch(base + route + "/tasks", {
+          method: "POST",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ ...task, order: 2 }),
+        })
+      ).status,
+    ).toBe(403);
+
+    const promoted = await fetch(
+      base +
+        route +
+        `/contributors/${encodeURIComponent(collaborator.id)}/role`,
+      {
+        method: "PATCH",
+        headers: admin,
+        body: JSON.stringify({ role: "officer" }),
+      },
+    );
+    expect(promoted.status).toBe(200);
+    expect(
+      (
+        await (
+          await fetch(base + "/api/admin/hunts", {
+            headers: headers(collaborator.cookie),
+          })
+        ).json()
+      ).value[0].role,
+    ).toBe("officer");
+    const demoted = await fetch(
+      base +
+        route +
+        `/contributors/${encodeURIComponent(collaborator.id)}/role`,
+      {
+        method: "PATCH",
+        headers: admin,
+        body: JSON.stringify({ role: "contributor" }),
+      },
+    );
+    expect(demoted.status).toBe(200);
+    expect(
+      (
+        await fetch(base + route + "/tasks", {
+          method: "POST",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ ...task, order: 2 }),
+        })
+      ).status,
+    ).toBe(403);
+    const repromoted = await fetch(
+      base +
+        route +
+        `/contributors/${encodeURIComponent(collaborator.id)}/role`,
+      {
+        method: "PATCH",
+        headers: admin,
+        body: JSON.stringify({ role: "officer" }),
+      },
+    );
+    expect(repromoted.status).toBe(200);
+    expect(
+      (
+        await fetch(base + route + "/contributors", {
+          method: "POST",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ creatorId: stranger.id }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await fetch(base + route, {
+          method: "DELETE",
+          headers: headers(collaborator.cookie),
+          body: JSON.stringify({ confirmationName: input.name }),
+        })
+      ).status,
+    ).toBe(403);
+    const officerView = await (
+      await fetch(base + route, { headers: headers(collaborator.cookie) })
+    ).json();
+    expect(officerView.value.tasks).toHaveLength(1);
     const contributedTask = await (
       await fetch(base + route + "/tasks", {
         method: "POST",
@@ -580,15 +706,50 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
       displayLabel: "Updated fountain",
     });
 
-    expect(
-      (
-        await fetch(base + route + "/contributors", {
-          method: "POST",
-          headers: headers(collaborator.cookie),
-          body: JSON.stringify({ creatorId: stranger.id }),
-        })
-      ).status,
-    ).toBe(403);
+    const additionalOwner = await fetch(
+      base +
+        route +
+        `/contributors/${encodeURIComponent(collaborator.id)}/role`,
+      {
+        method: "PATCH",
+        headers: admin,
+        body: JSON.stringify({ role: "owner" }),
+      },
+    );
+    expect(additionalOwner.status).toBe(200);
+    const protectedOriginalOwner = await fetch(
+      base + route + `/contributors/${encodeURIComponent(owner.id)}/role`,
+      {
+        method: "PATCH",
+        headers: headers(collaborator.cookie),
+        body: JSON.stringify({ role: "officer" }),
+      },
+    );
+    expect(protectedOriginalOwner.status).toBe(403);
+    const cannotRemoveOriginalOwner = await fetch(
+      base + route + `/contributors/${encodeURIComponent(owner.id)}`,
+      { method: "DELETE", headers: headers(collaborator.cookie) },
+    );
+    expect(cannotRemoveOriginalOwner.status).toBe(403);
+    const additionalOwnerGrant = await fetch(base + route + "/contributors", {
+      method: "POST",
+      headers: headers(collaborator.cookie),
+      body: JSON.stringify({ creatorId: stranger.id }),
+    });
+    expect(additionalOwnerGrant.status).toBe(200);
+    const additionalOwnerPromotion = await fetch(
+      base + route + `/contributors/${encodeURIComponent(stranger.id)}/role`,
+      {
+        method: "PATCH",
+        headers: headers(collaborator.cookie),
+        body: JSON.stringify({ role: "officer" }),
+      },
+    );
+    expect(additionalOwnerPromotion.status).toBe(200);
+    await fetch(
+      base + route + `/contributors/${encodeURIComponent(stranger.id)}`,
+      { method: "DELETE", headers: admin },
+    );
     const legacyPath = join(directory, "hunts.json");
     const legacy = JSON.parse(await readFile(legacyPath, "utf8"));
     legacy.hunts.find((hunt: { id: string }) => hunt.id === id).accessCode =
@@ -643,6 +804,12 @@ test("creator ownership, contributor grants, privacy and restart persistence", a
       displayLabel: "Updated fountain",
       requiredAnswer: "New answer",
     });
+    const restoredRoles = await (
+      await fetch(base + "/api/admin/hunts", {
+        headers: headers(collaborator.cookie),
+      })
+    ).json();
+    expect(restoredRoles.value[0].role).toBe("owner");
     expect(
       (await fetch(base + route, { headers: headers(collaborator.cookie) }))
         .status,
@@ -750,7 +917,22 @@ test("ownership and contributor grants survive terminating the Node process", as
           )
         ).json()
       ).value,
-    ).toEqual([collaborator]);
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          id: "original-owner",
+          role: "owner",
+          pending: false,
+          originalOwner: true,
+        },
+        {
+          id: collaborator,
+          role: "contributor",
+          pending: false,
+          originalOwner: false,
+        },
+      ]),
+    );
   } finally {
     await stop();
     await rm(directory, { recursive: true, force: true });
@@ -825,7 +1007,7 @@ test("account task progress survives restart without cookies and isolates player
       opened.payload.value.tasks.map(
         (task: { completed: boolean }) => task.completed,
       ),
-    ).toEqual([false, false]);
+    ).toEqual([false]);
     expect(opened.payload.value.tasks[0].description).toBe(task.description);
     expect(JSON.stringify(opened.payload)).not.toMatch(
       /Bucky|ownerId|requiredAnswer/,
@@ -934,6 +1116,45 @@ test("hunt deletion requires the owner and clears related saved records", async 
     expect(await contributors.members(hunt.id)).toEqual([]);
   } finally {
     await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("accepted email invitations retain the verified account email and default to Contributor", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-hunt-roles-"));
+  try {
+    const contributors = new ContributorStore(
+      join(directory, "hunt-contributors.json"),
+    );
+    const huntId = "role-test-hunt";
+    const accountId = `google-${"c".repeat(64)}`;
+    await contributors.invite(huntId, "Teammate@example.com");
+    await contributors.acceptInvitations("teammate@example.com", accountId);
+    expect(await contributors.entries(huntId)).toEqual([
+      {
+        id: accountId,
+        role: "contributor",
+        pending: false,
+        originalOwner: false,
+        email: "teammate@example.com",
+      },
+    ]);
+    await contributors.setRole(
+      huntId,
+      accountId,
+      "officer",
+      "original-owner-id",
+    );
+    expect(await contributors.entries(huntId)).toEqual([
+      {
+        id: accountId,
+        role: "officer",
+        pending: false,
+        originalOwner: false,
+        email: "teammate@example.com",
+      },
+    ]);
+  } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });

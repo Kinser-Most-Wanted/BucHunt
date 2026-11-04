@@ -5,13 +5,14 @@ import { validateHunt } from "../validation/huntValidation.js";
 import type {
   HuntConfigurationFile,
   HuntDefinition,
+  HuntRole,
   OperationResult,
   TaskDefinition,
 } from "../foundation/types.js";
 
 export class StoreError extends Error {
   constructor(
-    public code: "storage" | "validation" | "not-found",
+    public code: "storage" | "validation" | "not-found" | "forbidden",
     message: string,
     public issues?: { field: string; message: string }[],
   ) {
@@ -375,6 +376,8 @@ interface ContributorFile {
   schemaVersion: 1;
   contributors: Record<string, string[]>;
   invitations: Record<string, string[]>;
+  roles: Record<string, Record<string, "owner" | "officer">>;
+  emails: Record<string, Record<string, string>>;
 }
 function contributorFile(value: unknown): ContributorFile {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -388,10 +391,24 @@ function contributorFile(value: unknown): ContributorFile {
   )
     throw new Error("Invalid contributor configuration");
   data.invitations ??= {};
+  data.roles ??= {};
+  data.emails ??= {};
   if (
     !data.invitations ||
     typeof data.invitations !== "object" ||
     Array.isArray(data.invitations)
+  )
+    throw new Error("Invalid contributor configuration");
+  if (
+    !data.roles ||
+    typeof data.roles !== "object" ||
+    Array.isArray(data.roles)
+  )
+    throw new Error("Invalid contributor configuration");
+  if (
+    !data.emails ||
+    typeof data.emails !== "object" ||
+    Array.isArray(data.emails)
   )
     throw new Error("Invalid contributor configuration");
   for (const [huntId, members] of Object.entries(data.contributors)) {
@@ -420,7 +437,46 @@ function contributorFile(value: unknown): ContributorFile {
     )
       throw new Error("Invalid contributor configuration");
   }
+  for (const [huntId, roles] of Object.entries(data.roles)) {
+    if (
+      !/^[a-zA-Z0-9-]+$/.test(huntId) ||
+      !roles ||
+      typeof roles !== "object" ||
+      Array.isArray(roles) ||
+      Object.entries(roles).some(
+        ([id, role]) =>
+          !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(id) ||
+          (role !== "owner" && role !== "officer"),
+      )
+    )
+      throw new Error("Invalid contributor configuration");
+  }
+  for (const [huntId, emails] of Object.entries(data.emails)) {
+    if (
+      !/^[a-zA-Z0-9-]+$/.test(huntId) ||
+      !emails ||
+      typeof emails !== "object" ||
+      Array.isArray(emails) ||
+      Object.entries(emails).some(
+        ([id, email]) =>
+          !/^(?:browser:[a-f0-9]{64}|google-[a-f0-9]{64})$/.test(id) ||
+          typeof email !== "string" ||
+          email.length > 254 ||
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+          email !== email.toLowerCase(),
+      )
+    )
+      throw new Error("Invalid contributor configuration");
+  }
   return data;
+}
+export interface HuntContributorEntry {
+  id: string;
+  role: HuntRole;
+  pending: boolean;
+  originalOwner: boolean;
+  email?: string;
+  displayName?: string;
 }
 // Keep membership separate so existing version-1 hunt definitions remain valid.
 export class ContributorStore {
@@ -428,7 +484,13 @@ export class ContributorStore {
   constructor(path: string) {
     this.file = new JsonFile(
       path,
-      () => ({ schemaVersion: 1, contributors: {}, invitations: {} }),
+      () => ({
+        schemaVersion: 1,
+        contributors: {},
+        invitations: {},
+        roles: {},
+        emails: {},
+      }),
       contributorFile,
     );
   }
@@ -449,13 +511,81 @@ export class ContributorStore {
     const all = await this.all();
     return Object.hasOwn(all, huntId) ? all[huntId] : [];
   }
-  async entries(huntId: string): Promise<string[]> {
+  async roleFor(
+    huntId: string,
+    memberId: string,
+    originalOwnerId: string,
+  ): Promise<HuntRole | undefined> {
+    if (memberId === originalOwnerId) return "owner";
+    return this.file.query((data) => {
+      if (!(data.contributors[huntId] ?? []).includes(memberId))
+        return undefined;
+      return data.roles[huntId]?.[memberId] ?? "contributor";
+    });
+  }
+  async entries(
+    huntId: string,
+    originalOwnerId?: string,
+    originalOwnerName?: string,
+  ): Promise<HuntContributorEntry[]> {
     const data = await this.file.get();
     const members = data.contributors[huntId] ?? [];
-    const invites = (data.invitations[huntId] ?? []).map(
-      (email) => `invite:${email}`,
-    );
-    return [...members, ...invites];
+    const invites = data.invitations[huntId] ?? [];
+    const entries: HuntContributorEntry[] = [
+      ...members.map((id) => ({
+        id,
+        role: data.roles[huntId]?.[id] ?? "contributor",
+        pending: false,
+        originalOwner: false,
+        ...(data.emails[huntId]?.[id]
+          ? { email: data.emails[huntId][id] }
+          : {}),
+      })),
+      ...invites.map((email) => ({
+        id: `invite:${email}`,
+        role: "contributor" as const,
+        pending: true,
+        originalOwner: false,
+      })),
+    ];
+    if (originalOwnerId)
+      entries.unshift({
+        id: "original-owner",
+        role: "owner",
+        pending: false,
+        originalOwner: true,
+        ...(originalOwnerName ? { displayName: originalOwnerName } : {}),
+      });
+    return entries;
+  }
+  async setRole(
+    huntId: string,
+    memberId: string,
+    role: unknown,
+    originalOwnerId: string,
+    requesterId = "",
+  ): Promise<void> {
+    if (memberId === originalOwnerId)
+      throw new StoreError(
+        "forbidden",
+        "The original hunt owner cannot be demoted or changed.",
+      );
+    if (memberId === requesterId)
+      throw new StoreError(
+        "forbidden",
+        "You cannot change your own hunt role.",
+      );
+    if (role !== "owner" && role !== "officer" && role !== "contributor")
+      throw new StoreError("validation", "Choose a valid hunt role.");
+    await this.file.update((data) => {
+      if (!(data.contributors[huntId] ?? []).includes(memberId))
+        throw new StoreError("not-found", "Hunt contributor not found.");
+      if (!Object.hasOwn(data.roles, huntId)) data.roles[huntId] = {};
+      if (role === "contributor") delete data.roles[huntId][memberId];
+      else data.roles[huntId][memberId] = role;
+      if (Object.keys(data.roles[huntId]).length === 0)
+        delete data.roles[huntId];
+    });
   }
   async invite(huntId: string, email: unknown): Promise<void> {
     if (
@@ -489,6 +619,8 @@ export class ContributorStore {
           data.contributors[huntId] = [];
         if (!data.contributors[huntId].includes(accountId))
           data.contributors[huntId].push(accountId);
+        if (!Object.hasOwn(data.emails, huntId)) data.emails[huntId] = {};
+        data.emails[huntId][accountId] = normalized;
         data.invitations[huntId] = invites.filter(
           (invitedEmail) => invitedEmail !== normalized,
         );
@@ -508,6 +640,18 @@ export class ContributorStore {
         if (!remaining.includes(accountId)) remaining.push(accountId);
         members.splice(0, members.length, ...remaining);
       }
+      for (const roles of Object.values(data.roles)) {
+        if (roles[legacyId]) {
+          roles[accountId] = roles[legacyId];
+          delete roles[legacyId];
+        }
+      }
+      for (const emails of Object.values(data.emails)) {
+        if (emails[legacyId]) {
+          emails[accountId] = emails[legacyId];
+          delete emails[legacyId];
+        }
+      }
     });
   }
   async add(huntId: string, creatorId: unknown): Promise<void> {
@@ -526,7 +670,22 @@ export class ContributorStore {
         data.contributors[huntId].push(creatorId);
     });
   }
-  async remove(huntId: string, creatorId: string): Promise<void> {
+  async remove(
+    huntId: string,
+    creatorId: string,
+    requesterId: string,
+    originalOwnerId: string,
+  ): Promise<void> {
+    if (creatorId === originalOwnerId)
+      throw new StoreError(
+        "forbidden",
+        "The original hunt owner cannot be removed.",
+      );
+    if (!creatorId.startsWith("invite:") && creatorId === requesterId)
+      throw new StoreError(
+        "forbidden",
+        "You cannot remove your own hunt access.",
+      );
     await this.file.update((data) => {
       if (creatorId.startsWith("invite:")) {
         const email = creatorId.slice("invite:".length).toLowerCase();
@@ -540,12 +699,24 @@ export class ContributorStore {
         data.contributors[huntId] = data.contributors[huntId].filter(
           (id) => id !== creatorId,
         );
+      if (data.roles[huntId]) {
+        delete data.roles[huntId][creatorId];
+        if (Object.keys(data.roles[huntId]).length === 0)
+          delete data.roles[huntId];
+      }
+      if (data.emails[huntId]) {
+        delete data.emails[huntId][creatorId];
+        if (Object.keys(data.emails[huntId]).length === 0)
+          delete data.emails[huntId];
+      }
     });
   }
   async removeHunt(huntId: string): Promise<void> {
     await this.file.update((data) => {
       delete data.contributors[huntId];
       delete data.invitations[huntId];
+      delete data.roles[huntId];
+      delete data.emails[huntId];
     });
   }
 }

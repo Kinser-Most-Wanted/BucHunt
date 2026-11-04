@@ -522,7 +522,7 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(page.getByTestId("hunt-details-editor")).toBeHidden();
 });
 
-test("only owners and contributors can configure a hunt through the creator workspace", async ({
+test("hunt owners, officers, and contributors get their assigned workspace permissions", async ({
   page,
   browser,
   baseURL,
@@ -586,7 +586,7 @@ test("only owners and contributors can configure a hunt through the creator work
       .getByLabel("Collaborator's Google email")
       .fill("teammate@example.com");
     await page
-      .getByRole("button", { name: "Add contributor", exact: true })
+      .getByRole("button", { name: "Invite as Contributor", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toContainText(
       "Invitation saved",
@@ -607,7 +607,7 @@ test("only owners and contributors can configure a hunt through the creator work
     );
     await page.getByTestId("contributors-panel").locator("summary").click();
     await expect(page.getByTestId("contributor-list")).toContainText(
-      "Google account contributor",
+      "Google account · Contributor",
       { timeout: 15_000 },
     );
     await member.getByTestId("refresh-my-hunts").click();
@@ -629,11 +629,44 @@ test("only owners and contributors can configure a hunt through the creator work
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-owner")).toHaveText(
-      "Shared with you",
+      "Contributor access",
     );
-    await expect(member.getByTestId("hunt-creators")).not.toContainText(
-      "Owner",
+    await expect(member.getByTestId("hunt-tasks-section")).toBeHidden();
+    await expect(member.getByTestId("edit-hunt-link")).toBeHidden();
+    await expect(member.getByTestId("player-hunt-link")).toBeHidden();
+    await expect(member.locator(".hunt-access-code")).toBeHidden();
+    await expect(member.getByTestId("contributors-panel")).toBeHidden();
+    const contributorTaskCreate = await member.request.post(
+      `/api/admin/hunts/${id}/tasks`,
+      { data: { displayLabel: "Blocked", order: 1 } },
     );
+    expect(contributorTaskCreate.status()).toBe(403);
+    await member.getByTestId("back-to-manage-hunts").click();
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Google account · Contributor",
+    );
+    const originalOwnerRow = page
+      .getByTestId("contributor-list")
+      .locator("li")
+      .filter({ hasText: "Original hunt owner" });
+    await expect(originalOwnerRow.locator("select")).toHaveCount(0);
+    await expect(
+      originalOwnerRow.getByRole("button", { name: "Remove access" }),
+    ).toBeHidden();
+    await page
+      .getByTestId("contributor-list")
+      .getByLabel("Role for Google account")
+      .selectOption("officer");
+    await expect(page.getByTestId("contributor-status")).toContainText(
+      "Role changed to Officer",
+    );
+    await member.getByTestId("refresh-my-hunts").click();
+    await member
+      .getByRole("button", { name: "Shared hunt (officer)", exact: true })
+      .click();
+    await expect(member.getByTestId("hunt-owner")).toHaveText("Officer access");
+    await expect(member.getByTestId("hunt-tasks-section")).toBeVisible();
+    await expect(member.getByTestId("edit-hunt-link")).toBeVisible();
     await member.getByRole("button", { name: "Edit hunt tasks" }).click();
     await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
     await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
@@ -666,7 +699,7 @@ test("only owners and contributors can configure a hunt through the creator work
       ).status(),
     );
     await page
-      .getByRole("button", { name: "Remove contributor", exact: true })
+      .getByRole("button", { name: "Remove access", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toHaveText(
       "Contributor removed.",

@@ -115,6 +115,14 @@ export function createApplication(options: ServerOptions = {}) {
   const accountProfiles = new PlayerProfileStore(
     resolve(directory, "player-profiles.json"),
   );
+  async function contributorEntries(huntId: string, ownerId: string) {
+    const ownerProfile = await accountProfiles.get(ownerId);
+    return contributors.entries(
+      huntId,
+      ownerId,
+      ownerProfile.displayName ?? undefined,
+    );
+  }
   const google = new OAuth2Client(options.googleClientId);
   async function playerId(request: IncomingMessage): Promise<string | null> {
     const match = /^Bearer ([^\s]{1,16384})$/.exec(
@@ -621,7 +629,7 @@ export function createApplication(options: ServerOptions = {}) {
             if (method === "GET" && !match[3]) {
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id, hunt.ownerId),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
@@ -651,7 +659,7 @@ export function createApplication(options: ServerOptions = {}) {
               }
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id, hunt.ownerId),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
@@ -661,10 +669,15 @@ export function createApplication(options: ServerOptions = {}) {
                   "forbidden",
                   "The original hunt owner cannot be removed.",
                 );
-              await contributors.remove(hunt.id, match[3]);
+              await contributors.remove(
+                hunt.id,
+                match[3],
+                creatorId,
+                hunt.ownerId,
+              );
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id, hunt.ownerId),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
@@ -688,10 +701,11 @@ export function createApplication(options: ServerOptions = {}) {
               roleMatch[2],
               role,
               hunt.ownerId,
+              creatorId,
             );
             json(response, 200, {
               ok: true,
-              value: await contributors.entries(hunt.id, hunt.ownerId),
+              value: await contributorEntries(hunt.id, hunt.ownerId),
             });
             return;
           }

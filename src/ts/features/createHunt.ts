@@ -15,6 +15,7 @@ interface HuntContributor {
   pending: boolean;
   originalOwner: boolean;
   email?: string;
+  displayName?: string;
 }
 type HuntListFilter =
   | "recent-3"
@@ -314,19 +315,25 @@ export function mountCreateHunt(
     }
     memberList.replaceChildren();
     creators?.replaceChildren();
+    const session = await getCreatorSession();
+    if (selected?.id !== id) return;
     for (const contributor of result.value) {
       const invitation = contributor.pending;
       const creatorId = contributor.id;
+      const isSelf = session.ok && session.value.id === creatorId;
       const identifier = invitation ? creatorId.slice("invite:".length) : "";
       const item = document.createElement("li");
       const label = document.createElement("span");
       label.textContent = contributor.originalOwner
-        ? "Original hunt owner"
+        ? `Original hunt owner · ${contributor.displayName ?? "Display name not set"}`
         : invitation
           ? `Invitation pending · ${identifier} · Contributor`
-          : `${contributor.email ?? "Google account"} · ${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)}`;
+          : `${contributor.email ?? "Google account"} · ${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)}${isSelf ? " · You" : ""}`;
       if (!invitation && !contributor.originalOwner) {
         const role = document.createElement("select");
+        role.className = "contributor-role-select";
+        role.disabled = isSelf;
+        if (isSelf) role.title = "You cannot change your own hunt role.";
         role.setAttribute(
           "aria-label",
           `Role for ${contributor.email ?? "Google account"}`,
@@ -365,6 +372,8 @@ export function mountCreateHunt(
       remove.type = "button";
       remove.textContent = invitation ? "Cancel invitation" : "Remove access";
       remove.hidden = contributor.originalOwner;
+      remove.disabled = isSelf;
+      if (isSelf) remove.title = "You cannot remove your own hunt access.";
       remove.addEventListener("click", async () => {
         remove.disabled = true;
         const result = await request<HuntContributor[]>(
@@ -388,7 +397,7 @@ export function mountCreateHunt(
       const chip = document.createElement("li");
       chip.className = "creator-chip";
       chip.textContent = contributor.originalOwner
-        ? "Original owner"
+        ? `Original owner · ${contributor.displayName ?? "Display name not set"}`
         : invitation
           ? `Invitation pending · ${identifier} · Contributor`
           : `${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)} · ${contributor.email ?? "Google account"}`;

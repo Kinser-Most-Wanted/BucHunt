@@ -143,7 +143,7 @@ test("PDF paginates many players and tasks without dropping long or Unicode cont
   expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(4);
 });
 
-test("exports enforce owner/contributor access, include both stores, and never alter saved player data", async () => {
+test("exports enforce owner access, include both stores, and never alter saved player data", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-export-"));
   const hunts = new HuntStore(join(directory, "hunts.json"));
   const hunt = await hunts.create(input, accountId("owner"));
@@ -258,7 +258,7 @@ test("exports enforce owner/contributor access, include both stores, and never a
             headers: { Authorization: "Bearer contributor" },
           })
         ).status,
-      ).toBe(200);
+      ).toBe(403);
     }
     const after = await Promise.all(
       trackedFiles.map((file) => readFile(join(directory, file), "utf8")),

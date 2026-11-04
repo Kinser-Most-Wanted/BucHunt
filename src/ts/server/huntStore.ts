@@ -476,6 +476,7 @@ export interface HuntContributorEntry {
   pending: boolean;
   originalOwner: boolean;
   email?: string;
+  displayName?: string;
 }
 // Keep membership separate so existing version-1 hunt definitions remain valid.
 export class ContributorStore {
@@ -525,6 +526,7 @@ export class ContributorStore {
   async entries(
     huntId: string,
     originalOwnerId?: string,
+    originalOwnerName?: string,
   ): Promise<HuntContributorEntry[]> {
     const data = await this.file.get();
     const members = data.contributors[huntId] ?? [];
@@ -552,6 +554,7 @@ export class ContributorStore {
         role: "owner",
         pending: false,
         originalOwner: true,
+        ...(originalOwnerName ? { displayName: originalOwnerName } : {}),
       });
     return entries;
   }
@@ -560,11 +563,17 @@ export class ContributorStore {
     memberId: string,
     role: unknown,
     originalOwnerId: string,
+    requesterId = "",
   ): Promise<void> {
     if (memberId === originalOwnerId)
       throw new StoreError(
         "forbidden",
         "The original hunt owner cannot be demoted or changed.",
+      );
+    if (memberId === requesterId)
+      throw new StoreError(
+        "forbidden",
+        "You cannot change your own hunt role.",
       );
     if (role !== "owner" && role !== "officer" && role !== "contributor")
       throw new StoreError("validation", "Choose a valid hunt role.");
@@ -661,7 +670,22 @@ export class ContributorStore {
         data.contributors[huntId].push(creatorId);
     });
   }
-  async remove(huntId: string, creatorId: string): Promise<void> {
+  async remove(
+    huntId: string,
+    creatorId: string,
+    requesterId: string,
+    originalOwnerId: string,
+  ): Promise<void> {
+    if (creatorId === originalOwnerId)
+      throw new StoreError(
+        "forbidden",
+        "The original hunt owner cannot be removed.",
+      );
+    if (!creatorId.startsWith("invite:") && creatorId === requesterId)
+      throw new StoreError(
+        "forbidden",
+        "You cannot remove your own hunt access.",
+      );
     await this.file.update((data) => {
       if (creatorId.startsWith("invite:")) {
         const email = creatorId.slice("invite:".length).toLowerCase();

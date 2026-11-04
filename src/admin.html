@@ -355,7 +355,11 @@
                 ></output>
               </div>
             </div>
-            <section class="details-tasks" aria-labelledby="tasks-heading">
+            <section
+              class="details-tasks"
+              data-testid="hunt-tasks-section"
+              aria-labelledby="tasks-heading"
+            >
               <div class="details-section-heading">
                 <p class="eyebrow">THE ADVENTURE</p>
                 <h3 id="tasks-heading">Hunt tasks</h3>
@@ -383,7 +387,7 @@
               data-testid="contributors-panel"
               hidden
             >
-              <summary>Contributors</summary>
+              <summary>Hunt team</summary>
               <section
                 class="details-creators"
                 aria-labelledby="creators-heading"
@@ -402,8 +406,13 @@
               </section>
               <div class="contributor-management">
                 <p>
-                  As the owner, you can let another creator manage this hunt's
-                  tasks.
+                  New collaborators start as Contributors. Owners can promote
+                  them to Officer or Owner here.
+                </p>
+                <p class="field-help">
+                  Officers can edit hunt tasks but cannot delete the hunt or
+                  manage the team. Contributors can view basic hunt details. The
+                  original owner cannot be removed or demoted.
                 </p>
                 <form data-testid="contributor-form">
                   <label for="contributor-email"
@@ -416,7 +425,7 @@
                     autocomplete="email"
                     required
                   />
-                  <button type="submit">Add contributor</button>
+                  <button type="submit">Invite as Contributor</button>
                 </form>
                 <p class="field-help">
                   Access is added when they sign in with this verified email.

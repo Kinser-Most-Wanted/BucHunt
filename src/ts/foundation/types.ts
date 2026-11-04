@@ -1,5 +1,6 @@
 export type HuntStatus = "draft" | "published" | "archived";
 export type TaskOrderMode = "sequential" | "any";
+export type HuntRole = "owner" | "officer" | "contributor";
 
 export interface HuntInput {
   name: string;

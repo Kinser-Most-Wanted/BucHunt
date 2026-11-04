@@ -118,6 +118,12 @@ test("multiple-choice answers persist rejected choices per account and complete 
     requiredAnswer: "Square",
     choices: ["Square", "Circle", "Triangle", "Octagon"],
   });
+  const nextTask = await store.addTask(hunt.id, {
+    ...task,
+    displayLabel: "Library",
+    requiredAnswer: "Bucky",
+    order: 2,
+  });
   expect(
     (await new HuntStore(join(directory, "hunts.json")).get(hunt.id)).tasks[0],
   ).toEqual(saved);
@@ -141,11 +147,14 @@ test("multiple-choice answers persist rejected choices per account and complete 
     });
   const route = `/hunts/${hunt.id}`;
   const answer = route + `/tasks/${saved.id}/answer`;
+  const nextAnswer = route + `/tasks/${nextTask.id}/answer`;
   try {
     expect((await call("/join", { accessCode: hunt.accessCode })).status).toBe(
       200,
     );
     const displayed = (await (await call(route)).json()).value.tasks[0];
+    expect((await (await call(route)).json()).value.tasks).toHaveLength(1);
+    expect((await call(nextAnswer, { answer: "Bucky" })).status).toBe(400);
     expect(displayed.choices).toEqual([
       "Circle",
       "Octagon",
@@ -178,7 +187,12 @@ test("multiple-choice answers persist rejected choices per account and complete 
     expect(
       (await (await call(answer, { answer: "Square" })).json()).value.completed,
     ).toBe(true);
-    expect((await (await call(route)).json()).value.tasks[0].completed).toBe(
+    const advanced = (await (await call(route)).json()).value.tasks;
+    expect(advanced).toHaveLength(2);
+    expect(advanced[0].completed).toBe(true);
+    expect(advanced[1]).toMatchObject({ id: nextTask.id, completed: false });
+    expect((await call(nextAnswer, { answer: "Bucky" })).status).toBe(200);
+    expect((await (await call(route)).json()).value.tasks[1].completed).toBe(
       true,
     );
   } finally {
@@ -993,7 +1007,7 @@ test("account task progress survives restart without cookies and isolates player
       opened.payload.value.tasks.map(
         (task: { completed: boolean }) => task.completed,
       ),
-    ).toEqual([false, false]);
+    ).toEqual([false]);
     expect(opened.payload.value.tasks[0].description).toBe(task.description);
     expect(JSON.stringify(opened.payload)).not.toMatch(
       /Bucky|ownerId|requiredAnswer/,

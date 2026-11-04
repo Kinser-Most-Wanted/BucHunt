@@ -2958,7 +2958,6 @@ body[data-page="player"].player-hunt-modal-open {
 }
 .player-hunt-details .task-answer-input {
   width: 100%;
-  min-height: 3.5rem;
   margin-top: 0.35rem;
   padding: 0.9rem 1rem;
   border: 1px solid rgb(255 255 255 / 22%);

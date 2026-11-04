@@ -99,6 +99,36 @@ async function evaluateChoice(
   await store.complete(player, hunt, task.id);
   return true;
 }
+function availableTasks(
+  hunt: HuntDefinition,
+  completed: string[],
+): TaskDefinition[] {
+  const ordered = [...hunt.tasks].sort(
+    (left, right) => left.order - right.order,
+  );
+  if (hunt.taskOrderMode !== "sequential") return ordered;
+  const nextIndex = ordered.findIndex((task) => !completed.includes(task.id));
+  return ordered.filter(
+    (task, index) => completed.includes(task.id) || index === nextIndex,
+  );
+}
+function rejectFutureTask(
+  hunt: HuntDefinition,
+  task: TaskDefinition,
+  completed: string[],
+): void {
+  if (hunt.taskOrderMode !== "sequential" || completed.includes(task.id))
+    return;
+  const ordered = [...hunt.tasks].sort(
+    (left, right) => left.order - right.order,
+  );
+  const nextIndex = ordered.findIndex((item) => !completed.includes(item.id));
+  if (ordered.indexOf(task) !== nextIndex)
+    throw new StoreError(
+      "validation",
+      "Complete the previous task before starting this one.",
+    );
+}
 export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
@@ -206,18 +236,16 @@ export function createApplication(options: ServerOptions = {}) {
       beginsAt: hunt.beginsAt,
       endsAt: hunt.endsAt,
       status: hunt.status,
-      tasks: [...hunt.tasks]
-        .sort((a, b) => a.order - b.order)
-        .map((task) => ({
-          id: task.id,
-          huntId: hunt.id,
-          displayLabel: task.displayLabel,
-          description: task.description,
-          hint: task.hint,
-          location: task.location,
-          completed: completed.includes(task.id),
-          ...playerChoices(task, incorrect[task.id] ?? []),
-        })),
+      tasks: availableTasks(hunt, completed).map((task) => ({
+        id: task.id,
+        huntId: hunt.id,
+        displayLabel: task.displayLabel,
+        description: task.description,
+        hint: task.hint,
+        location: task.location,
+        completed: completed.includes(task.id),
+        ...playerChoices(task, incorrect[task.id] ?? []),
+      })),
     };
   }
   return createServer(async (request, response) => {
@@ -358,6 +386,11 @@ export function createApplication(options: ServerOptions = {}) {
             }
             const task = hunt.tasks.find((task) => task.id === accountMatch[2]);
             if (!task) throw new StoreError("not-found", "Task not found.");
+            rejectFutureTask(
+              hunt,
+              task,
+              await accountProgress.completed(player, hunt.id),
+            );
             const input = await body(request);
             const answer =
               input && typeof input === "object"
@@ -740,6 +773,11 @@ export function createApplication(options: ServerOptions = {}) {
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);
           if (!task) throw new StoreError("not-found", "Task not found.");
+          rejectFutureTask(
+            hunt,
+            task,
+            await progress.completed(player, hunt.id),
+          );
           const input = await body(request);
           const answer =
             input && typeof input === "object"
@@ -781,18 +819,16 @@ export function createApplication(options: ServerOptions = {}) {
               beginsAt: hunt.beginsAt,
               endsAt: hunt.endsAt,
               status: hunt.status,
-              tasks: [...hunt.tasks]
-                .sort((a, b) => a.order - b.order)
-                .map((task) => ({
-                  id: task.id,
-                  huntId: hunt.id,
-                  displayLabel: task.displayLabel,
-                  description: task.description,
-                  hint: task.hint,
-                  location: task.location,
-                  completed: completed.includes(task.id),
-                  ...playerChoices(task, incorrect[task.id] ?? []),
-                })),
+              tasks: availableTasks(hunt, completed).map((task) => ({
+                id: task.id,
+                huntId: hunt.id,
+                displayLabel: task.displayLabel,
+                description: task.description,
+                hint: task.hint,
+                location: task.location,
+                completed: completed.includes(task.id),
+                ...playerChoices(task, incorrect[task.id] ?? []),
+              })),
             },
           });
           return;

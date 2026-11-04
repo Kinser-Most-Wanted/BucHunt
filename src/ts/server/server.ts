@@ -22,6 +22,11 @@ import {
 } from "./huntStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 import { PlayerProfileStore } from "./playerProfileStore.js";
+import {
+  buildHuntResults,
+  resultsCsv,
+  resultsPdf,
+} from "./huntResultsExport.js";
 
 interface ServerOptions {
   dataDirectory?: string;
@@ -525,6 +530,10 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const exportMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
+            path,
+          );
         const taskMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/tasks\/([a-zA-Z0-9-]+)$/.exec(
             path,
@@ -537,9 +546,9 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/contributors\/(browser:[a-f0-9]{64}|google-[a-f0-9]{64})\/role$/.exec(
             path,
           );
-        if (match || taskMatch || roleMatch) {
+        if (match || taskMatch || roleMatch || exportMatch) {
           const hunt = await hunts.get(
-            match?.[1] ?? taskMatch?.[1] ?? roleMatch![1],
+            match?.[1] ?? taskMatch?.[1] ?? roleMatch?.[1] ?? exportMatch![1],
           );
           const requesterRole = await contributors.roleFor(
             hunt.id,
@@ -557,6 +566,48 @@ export function createApplication(options: ServerOptions = {}) {
           const canEdit =
             requesterRole === "owner" || requesterRole === "officer";
           const canManage = requesterRole === "owner";
+          if (exportMatch && method === "GET") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Only Owners and Officers can export hunt results.",
+              });
+              return;
+            }
+            const [accounts, legacy] = await Promise.all([
+              accountProgress.participants(hunt.id),
+              progress.participants(hunt.id),
+            ]);
+            const participants = await Promise.all(
+              accounts.map(async (player) => ({
+                ...player,
+                displayName: (await accountProfiles.get(player.playerId))
+                  .displayName,
+              })),
+            );
+            const results = buildHuntResults(hunt, [
+              ...participants,
+              ...legacy,
+            ]);
+            const format = exportMatch[2];
+            const content =
+              format === "pdf"
+                ? Buffer.from(await resultsPdf(results))
+                : Buffer.from(resultsCsv(results), "utf8");
+            response.writeHead(200, {
+              "Content-Type":
+                format === "pdf"
+                  ? "application/pdf"
+                  : "text/csv; charset=utf-8",
+              "Content-Disposition": `attachment; filename="hunt-${hunt.id}-results.${format}"`,
+              "Content-Length": content.length,
+              "Cache-Control": "no-store",
+              "X-Content-Type-Options": "nosniff",
+            });
+            response.end(content);
+            return;
+          }
           if (match && !match[2] && method === "DELETE") {
             if (!canManage) {
               json(response, 403, {

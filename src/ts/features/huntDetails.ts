@@ -3,7 +3,7 @@ import type {
   HuntRole,
   TaskDefinition,
 } from "../foundation/types.js";
-import { createHuntRepository } from "./huntRepository.js";
+import { createHuntRepository, downloadHuntResults } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
@@ -17,6 +17,47 @@ const copyAccessCodeStatus = dialog?.querySelector<HTMLElement>(
 );
 let activeRequest = 0;
 let activeHunt: HuntDefinition | undefined;
+let canExport = false;
+let exporting = false;
+
+function updateExportButtons(): void {
+  for (const format of ["pdf", "csv"] as const) {
+    const button = dialog?.querySelector<HTMLButtonElement>(
+      `[data-testid="export-hunt-${format}"]`,
+    );
+    if (button) {
+      button.hidden = !canExport;
+      button.disabled = exporting || !activeHunt || !canExport;
+    }
+  }
+}
+
+for (const format of ["pdf", "csv"] as const) {
+  dialog
+    ?.querySelector<HTMLButtonElement>(`[data-testid="export-hunt-${format}"]`)
+    ?.addEventListener("click", async () => {
+      if (!activeHunt || !canExport || exporting) return;
+      const huntId = activeHunt.id;
+      const requestId = activeRequest;
+      const status = dialog?.querySelector<HTMLElement>(
+        '[data-testid="hunt-export-status"]',
+      );
+      exporting = true;
+      updateExportButtons();
+      if (status)
+        status.textContent = `Preparing ${format.toUpperCase()} export…`;
+      try {
+        const result = await downloadHuntResults(huntId, format);
+        if (status && activeRequest === requestId)
+          status.textContent = result.ok
+            ? `${format.toUpperCase()} export downloaded.`
+            : result.message;
+      } finally {
+        exporting = false;
+        updateExportButtons();
+      }
+    });
+}
 
 copyAccessCodeButton?.addEventListener("click", async () => {
   const accessCode = activeHunt?.accessCode;
@@ -117,6 +158,12 @@ function setDetailView(editing: boolean): void {
 
 function resetDialog(): void {
   activeHunt = undefined;
+  canExport = false;
+  updateExportButtons();
+  const exportStatus = dialog?.querySelector<HTMLElement>(
+    '[data-testid="hunt-export-status"]',
+  );
+  if (exportStatus) exportStatus.textContent = "";
   setDetailView(false);
   const facts = dialog?.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',
@@ -179,6 +226,8 @@ function resetDialog(): void {
 function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
+  canExport = role === "owner" || role === "officer";
+  updateExportButtons();
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   );

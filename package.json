@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1152.0",
-    "google-auth-library": "10.9.1"
+    "google-auth-library": "10.9.1",
+    "pdf-lib": "1.17.1"
   }
 }

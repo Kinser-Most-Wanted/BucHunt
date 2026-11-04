@@ -104,6 +104,36 @@ async function evaluateChoice(
   await store.complete(player, hunt, task.id);
   return true;
 }
+function availableTasks(
+  hunt: HuntDefinition,
+  completed: string[],
+): TaskDefinition[] {
+  const ordered = [...hunt.tasks].sort(
+    (left, right) => left.order - right.order,
+  );
+  if (hunt.taskOrderMode !== "sequential") return ordered;
+  const nextIndex = ordered.findIndex((task) => !completed.includes(task.id));
+  return ordered.filter(
+    (task, index) => completed.includes(task.id) || index === nextIndex,
+  );
+}
+function rejectFutureTask(
+  hunt: HuntDefinition,
+  task: TaskDefinition,
+  completed: string[],
+): void {
+  if (hunt.taskOrderMode !== "sequential" || completed.includes(task.id))
+    return;
+  const ordered = [...hunt.tasks].sort(
+    (left, right) => left.order - right.order,
+  );
+  const nextIndex = ordered.findIndex((item) => !completed.includes(item.id));
+  if (ordered.indexOf(task) !== nextIndex)
+    throw new StoreError(
+      "validation",
+      "Complete the previous task before starting this one.",
+    );
+}
 export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
@@ -120,6 +150,14 @@ export function createApplication(options: ServerOptions = {}) {
   const accountProfiles = new PlayerProfileStore(
     resolve(directory, "player-profiles.json"),
   );
+  async function contributorEntries(huntId: string, ownerId: string) {
+    const ownerProfile = await accountProfiles.get(ownerId);
+    return contributors.entries(
+      huntId,
+      ownerId,
+      ownerProfile.displayName ?? undefined,
+    );
+  }
   const google = new OAuth2Client(options.googleClientId);
   async function playerId(request: IncomingMessage): Promise<string | null> {
     const match = /^Bearer ([^\s]{1,16384})$/.exec(
@@ -203,18 +241,16 @@ export function createApplication(options: ServerOptions = {}) {
       beginsAt: hunt.beginsAt,
       endsAt: hunt.endsAt,
       status: hunt.status,
-      tasks: [...hunt.tasks]
-        .sort((a, b) => a.order - b.order)
-        .map((task) => ({
-          id: task.id,
-          huntId: hunt.id,
-          displayLabel: task.displayLabel,
-          description: task.description,
-          hint: task.hint,
-          location: task.location,
-          completed: completed.includes(task.id),
-          ...playerChoices(task, incorrect[task.id] ?? []),
-        })),
+      tasks: availableTasks(hunt, completed).map((task) => ({
+        id: task.id,
+        huntId: hunt.id,
+        displayLabel: task.displayLabel,
+        description: task.description,
+        hint: task.hint,
+        location: task.location,
+        completed: completed.includes(task.id),
+        ...playerChoices(task, incorrect[task.id] ?? []),
+      })),
     };
   }
   return createServer(async (request, response) => {
@@ -355,6 +391,11 @@ export function createApplication(options: ServerOptions = {}) {
             }
             const task = hunt.tasks.find((task) => task.id === accountMatch[2]);
             if (!task) throw new StoreError("not-found", "Task not found.");
+            rejectFutureTask(
+              hunt,
+              task,
+              await accountProgress.completed(player, hunt.id),
+            );
             const input = await body(request);
             const answer =
               input && typeof input === "object"
@@ -464,22 +505,28 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (path === "/api/admin/hunts" && method === "GET") {
-          const [sharedHuntIds, summaries] = await Promise.all([
-            contributors.huntIdsFor(creatorId),
-            hunts.listSummaries(),
-          ]);
-          const accessible = summaries.filter(
-            (hunt) => hunt.ownerId === creatorId || sharedHuntIds.has(hunt.id),
+          const summaries = await hunts.listSummaries();
+          const accessible = await Promise.all(
+            summaries.map(async (hunt) => ({
+              hunt,
+              role: await contributors.roleFor(
+                hunt.id,
+                creatorId,
+                hunt.ownerId,
+              ),
+            })),
           );
           json(response, 200, {
             ok: true,
-            value: accessible.map((hunt) => ({
-              id: hunt.id,
-              name: hunt.name,
-              role: hunt.ownerId === creatorId ? "owner" : "contributor",
-              createdAt: hunt.createdAt,
-              updatedAt: hunt.updatedAt,
-            })),
+            value: accessible
+              .filter(({ role }) => role !== undefined)
+              .map(({ hunt, role }) => ({
+                id: hunt.id,
+                name: hunt.name,
+                role,
+                createdAt: hunt.createdAt,
+                updatedAt: hunt.updatedAt,
+              })),
           });
           return;
         }
@@ -495,24 +542,39 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)(?:\/(tasks|contributors)(?:\/((?:browser:[a-f0-9]{64}|google-[a-f0-9]{64}|invite:[^/]+)))?)?$/.exec(
             path,
           );
-        if (match || taskMatch || exportMatch) {
-          const hunt = await hunts.get(
-            match?.[1] ?? taskMatch?.[1] ?? exportMatch![1],
+        const roleMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/contributors\/(browser:[a-f0-9]{64}|google-[a-f0-9]{64})\/role$/.exec(
+            path,
           );
-          const owner = hunt.ownerId === creatorId;
-          if (
-            !owner &&
-            !(await contributors.members(hunt.id)).includes(creatorId)
-          ) {
+        if (match || taskMatch || roleMatch || exportMatch) {
+          const hunt = await hunts.get(
+            match?.[1] ?? taskMatch?.[1] ?? roleMatch?.[1] ?? exportMatch![1],
+          );
+          const requesterRole = await contributors.roleFor(
+            hunt.id,
+            creatorId,
+            hunt.ownerId,
+          );
+          if (!requesterRole) {
             json(response, 403, {
               ok: false,
-              code: "unauthorized",
-              message:
-                "Only this hunt's owner and contributors can access its configuration.",
+              code: "forbidden",
+              message: "You do not have access to this hunt.",
             });
             return;
           }
+          const canEdit =
+            requesterRole === "owner" || requesterRole === "officer";
+          const canManage = requesterRole === "owner";
           if (exportMatch && method === "GET") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Only Owners and Officers can export hunt results.",
+              });
+              return;
+            }
             const [accounts, legacy] = await Promise.all([
               accountProgress.participants(hunt.id),
               progress.participants(hunt.id),
@@ -547,11 +609,11 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && !match[2] && method === "DELETE") {
-            if (!owner) {
+            if (!canManage) {
               json(response, 403, {
                 ok: false,
-                code: "unauthorized",
-                message: "Only the hunt owner can delete this hunt.",
+                code: "forbidden",
+                message: "Only hunt owners can delete this hunt.",
               });
               return;
             }
@@ -575,6 +637,14 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (taskMatch && method === "PATCH") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 200, {
               ok: true,
               value: await hunts.updateTask(
@@ -586,6 +656,14 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (taskMatch && method === "DELETE") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 200, {
               ok: true,
               value: await hunts.deleteTask(hunt.id, taskMatch[2]),
@@ -593,13 +671,30 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && !match[2] && method === "GET") {
+            const configuration = await hunts.getWithAccessCode(hunt.id);
             json(response, 200, {
               ok: true,
-              value: await hunts.getWithAccessCode(hunt.id),
+              value:
+                requesterRole === "contributor"
+                  ? {
+                      ...configuration,
+                      ownerId: "",
+                      accessCode: null,
+                      tasks: [],
+                    }
+                  : configuration,
             });
             return;
           }
           if (match && match[2] === "tasks" && !match[3] && method === "POST") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Contributors have view-only access to hunt details.",
+              });
+              return;
+            }
             json(response, 201, {
               ok: true,
               value: await hunts.addTask(hunt.id, await body(request)),
@@ -607,18 +702,18 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && match[2] === "contributors") {
-            if (!owner) {
+            if (!canManage) {
               json(response, 403, {
                 ok: false,
-                code: "unauthorized",
-                message: "Only the hunt owner can manage contributors.",
+                code: "forbidden",
+                message: "Only hunt owners can manage contributors.",
               });
               return;
             }
             if (method === "GET" && !match[3]) {
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
@@ -638,21 +733,65 @@ export function createApplication(options: ServerOptions = {}) {
                     "You cannot invite your own account as a collaborator.",
                   );
                 await contributors.invite(hunt.id, fields.email);
-              } else await contributors.add(hunt.id, fields.creatorId);
+              } else {
+                if (fields.creatorId === hunt.ownerId)
+                  throw new StoreError(
+                    "validation",
+                    "The original hunt owner already has full access.",
+                  );
+                await contributors.add(hunt.id, fields.creatorId);
+              }
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
             if (method === "DELETE" && match[3]) {
-              await contributors.remove(hunt.id, match[3]);
+              if (match[3] === hunt.ownerId)
+                throw new StoreError(
+                  "forbidden",
+                  "The original hunt owner cannot be removed.",
+                );
+              await contributors.remove(
+                hunt.id,
+                match[3],
+                creatorId,
+                hunt.ownerId,
+              );
               json(response, 200, {
                 ok: true,
-                value: await contributors.entries(hunt.id),
+                value: await contributorEntries(hunt.id, hunt.ownerId),
               });
               return;
             }
+          }
+          if (roleMatch && method === "PATCH") {
+            if (!canManage) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Only hunt owners can change contributor roles.",
+              });
+              return;
+            }
+            const input = await body(request);
+            const role =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).role
+                : undefined;
+            await contributors.setRole(
+              hunt.id,
+              roleMatch[2],
+              role,
+              hunt.ownerId,
+              creatorId,
+            );
+            json(response, 200, {
+              ok: true,
+              value: await contributorEntries(hunt.id, hunt.ownerId),
+            });
+            return;
           }
         }
       }
@@ -685,6 +824,11 @@ export function createApplication(options: ServerOptions = {}) {
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);
           if (!task) throw new StoreError("not-found", "Task not found.");
+          rejectFutureTask(
+            hunt,
+            task,
+            await progress.completed(player, hunt.id),
+          );
           const input = await body(request);
           const answer =
             input && typeof input === "object"
@@ -726,18 +870,16 @@ export function createApplication(options: ServerOptions = {}) {
               beginsAt: hunt.beginsAt,
               endsAt: hunt.endsAt,
               status: hunt.status,
-              tasks: [...hunt.tasks]
-                .sort((a, b) => a.order - b.order)
-                .map((task) => ({
-                  id: task.id,
-                  huntId: hunt.id,
-                  displayLabel: task.displayLabel,
-                  description: task.description,
-                  hint: task.hint,
-                  location: task.location,
-                  completed: completed.includes(task.id),
-                  ...playerChoices(task, incorrect[task.id] ?? []),
-                })),
+              tasks: availableTasks(hunt, completed).map((task) => ({
+                id: task.id,
+                huntId: hunt.id,
+                displayLabel: task.displayLabel,
+                description: task.description,
+                hint: task.hint,
+                location: task.location,
+                completed: completed.includes(task.id),
+                ...playerChoices(task, incorrect[task.id] ?? []),
+              })),
             },
           });
           return;
@@ -791,7 +933,13 @@ export function createApplication(options: ServerOptions = {}) {
         );
       json(
         response,
-        code === "not-found" ? 404 : code === "validation" ? 400 : 500,
+        code === "not-found"
+          ? 404
+          : code === "validation"
+            ? 400
+            : code === "forbidden"
+              ? 403
+              : 500,
         {
           ok: false,
           code,

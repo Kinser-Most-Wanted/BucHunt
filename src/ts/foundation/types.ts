@@ -45,6 +45,18 @@ export interface HuntParticipantProgress {
     completed: boolean;
   }[];
 }
+export interface HuntParticipationSummary {
+  activeCount: number;
+  leftCompletedCount: number;
+  leftIncompleteCount: number;
+}
+export type HuntParticipationResult =
+  | {
+      ok: true;
+      value: HuntParticipantProgress[];
+      summary: HuntParticipationSummary;
+    }
+  | Extract<OperationResult<never>, { ok: false }>;
 export interface TaskDefinition extends TaskInput {
   id: string;
 }

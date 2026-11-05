@@ -1,5 +1,7 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
+  HuntParticipationResult,
+  HuntParticipantProgress,
   HuntStatus,
   OperationResult,
   PlayerHunt,
@@ -115,8 +117,12 @@ export function createHuntRepository(): HuntRepository {
       ),
     getAdminHunt: (id) =>
       creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}`),
-    getHuntParticipants: (id) =>
-      creatorRequest(`/api/admin/hunts/${encodeURIComponent(id)}/participants`),
+    getHuntParticipationProgress: async (id) => {
+      const result = await creatorRequest<HuntParticipantProgress[]>(
+        `/api/admin/hunts/${encodeURIComponent(id)}/participants`,
+      );
+      return result.ok ? (result as HuntParticipationResult) : result;
+    },
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
     joinHunt: (accessCode, identity) =>

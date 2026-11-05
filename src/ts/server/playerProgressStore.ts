@@ -111,6 +111,17 @@ export class PlayerProgressStore {
         completedTaskIds: [...hunts[hunt]],
       }));
   }
+  async departedParticipants(
+    hunt: string,
+  ): Promise<{ playerId: string; completedTaskIds: string[] }[]> {
+    const data = await this.file.get();
+    return Object.entries(data.savedProgress ?? {})
+      .filter(([, hunts]) => Object.hasOwn(hunts, hunt))
+      .map(([playerId, hunts]) => ({
+        playerId,
+        completedTaskIds: [...hunts[hunt]],
+      }));
+  }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
     if (

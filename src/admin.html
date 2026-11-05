@@ -414,6 +414,23 @@
                   Participation and progress
                 </h3>
               </div>
+              <dl
+                class="participant-progress-stats"
+                data-testid="participant-progress-stats"
+              >
+                <div>
+                  <dt>Actively in hunt</dt>
+                  <dd data-testid="participant-active-count">0</dd>
+                </div>
+                <div>
+                  <dt>Left after completing</dt>
+                  <dd data-testid="participant-left-completed-count">0</dd>
+                </div>
+                <div>
+                  <dt>Left incomplete</dt>
+                  <dd data-testid="participant-left-incomplete-count">0</dd>
+                </div>
+              </dl>
               <div class="participant-progress-toolbar">
                 <p
                   class="details-muted"
@@ -434,7 +451,7 @@
                 data-testid="participant-progress-empty"
                 hidden
               >
-                No players have joined this hunt yet.
+                No players are actively in this hunt.
               </p>
               <ul
                 class="participant-progress-list"

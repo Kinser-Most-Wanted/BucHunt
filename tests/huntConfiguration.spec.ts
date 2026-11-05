@@ -140,7 +140,10 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
     3,
   );
+  await expect(list).toContainText("Hunt 0");
+  await expect(list).toContainText("Hunt 1");
   await expect(list).toContainText("Hunt 999");
+  await expect(list).not.toContainText("Hunt 2");
   await expect(
     page.getByTestId("edit-hunt-selector").locator("option"),
   ).toHaveCount(1);
@@ -157,7 +160,7 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
     )
     .toBe("none");
   await expect(page.getByTestId("manage-hunts-filter-note")).toContainText(
-    "3 most recently edited",
+    "3 most recently created or edited",
   );
   const dialog = page.getByTestId("hunt-details-dialog");
   await expect(dialog).toBeVisible();
@@ -205,8 +208,12 @@ test("manage hunts virtualizes long lists and owner deletion requires the hunt n
   expect(
     await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
   ).toBeLessThan(24);
+  await page.getByTestId("manage-hunts-search").fill("Hunt 420");
+  await expect(list).toContainText("Hunt 420");
   await page.getByTestId("close-hunt-details").click();
   await page.getByTestId("open-manage-hunts").click();
+  await expect(page.getByTestId("manage-hunts-search")).toHaveValue("");
+  await expect(list).toContainText("Hunt 0");
   expect(huntRequests).toBe(1);
   await page.getByTestId("refresh-my-hunts").click();
   await expect.poll(() => huntRequests).toBe(2);

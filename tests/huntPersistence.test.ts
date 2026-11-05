@@ -1147,9 +1147,9 @@ test("account browser answers tasks and restores progress in another browser", a
         await page
           .getByRole("button", { name: "Join Hunt", exact: true })
           .click();
-        await expect(
-          page.getByTestId("player-hunt-lookup-status"),
-        ).toContainText("Invalid access code");
+        await expect(page.getByTestId("player-hunt-join-status")).toContainText(
+          "Invalid access code",
+        );
         await page.getByLabel("Access code").fill(hunt.accessCode!);
         await page
           .getByRole("button", { name: "Join Hunt", exact: true })

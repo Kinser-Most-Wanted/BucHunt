@@ -328,4 +328,3 @@ export async function downloadHuntResults(
     };
   }
 }
-

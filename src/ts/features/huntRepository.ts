@@ -1,7 +1,6 @@
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
   HuntStatus,
-  HuntParticipantProgress,
   OperationResult,
   PlayerHunt,
   PlayerIdentity,
@@ -329,3 +328,4 @@ export async function downloadHuntResults(
     };
   }
 }
+

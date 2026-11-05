@@ -2142,6 +2142,71 @@ body[data-page="hunt-details"] .hunt-id-toggle {
   color: #e7eaf0;
   overflow-wrap: anywhere;
 }
+.participant-progress-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+.participant-progress-toolbar .details-muted {
+  margin: 0;
+}
+.participant-progress-list,
+.participant-task-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.participant-progress-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 3%);
+}
+.participant-progress-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.participant-progress-heading h4 {
+  margin: 0;
+  color: #f4f5f9;
+  overflow-wrap: anywhere;
+}
+.participant-progress-summary {
+  color: #ffc72c;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.participant-task-list {
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.participant-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+  color: #cbd2dc;
+  font-size: 0.84rem;
+}
+.participant-task-status {
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.participant-task-status.is-complete {
+  color: #8ed8ad;
+}
+.participant-task-status.is-incomplete {
+  color: #aab3c1;
+}
 .creator-list {
   display: flex;
   flex-wrap: wrap;

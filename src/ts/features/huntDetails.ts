@@ -1,5 +1,6 @@
 import type {
   HuntDefinition,
+  HuntParticipantProgress,
   HuntRole,
   TaskDefinition,
 } from "../foundation/types.js";
@@ -19,6 +20,9 @@ let activeRequest = 0;
 let activeHunt: HuntDefinition | undefined;
 let canExport = false;
 let exporting = false;
+let canViewProgress = false;
+let participantRequest = 0;
+let loadingParticipants = false;
 
 function updateExportButtons(): void {
   for (const format of ["pdf", "csv"] as const) {
@@ -31,6 +35,105 @@ function updateExportButtons(): void {
     }
   }
 }
+
+function updateParticipantControls(): void {
+  const section = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress"]',
+  );
+  if (section) section.hidden = !canViewProgress;
+  const button = dialog?.querySelector<HTMLButtonElement>(
+    '[data-testid="refresh-participant-progress"]',
+  );
+  if (button) button.disabled = loadingParticipants || !canViewProgress;
+}
+
+function renderParticipants(participants: HuntParticipantProgress[]): void {
+  const list = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-list"]',
+  );
+  const empty = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-empty"]',
+  );
+  if (!list || !empty) return;
+  const fragment = document.createDocumentFragment();
+  participants.forEach((participant, index) => {
+    const card = document.createElement("li");
+    card.className = "participant-progress-card";
+    card.dataset.testid = "participant-progress-row";
+    const heading = document.createElement("div");
+    heading.className = "participant-progress-heading";
+    const name = document.createElement("h4");
+    name.textContent = participant.displayName?.trim() || `Player ${index + 1}`;
+    const completed = participant.tasks.filter((task) => task.completed).length;
+    const summary = document.createElement("span");
+    summary.className = "participant-progress-summary";
+    summary.textContent = participant.tasks.length
+      ? `${completed} of ${participant.tasks.length} tasks complete`
+      : "No tasks yet";
+    heading.append(name, summary);
+    card.append(heading);
+    if (participant.tasks.length) {
+      const tasks = document.createElement("ul");
+      tasks.className = "participant-task-list";
+      for (const task of participant.tasks) {
+        const row = document.createElement("li");
+        row.className = "participant-task-row";
+        row.dataset.testid = "participant-task-row";
+        const label = document.createElement("span");
+        label.textContent = task.displayLabel;
+        const status = document.createElement("span");
+        status.className = `participant-task-status ${task.completed ? "is-complete" : "is-incomplete"}`;
+        status.dataset.testid = "participant-task-status";
+        status.textContent = task.completed ? "Completed" : "Incomplete";
+        row.append(label, status);
+        tasks.append(row);
+      }
+      card.append(tasks);
+    }
+    fragment.append(card);
+  });
+  list.replaceChildren(fragment);
+  empty.hidden = participants.length !== 0;
+}
+
+async function loadParticipants(): Promise<void> {
+  if (!activeHunt || !canViewProgress || loadingParticipants) return;
+  const huntId = activeHunt.id;
+  const requestId = activeRequest;
+  const progressRequest = ++participantRequest;
+  const status = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-status"]',
+  );
+  loadingParticipants = true;
+  updateParticipantControls();
+  if (status) status.textContent = "Loading participant progress…";
+  try {
+    const result = await repository.getHuntParticipants(huntId);
+    if (
+      requestId !== activeRequest ||
+      progressRequest !== participantRequest ||
+      !dialog?.open
+    )
+      return;
+    if (!result.ok) {
+      if (status) status.textContent = result.message;
+      return;
+    }
+    renderParticipants(result.value);
+    if (status) status.textContent = "Participant progress is up to date.";
+  } finally {
+    if (progressRequest === participantRequest) {
+      loadingParticipants = false;
+      updateParticipantControls();
+    }
+  }
+}
+
+dialog
+  ?.querySelector<HTMLButtonElement>(
+    '[data-testid="refresh-participant-progress"]',
+  )
+  ?.addEventListener("click", () => void loadParticipants());
 
 for (const format of ["pdf", "csv"] as const) {
   dialog
@@ -159,7 +262,11 @@ function setDetailView(editing: boolean): void {
 function resetDialog(): void {
   activeHunt = undefined;
   canExport = false;
+  canViewProgress = false;
+  loadingParticipants = false;
+  participantRequest++;
   updateExportButtons();
+  updateParticipantControls();
   const exportStatus = dialog?.querySelector<HTMLElement>(
     '[data-testid="hunt-export-status"]',
   );
@@ -177,6 +284,17 @@ function resetDialog(): void {
   facts?.replaceChildren();
   creators?.replaceChildren();
   tasks?.replaceChildren();
+  dialog
+    ?.querySelector<HTMLElement>('[data-testid="participant-progress-list"]')
+    ?.replaceChildren();
+  const participantStatus = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-status"]',
+  );
+  if (participantStatus) participantStatus.textContent = "";
+  const participantEmpty = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-empty"]',
+  );
+  if (participantEmpty) participantEmpty.hidden = true;
   const idOutput = dialog?.querySelector<HTMLOutputElement>(
     '[data-testid="hunt-detail-id"]',
   );
@@ -227,7 +345,9 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
   canExport = role === "owner" || role === "officer";
+  canViewProgress = canExport;
   updateExportButtons();
+  updateParticipantControls();
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',
   );
@@ -354,6 +474,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
     role === "contributor"
       ? `Contributor access · basic hunt details · ${hunt.status}`
       : `${hunt.tasks.length} ${hunt.tasks.length === 1 ? "task" : "tasks"} · ${hunt.status}`;
+  if (canViewProgress) void loadParticipants();
 }
 
 dialog

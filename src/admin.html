@@ -402,6 +402,45 @@
               </div>
               <dl class="hunt-facts" data-testid="hunt-facts"></dl>
             </section>
+            <section
+              class="details-overview participant-progress"
+              data-testid="participant-progress"
+              aria-labelledby="participant-progress-heading"
+              hidden
+            >
+              <div class="details-section-heading">
+                <p class="eyebrow">THE PLAYERS</p>
+                <h3 id="participant-progress-heading">
+                  Participation and progress
+                </h3>
+              </div>
+              <div class="participant-progress-toolbar">
+                <p
+                  class="details-muted"
+                  data-testid="participant-progress-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <button
+                  type="button"
+                  class="action"
+                  data-testid="refresh-participant-progress"
+                >
+                  Refresh progress
+                </button>
+              </div>
+              <p
+                class="details-muted"
+                data-testid="participant-progress-empty"
+                hidden
+              >
+                No players have joined this hunt yet.
+              </p>
+              <ul
+                class="participant-progress-list"
+                data-testid="participant-progress-list"
+              ></ul>
+            </section>
             <details
               class="more-options details-contributors"
               data-testid="contributors-panel"

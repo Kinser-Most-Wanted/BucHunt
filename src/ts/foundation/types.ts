@@ -36,6 +36,15 @@ export interface HuntDefinition extends HuntInput {
   accessCode: string | null;
   tasks: TaskDefinition[];
 }
+export interface HuntParticipantProgress {
+  participantId: string;
+  displayName: string | null;
+  tasks: {
+    id: string;
+    displayLabel: string;
+    completed: boolean;
+  }[];
+}
 export interface TaskDefinition extends TaskInput {
   id: string;
 }

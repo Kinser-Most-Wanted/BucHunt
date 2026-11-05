@@ -2302,19 +2302,29 @@ body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
   color: #e8ebf0;
   font-size: 1.5rem;
 }
+
+body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover { 
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+}
+
 .hunt-details-dialog > h2 {
   margin: 0.25rem 0 0.4rem;
   color: #f7f7fa;
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   letter-spacing: -0.05em;
 }
+
 .hunt-details-dialog .details-description,
 .hunt-details-dialog .details-muted {
   color: #aab3c1;
 }
+
 .hunt-details-dialog .details-actions {
   margin: 1rem 0;
 }
+
 body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle,
 body[data-page="admin"] dialog.hunt-details-dialog .details-edit-link,
 body[data-page="admin"] dialog.hunt-details-dialog .details-player-link {
@@ -2324,6 +2334,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-player-link {
   background: #15345d;
   color: #f4f5f9;
 }
+
 body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-toggle {
   border-color: rgb(255 199 44 / 26%);
   background: rgb(255 199 44 / 10%);
@@ -3393,6 +3404,12 @@ body[data-page="admin"] .hunt-access-code .hunt-access-code-copy {
   border-radius: 0.6rem;
   background: rgb(255 199 44 / 10%);
   color: #ffd45c;
+}
+
+body[data-page="admin"] .hunt-access-code .hunt-access-code-copy:hover { 
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
 }
 
 body[data-page="admin"] .hunt-access-code-copy-status {

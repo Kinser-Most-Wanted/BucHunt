@@ -152,10 +152,20 @@ export function createApplication(options: ServerOptions = {}) {
   );
   async function contributorEntries(huntId: string, ownerId: string) {
     const ownerProfile = await accountProfiles.get(ownerId);
-    return contributors.entries(
+    const entries = await contributors.entries(
       huntId,
       ownerId,
       ownerProfile.displayName ?? undefined,
+    );
+    return Promise.all(
+      entries.map(async (entry) => {
+        if (entry.originalOwner || entry.pending) return entry;
+        const profile = await accountProfiles.get(entry.id);
+        return {
+          ...entry,
+          ...(profile.displayName ? { displayName: profile.displayName } : {}),
+        };
+      }),
     );
   }
   const google = new OAuth2Client(options.googleClientId);

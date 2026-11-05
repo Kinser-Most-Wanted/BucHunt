@@ -17,10 +17,14 @@ function storedDisplayName(accountId: string): string | null {
 function storedIdentity(): PlayerIdentity | null {
   try {
     const value = JSON.parse(
-      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
-    ) as Partial<PlayerIdentity> | null;
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
+    ) as (Partial<PlayerIdentity> & { expiresAt?: number }) | null;
     if (
       value?.provider === "google" &&
+      (typeof value.expiresAt !== "number" ||
+        value.expiresAt * 1000 > Date.now()) &&
       typeof value.email === "string" &&
       typeof value.accountId === "string" &&
       typeof value.idToken === "string"
@@ -671,6 +675,7 @@ export function mountDisplayTasks(
       });
       if (!response.ok && response.status !== 401)
         throw new Error("The current sign-in could not be refreshed.");
+      localStorage.removeItem(PLAYER_SESSION_KEY);
       sessionStorage.removeItem(PLAYER_SESSION_KEY);
       window.location.assign("./index.html");
     } catch {
@@ -1060,6 +1065,31 @@ export function mountDisplayTasks(
         if (task.hint?.trim()) {
           const hint = document.createElement("p");
           hint.className = "task-hint";
+          hint.hidden = true;
+          hint.id = `task-hint-${task.id}`;
+          label.tabIndex = 0;
+          label.setAttribute("role", "button");
+          label.setAttribute("aria-expanded", "false");
+          label.setAttribute("aria-controls", hint.id);
+          const toggleHint = (): void => {
+            hint.hidden = !hint.hidden;
+            label.setAttribute("aria-expanded", String(!hint.hidden));
+          };
+          item.addEventListener("click", (event) => {
+            if (
+              (event.target as HTMLElement).closest(
+                "button, input, select, textarea, a, form, .task-location",
+              )
+            )
+              return;
+            toggleHint();
+          });
+          label.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleHint();
+            }
+          });
           const hintLabel = document.createElement("strong");
           hintLabel.textContent = "Hint: ";
           hint.append(hintLabel, document.createTextNode(task.hint));
@@ -1313,6 +1343,7 @@ export function mountDisplayTasks(
 
   signOut.addEventListener("click", () => {
     try {
+      localStorage.removeItem(PLAYER_SESSION_KEY);
       sessionStorage.removeItem(PLAYER_SESSION_KEY);
     } catch {
       // The visible state still signs out for this page view.

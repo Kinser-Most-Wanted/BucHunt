@@ -851,6 +851,12 @@ export function mountDisplayTasks(
     '[data-testid="player-hunt-form"]',
   );
   const huntInput = root.querySelector<HTMLInputElement>('[name="accessCode"]');
+  const joinStatus = document.createElement("p");
+  joinStatus.className = "player-hunt-join-status";
+  joinStatus.dataset.testid = "player-hunt-join-status";
+  joinStatus.setAttribute("role", "status");
+  joinStatus.setAttribute("aria-live", "polite");
+  huntForm?.after(joinStatus);
   const submitSharedLinkJoin = (): void => {
     sharedLinkJoinPending = true;
     if (autoJoin) {
@@ -977,7 +983,7 @@ export function mountDisplayTasks(
       huntStatus.textContent = "Loading Hunt details...";
       const identity = storedIdentity();
       if (!identity) {
-        huntStatus.textContent = "Sign in with Google first.";
+        joinStatus.textContent = "Sign in with Google first.";
         return;
       }
       const result = await repository.getAccountHunt(huntId, identity);
@@ -1230,28 +1236,29 @@ export function mountDisplayTasks(
       );
       if (button) button.disabled = true;
       const requestId = ++huntRequest;
-      huntStatus.textContent = "Joining Hunt...";
+      joinStatus.textContent = "Joining Hunt...";
       try {
         const result = await repository.joinHunt(accessCode, identity);
         if (requestId !== huntRequest) return;
         if (!result.ok) {
-          huntStatus.textContent = result.message;
+          joinStatus.textContent = result.message;
           if (result.code === "unauthorized") void preparePlayerSignIn();
           return;
         }
         huntInput.value = "";
+        joinStatus.textContent = "";
         await loadHunts(
           identity,
           storedDisplayName(identity.accountId) ?? identity.email,
         );
         if (isSharedLinkJoin) {
-          huntStatus.textContent =
+          joinStatus.textContent =
             "You joined the Hunt. It is now in your list.";
         } else {
           await loadHunt(result.value.huntId);
         }
       } catch {
-        huntStatus.textContent = "The Hunt service could not be reached.";
+        joinStatus.textContent = "The Hunt service could not be reached.";
       } finally {
         if (button) button.disabled = false;
       }

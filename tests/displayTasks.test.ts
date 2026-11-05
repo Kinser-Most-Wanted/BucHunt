@@ -250,6 +250,61 @@ test("manual access-code joins remain in the hunt list after closing details", a
   await expect(page.getByTestId("player-hunt-list")).toContainText(hunt.name);
 });
 
+test("manual access-code errors are visible outside the closed hunt details", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        email: "player@example.com",
+        accountId: "google-account-invalid-code",
+        idToken: "verified-test-token",
+      }),
+    );
+    localStorage.setItem(
+      "buchunt.player-profile.google-account-invalid-code",
+      "Baja",
+    );
+  });
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
+  );
+  await page.route("**/api/player/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Baja" } },
+      });
+    } else if (path.endsWith("/join")) {
+      await route.fulfill({
+        status: 400,
+        json: {
+          ok: false,
+          code: "validation",
+          message: "Invalid access code. The hunt may be unavailable.",
+        },
+      });
+    } else if (path.endsWith("/hunts")) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+    } else {
+      await route.fulfill({ json: { ok: true, value: {} } });
+    }
+  });
+
+  await page.goto("/player.html");
+  await page.getByLabel("Hunt access code").fill("BADCODE1");
+  await page.getByRole("button", { name: "Join Hunt", exact: true }).click();
+  await expect(page.getByTestId("player-hunt-join-status")).toHaveText(
+    "Invalid access code. The hunt may be unavailable.",
+  );
+  await expect(page.getByTestId("player-hunt-details")).toBeHidden();
+});
+
 test("Google sign-in lets a player open and revisit saved progress", async ({
   page,
 }) => {

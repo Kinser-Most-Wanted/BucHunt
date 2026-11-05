@@ -287,9 +287,18 @@ export function mountCreateHunt(
       fragment.append(spacer(filteredHunts.length - end));
     list.replaceChildren(fragment);
   }
-  manageDialog.addEventListener("scroll", () => renderHuntWindow(), {
-    passive: true,
-  });
+  let huntScrollFrame: number | undefined;
+  manageDialog.addEventListener(
+    "scroll",
+    () => {
+      if (huntScrollFrame !== undefined) return;
+      huntScrollFrame = requestAnimationFrame(() => {
+        huntScrollFrame = undefined;
+        renderHuntWindow();
+      });
+    },
+    { passive: true },
+  );
   listFilter.addEventListener("change", () => updateFilteredHunts());
   listSearch.addEventListener("input", () => updateFilteredHunts());
 
@@ -328,7 +337,7 @@ export function mountCreateHunt(
         ? `Original hunt owner · ${contributor.displayName ?? "Display name not set"}`
         : invitation
           ? `Invitation pending · ${identifier} · Contributor`
-          : `${contributor.email ?? "Google account"} · ${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)}${isSelf ? " · You" : ""}`;
+          : `${contributor.displayName?.trim() || contributor.email || "Google account"} · ${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)}${isSelf ? " · You" : ""}`;
       if (!invitation && !contributor.originalOwner) {
         const role = document.createElement("select");
         role.className = "contributor-role-select";
@@ -336,7 +345,7 @@ export function mountCreateHunt(
         if (isSelf) role.title = "You cannot change your own hunt role.";
         role.setAttribute(
           "aria-label",
-          `Role for ${contributor.email ?? "Google account"}`,
+          `Role for ${contributor.displayName?.trim() || contributor.email || "Google account"}`,
         );
         for (const [value, name] of [
           ["contributor", "Contributor"],
@@ -400,7 +409,7 @@ export function mountCreateHunt(
         ? `Original owner · ${contributor.displayName ?? "Display name not set"}`
         : invitation
           ? `Invitation pending · ${identifier} · Contributor`
-          : `${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)} · ${contributor.email ?? "Google account"}`;
+          : `${contributor.role[0]!.toUpperCase()}${contributor.role.slice(1)} · ${contributor.displayName?.trim() || contributor.email || "Google account"}`;
       creators?.append(chip);
     }
     if (contributorsStatus) {
@@ -420,7 +429,7 @@ export function mountCreateHunt(
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
     panel.open = false;
-    panel.hidden = hunt.role !== "owner";
+    panel.hidden = false;
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";

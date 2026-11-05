@@ -635,7 +635,15 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
     await expect(member.getByTestId("edit-hunt-link")).toBeHidden();
     await expect(member.getByTestId("player-hunt-link")).toBeHidden();
     await expect(member.locator(".hunt-access-code")).toBeHidden();
-    await expect(member.getByTestId("contributors-panel")).toBeHidden();
+    const contributorPanel = member.getByTestId("contributors-panel");
+    await expect(contributorPanel).toBeVisible();
+    await contributorPanel.locator("summary").click();
+    await expect(contributorPanel).toContainText(
+      "As a Contributor, you can view basic hunt details.",
+    );
+    await expect(
+      contributorPanel.locator(".contributor-management"),
+    ).toBeHidden();
     const contributorTaskCreate = await member.request.post(
       `/api/admin/hunts/${id}/tasks`,
       { data: { displayLabel: "Blocked", order: 1 } },

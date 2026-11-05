@@ -101,13 +101,18 @@ async function getGoogleConfig() {
 
 function clearPlayerSession(): void {
   try {
+    localStorage.removeItem(PLAYER_SESSION_KEY);
+  } catch {
+    /* Storage may be unavailable. */
+  }
+  try {
     sessionStorage.removeItem(PLAYER_SESSION_KEY);
   } catch {
     /* Storage may be unavailable. */
   }
 }
 function rememberPlayerSession(
-  user: { subject?: unknown; email?: unknown },
+  user: { subject?: unknown; email?: unknown; expiresAt?: unknown },
   credential?: string,
 ): void {
   if (typeof user.subject !== "string" || typeof user.email !== "string")
@@ -115,7 +120,9 @@ function rememberPlayerSession(
   try {
     if (!credential) {
       const saved = JSON.parse(
-        sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+        localStorage.getItem(PLAYER_SESSION_KEY) ??
+          sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+          "null",
       ) as {
         provider?: unknown;
         accountId?: unknown;
@@ -128,19 +135,24 @@ function rememberPlayerSession(
         saved.email === user.email &&
         typeof saved.idToken === "string" &&
         saved.idToken !== "verified-server-session"
-      )
+      ) {
+        localStorage.setItem(
+          PLAYER_SESSION_KEY,
+          JSON.stringify({ ...saved, expiresAt: user.expiresAt }),
+        );
         return;
+      }
       return;
     }
-    sessionStorage.setItem(
-      PLAYER_SESSION_KEY,
-      JSON.stringify({
-        provider: "google",
-        accountId: user.subject,
-        email: user.email,
-        idToken: credential,
-      }),
-    );
+    const saved = JSON.stringify({
+      provider: "google",
+      accountId: user.subject,
+      email: user.email,
+      idToken: credential,
+      expiresAt: user.expiresAt,
+    });
+    sessionStorage.setItem(PLAYER_SESSION_KEY, saved);
+    localStorage.setItem(PLAYER_SESSION_KEY, saved);
   } catch {
     /* The server session remains authoritative if browser storage is unavailable. */
   }
@@ -155,7 +167,9 @@ async function loadAccountNickname(user: {
   let identity: { accountId?: unknown; idToken?: unknown } | null = null;
   try {
     identity = JSON.parse(
-      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
     ) as { accountId?: unknown; idToken?: unknown } | null;
   } catch {
     return;
@@ -294,7 +308,9 @@ accountNameForm?.addEventListener("submit", (event) => {
   let identity: { accountId?: unknown; idToken?: unknown } | null = null;
   try {
     identity = JSON.parse(
-      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
     ) as { accountId?: unknown; idToken?: unknown } | null;
   } catch {
     if (accountStatus) {

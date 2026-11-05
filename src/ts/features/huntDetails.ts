@@ -232,7 +232,27 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
     '[data-testid="contributors-panel"]',
   );
   if (contributorsPanel) {
-    contributorsPanel.hidden = role !== "owner";
+    contributorsPanel.hidden = false;
+    const management = contributorsPanel.querySelector<HTMLElement>(
+      ".contributor-management",
+    );
+    if (management) management.hidden = role !== "owner";
+    const creators =
+      contributorsPanel.querySelector<HTMLElement>(".details-creators");
+    if (creators) creators.hidden = role !== "owner";
+    let permissions = contributorsPanel.querySelector<HTMLElement>(
+      "[data-team-permissions]",
+    );
+    if (!permissions) {
+      permissions = document.createElement("p");
+      permissions.dataset.teamPermissions = "";
+      contributorsPanel.append(permissions);
+    }
+    permissions.hidden = role === "owner";
+    permissions.textContent =
+      role === "officer"
+        ? "As an Officer, you can create and edit hunt tasks. Only Owners can invite collaborators or change team roles."
+        : "As a Contributor, you can view basic hunt details. Ask an Owner for Officer access to create or edit tasks. Only Owners can manage the team.";
     contributorsPanel.open = false;
   }
   const editButton = dialog.querySelector<HTMLButtonElement>(

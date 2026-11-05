@@ -16,9 +16,13 @@ const PLAYER_SESSION_KEY = "buchunt.player-session";
 function storedGoogleToken(): string | null {
   try {
     const session = JSON.parse(
-      sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null",
-    ) as { provider?: unknown; idToken?: unknown } | null;
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
+    ) as { provider?: unknown; idToken?: unknown; expiresAt?: unknown } | null;
     return session?.provider === "google" &&
+      (typeof session.expiresAt !== "number" ||
+        session.expiresAt * 1000 > Date.now()) &&
       typeof session.idToken === "string" &&
       session.idToken !== "verified-server-session"
       ? session.idToken

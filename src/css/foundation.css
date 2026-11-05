@@ -2303,7 +2303,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
   font-size: 1.5rem;
 }
 
-body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover { 
+body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover {
   border-color: rgb(255 199 44 / 45%);
   background: rgb(255 199 44 / 9%);
   color: #ffc72c;
@@ -3406,7 +3406,7 @@ body[data-page="admin"] .hunt-access-code .hunt-access-code-copy {
   color: #ffd45c;
 }
 
-body[data-page="admin"] .hunt-access-code .hunt-access-code-copy:hover { 
+body[data-page="admin"] .hunt-access-code .hunt-access-code-copy:hover {
   border-color: rgb(255 199 44 / 45%);
   background: rgb(255 199 44 / 9%);
   color: #ffc72c;

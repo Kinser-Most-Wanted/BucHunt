@@ -1014,6 +1014,32 @@ test("leaving and rejoining a sequential hunt restores completion and next task"
   }
 });
 
+test("saved progress for departed accounts stays restorable but is omitted from active participants", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-left-results-"));
+  try {
+    const store = new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    );
+    await store.join("player-active", "hunt-a");
+    await store.complete("player-active", "hunt-a", "task-a");
+    await store.join("player-left", "hunt-a");
+    await store.complete("player-left", "hunt-a", "task-b");
+    await store.leave("player-left", "hunt-a");
+
+    // Older progress-only records remain reportable as legacy participants.
+    await store.complete("legacy-player", "hunt-a", "task-c");
+
+    expect(await store.completed("player-left", "hunt-a")).toEqual(["task-b"]);
+    expect(await store.huntsWithProgress("player-left")).toEqual([]);
+    expect(await store.participants("hunt-a")).toEqual([
+      { playerId: "player-active", completedTaskIds: ["task-a"] },
+      { playerId: "legacy-player", completedTaskIds: ["task-c"] },
+    ]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("hunt deletion requires the owner and clears related saved records", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-delete-hunt-"));
   const app = createApplication({ dataDirectory: directory });

@@ -82,6 +82,26 @@ export class PlayerProgressStore {
         ? Object.keys(data.players[player])
         : [];
   }
+  async participants(
+    hunt: string,
+  ): Promise<{ playerId: string; completedTaskIds: string[] }[]> {
+    const data = await this.file.get();
+    return Object.entries(data.players)
+      .filter(([playerId, hunts]) => {
+        if (!Object.hasOwn(hunts, hunt)) return false;
+        // Legacy progress records have no membership entry; keep including
+        // them. Account members who explicitly left retain an empty list.
+        return (
+          !data.activeHunts ||
+          !Object.hasOwn(data.activeHunts, playerId) ||
+          data.activeHunts[playerId].includes(hunt)
+        );
+      })
+      .map(([playerId, hunts]) => ({
+        playerId,
+        completedTaskIds: [...hunts[hunt]],
+      }));
+  }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
     return Object.hasOwn(data.players, player) &&
@@ -134,7 +154,6 @@ export class PlayerProgressStore {
       const activeHunts = memberships(data);
       if (Object.hasOwn(activeHunts, player)) {
         activeHunts[player] = activeHunts[player].filter((id) => id !== hunt);
-        if (activeHunts[player].length === 0) delete activeHunts[player];
       }
       if (data.incorrectChoices?.[player]) {
         delete data.incorrectChoices[player][hunt];

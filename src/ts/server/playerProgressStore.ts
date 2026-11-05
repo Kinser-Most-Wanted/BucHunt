@@ -1,7 +1,11 @@
 import { JsonFile, StoreError } from "./huntStore.js";
 interface ProgressFile {
   schemaVersion: 1;
+  // Completed task IDs remain after leaving so progress can be restored and
+  // counted against the hunt's task list for a future progress indicator.
   players: Record<string, Record<string, string[]>>;
+  // Active membership is separate from durable completion history.
+  activeHunts?: Record<string, string[]>;
   incorrectChoices?: Record<string, Record<string, Record<string, string[]>>>;
 }
 function progress(value: unknown): ProgressFile {
@@ -20,6 +24,17 @@ function progress(value: unknown): ProgressFile {
     for (const ids of Object.values(hunts))
       if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string"))
         throw new Error("Invalid progress");
+  }
+  if (data.activeHunts !== undefined) {
+    if (
+      !data.activeHunts ||
+      typeof data.activeHunts !== "object" ||
+      Array.isArray(data.activeHunts)
+    )
+      throw new Error("Invalid memberships");
+    for (const hunts of Object.values(data.activeHunts))
+      if (!Array.isArray(hunts) || hunts.some((id) => typeof id !== "string"))
+        throw new Error("Invalid memberships");
   }
   if (data.incorrectChoices !== undefined) {
     const object = (value: unknown): value is Record<string, unknown> =>
@@ -40,20 +55,32 @@ function progress(value: unknown): ProgressFile {
   }
   return data;
 }
+function memberships(data: ProgressFile): Record<string, string[]> {
+  // Older schema-1 files used the presence of a progress record as membership.
+  // On the first update, migrate that meaning without discarding completions.
+  return (data.activeHunts ??= Object.fromEntries(
+    Object.entries(data.players).map(([player, hunts]) => [
+      player,
+      Object.keys(hunts),
+    ]),
+  ));
+}
 export class PlayerProgressStore {
   private file: JsonFile<ProgressFile>;
   constructor(path: string) {
-    this.file = new JsonFile(
+    this.file = new JsonFile<ProgressFile>(
       path,
-      () => ({ schemaVersion: 1, players: {} }),
+      () => ({ schemaVersion: 1, players: {}, activeHunts: {} }),
       progress,
     );
   }
   async huntsWithProgress(player: string): Promise<string[]> {
     const data = await this.file.get();
-    return Object.hasOwn(data.players, player)
-      ? Object.keys(data.players[player])
-      : [];
+    return data.activeHunts
+      ? [...(data.activeHunts[player] ?? [])]
+      : Object.hasOwn(data.players, player)
+        ? Object.keys(data.players[player])
+        : [];
   }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
@@ -94,6 +121,9 @@ export class PlayerProgressStore {
     if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
       throw new StoreError("validation", "Invalid participation identifier.");
     await this.file.update((data) => {
+      const activeHunts = memberships(data);
+      const active = (activeHunts[player] ??= []);
+      if (!active.includes(hunt)) active.push(hunt);
       if (!Object.hasOwn(data.players, player)) data.players[player] = {};
       if (!Object.hasOwn(data.players[player], hunt))
         data.players[player][hunt] = [];
@@ -101,10 +131,10 @@ export class PlayerProgressStore {
   }
   async leave(player: string, hunt: string): Promise<void> {
     await this.file.update((data) => {
-      if (Object.hasOwn(data.players, player)) {
-        delete data.players[player][hunt];
-        if (Object.keys(data.players[player]).length === 0)
-          delete data.players[player];
+      const activeHunts = memberships(data);
+      if (Object.hasOwn(activeHunts, player)) {
+        activeHunts[player] = activeHunts[player].filter((id) => id !== hunt);
+        if (activeHunts[player].length === 0) delete activeHunts[player];
       }
       if (data.incorrectChoices?.[player]) {
         delete data.incorrectChoices[player][hunt];
@@ -125,6 +155,11 @@ export class PlayerProgressStore {
         delete hunts[hunt];
         if (Object.keys(hunts).length === 0)
           delete data.incorrectChoices![player];
+      }
+      for (const [player, hunts] of Object.entries(memberships(data))) {
+        const remaining = hunts.filter((id) => id !== hunt);
+        if (remaining.length === 0) delete data.activeHunts![player];
+        else data.activeHunts![player] = remaining;
       }
     });
   }

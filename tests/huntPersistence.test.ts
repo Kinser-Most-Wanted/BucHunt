@@ -902,6 +902,118 @@ test("account task progress survives restart without cookies and isolates player
   }
 });
 
+test("leaving and rejoining a sequential hunt restores completion and next task", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-rejoin-"));
+  const store = new HuntStore(join(directory, "hunts.json"));
+  const hunt = await store.create(input, "owner");
+  const first = await store.addTask(hunt.id, task);
+  const second = await store.addTask(hunt.id, {
+    ...task,
+    displayLabel: "Library",
+    order: 2,
+  });
+  const third = await store.addTask(hunt.id, {
+    ...task,
+    displayLabel: "Clocktower",
+    order: 3,
+  });
+  let app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+  const start = async () => {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${(app.address() as AddressInfo).port}/api/player/account`;
+  };
+  const stop = async () => {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+  };
+  let base = await start();
+  const call = (path: string, method = "GET", body?: unknown) =>
+    fetch(base + path, {
+      method,
+      headers: {
+        Authorization: "Bearer player-a",
+        "Content-Type": "application/json",
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  try {
+    expect(
+      (await call("/join", "POST", { accessCode: hunt.accessCode })).status,
+    ).toBe(200);
+    expect(
+      (await (await call(`/hunts/${hunt.id}`)).json()).value.tasks.map(
+        (item: { id: string; completed: boolean }) => ({
+          id: item.id,
+          completed: item.completed,
+        }),
+      ),
+    ).toEqual([{ id: first.id, completed: false }]);
+    expect(
+      (
+        await call(`/hunts/${hunt.id}/tasks/${first.id}/answer`, "POST", {
+          answer: task.requiredAnswer,
+        })
+      ).status,
+    ).toBe(200);
+
+    expect((await call(`/hunts/${hunt.id}`, "DELETE")).status).toBe(200);
+    expect((await call(`/hunts/${hunt.id}`)).status).toBe(403);
+
+    // Recreate the application to verify the same durable file survives a restart.
+    await stop();
+    app = createApplication({ dataDirectory: directory, verifyPlayerToken });
+    base = await start();
+    expect((await call(`/hunts/${hunt.id}`)).status).toBe(403);
+    expect(
+      (await call("/join", "POST", { accessCode: hunt.accessCode })).status,
+    ).toBe(200);
+
+    const restored = (await (await call(`/hunts/${hunt.id}`)).json()).value
+      .tasks;
+    expect(restored).toHaveLength(2);
+    expect(restored[0]).toMatchObject({ id: first.id, completed: true });
+    expect(restored[1]).toMatchObject({ id: second.id, completed: false });
+    expect(restored.map((item: { id: string }) => item.id)).not.toContain(
+      third.id,
+    );
+    expect(
+      (
+        await call(`/hunts/${hunt.id}/tasks/${third.id}/answer`, "POST", {
+          answer: task.requiredAnswer,
+        })
+      ).status,
+    ).toBe(400);
+
+    expect(
+      (
+        await call(`/hunts/${hunt.id}/tasks/${second.id}/answer`, "POST", {
+          answer: task.requiredAnswer,
+        })
+      ).status,
+    ).toBe(200);
+    const advanced = (await (await call(`/hunts/${hunt.id}`)).json()).value
+      .tasks;
+    expect(advanced).toHaveLength(3);
+    expect(
+      advanced
+        .slice(0, 2)
+        .map((item: { completed: boolean }) => item.completed),
+    ).toEqual([true, true]);
+    expect(advanced[2]).toMatchObject({ id: third.id, completed: false });
+
+    const stored = new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    );
+    const playerId = `google-${createHash("sha256").update("google-subject-a").digest("hex")}`;
+    expect(await stored.completed(playerId, hunt.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+  } finally {
+    await stop();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("hunt deletion requires the owner and clears related saved records", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-delete-hunt-"));
   const app = createApplication({ dataDirectory: directory });

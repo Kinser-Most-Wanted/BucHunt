@@ -393,6 +393,26 @@
               </p>
             </section>
             <section
+              data-testid="hunt-participants-section"
+              aria-labelledby="participants-heading"
+              hidden
+            >
+              <h3 id="participants-heading">Participants and progress</h3>
+              <button
+                type="button"
+                class="action"
+                data-testid="refresh-hunt-participants"
+              >
+                Refresh participants
+              </button>
+              <p
+                data-testid="hunt-participants-status"
+                role="status"
+                aria-live="polite"
+              ></p>
+              <ul data-testid="hunt-participants"></ul>
+            </section>
+            <section
               class="details-overview"
               aria-labelledby="overview-heading"
             >

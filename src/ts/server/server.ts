@@ -531,7 +531,7 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         const exportMatch =
-          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv|json)$/.exec(
             path,
           );
         const taskMatch =
@@ -571,7 +571,7 @@ export function createApplication(options: ServerOptions = {}) {
               json(response, 403, {
                 ok: false,
                 code: "forbidden",
-                message: "Only Owners and Officers can export hunt results.",
+                message: "Only Owners and Officers can view hunt results.",
               });
               return;
             }
@@ -591,6 +591,13 @@ export function createApplication(options: ServerOptions = {}) {
               ...legacy,
             ]);
             const format = exportMatch[2];
+            if (format === "json") {
+              json(response, 200, {
+                ok: true,
+                value: { tasks: results.tasks, players: results.players },
+              });
+              return;
+            }
             const content =
               format === "pdf"
                 ? Buffer.from(await resultsPdf(results))

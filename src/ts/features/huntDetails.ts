@@ -3,7 +3,11 @@ import type {
   HuntRole,
   TaskDefinition,
 } from "../foundation/types.js";
-import { createHuntRepository, downloadHuntResults } from "./huntRepository.js";
+import {
+  createHuntRepository,
+  downloadHuntResults,
+  request,
+} from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
@@ -19,6 +23,76 @@ let activeRequest = 0;
 let activeHunt: HuntDefinition | undefined;
 let canExport = false;
 let exporting = false;
+
+interface ParticipantResults {
+  tasks: { id: string; label: string }[];
+  players: {
+    id: string;
+    displayName: string | null;
+    completed: number;
+    statuses: boolean[];
+  }[];
+}
+const participantsSection = dialog?.querySelector<HTMLElement>(
+  '[data-testid="hunt-participants-section"]',
+);
+const participantsList = dialog?.querySelector<HTMLElement>(
+  '[data-testid="hunt-participants"]',
+);
+const participantsStatus = dialog?.querySelector<HTMLElement>(
+  '[data-testid="hunt-participants-status"]',
+);
+const refreshParticipants = dialog?.querySelector<HTMLButtonElement>(
+  '[data-testid="refresh-hunt-participants"]',
+);
+let participantsRequest = 0;
+
+async function loadParticipants(): Promise<void> {
+  if (
+    !activeHunt ||
+    !canExport ||
+    !participantsList ||
+    !participantsStatus ||
+    !refreshParticipants
+  )
+    return;
+  const requestId = ++participantsRequest;
+  const huntRequest = activeRequest;
+  refreshParticipants.disabled = true;
+  participantsList.replaceChildren();
+  participantsStatus.textContent = "Loading participants…";
+  const result = await request<ParticipantResults>(
+    `/api/admin/hunts/${encodeURIComponent(activeHunt.id)}/results/json`,
+  );
+  if (requestId !== participantsRequest || huntRequest !== activeRequest)
+    return;
+  refreshParticipants.disabled = false;
+  if (!result.ok) {
+    participantsStatus.textContent = result.message;
+    return;
+  }
+  participantsStatus.textContent = result.value.players.length
+    ? "Progress updated."
+    : "No participants have joined this hunt yet.";
+  for (const player of result.value.players) {
+    const item = document.createElement("li");
+    const heading = document.createElement("h4");
+    heading.textContent = player.displayName
+      ? `${player.displayName} (${player.id})`
+      : player.id;
+    const summary = document.createElement("p");
+    summary.textContent = `${player.completed} / ${result.value.tasks.length} tasks completed`;
+    const tasks = document.createElement("ul");
+    for (const [index, task] of result.value.tasks.entries()) {
+      const taskItem = document.createElement("li");
+      taskItem.textContent = `${task.label}: ${player.statuses[index] ? "Completed" : "Incomplete"}`;
+      tasks.append(taskItem);
+    }
+    item.append(heading, summary, tasks);
+    participantsList.append(item);
+  }
+}
+refreshParticipants?.addEventListener("click", () => void loadParticipants());
 
 function updateExportButtons(): void {
   for (const format of ["pdf", "csv"] as const) {
@@ -158,6 +232,10 @@ function setDetailView(editing: boolean): void {
 
 function resetDialog(): void {
   activeHunt = undefined;
+  participantsRequest++;
+  if (participantsSection) participantsSection.hidden = true;
+  participantsList?.replaceChildren();
+  if (participantsStatus) participantsStatus.textContent = "";
   canExport = false;
   updateExportButtons();
   const exportStatus = dialog?.querySelector<HTMLElement>(
@@ -227,6 +305,8 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
   canExport = role === "owner" || role === "officer";
+  if (participantsSection) participantsSection.hidden = !canExport;
+  if (canExport) void loadParticipants();
   updateExportButtons();
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
     '[data-testid="contributors-panel"]',

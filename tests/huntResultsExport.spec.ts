@@ -8,7 +8,7 @@ import { createApplication } from "../src/ts/server/server.js";
 import { HuntStore } from "../src/ts/server/huntStore.js";
 import { PlayerProgressStore } from "../src/ts/server/playerProgressStore.js";
 
-test("hunt overview downloads PDF and CSV and recovers from a failed export", async ({
+test("hunt overview refreshes participant progress, shows empty hunts, and exports results", async ({
   page,
   context,
 }) => {
@@ -16,6 +16,10 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
   const app = createApplication({
     dataDirectory: directory,
     staticDirectory: resolve("src"),
+    verifyPlayerToken: async (token) => {
+      if (token !== "participant-token") throw new Error("Invalid token");
+      return "participant-account";
+    },
   });
   await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
@@ -45,6 +49,30 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
       hint: null,
       points: 0,
     });
+    const resultsUrl = `${base}/api/admin/hunts/${hunt.id}/results/json`;
+    const emptyResults = await context.request.get(resultsUrl);
+    expect((await emptyResults.json()).value.players).toEqual([]);
+    const outsider = await fetch(resultsUrl);
+    expect(outsider.status).toBe(401);
+    const outsiderSession = await fetch(`${base}/api/admin/session`);
+    const forbidden = await fetch(resultsUrl, {
+      headers: {
+        Cookie: outsiderSession.headers.get("set-cookie")!.split(";")[0],
+      },
+    });
+    expect(forbidden.status).toBe(403);
+    const playerHeaders = { Authorization: "Bearer participant-token" };
+    const invalidJoin = await context.request.post(
+      `${base}/api/player/account/join`,
+      {
+        headers: playerHeaders,
+        data: { accessCode: "INVALID" },
+      },
+    );
+    expect(invalidJoin.ok()).toBe(false);
+    expect(
+      (await (await context.request.get(resultsUrl)).json()).value.players,
+    ).toEqual([]);
     await new PlayerProgressStore(
       join(directory, "player-progress.json"),
     ).complete("legacy-player", hunt.id, task.id);
@@ -73,6 +101,52 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
     const csvButton = page.getByTestId("export-hunt-csv");
     await expect(pdfButton).toBeEnabled();
     await expect(csvButton).toBeEnabled();
+    const participantList = page.getByTestId("hunt-participants");
+    await expect(participantList).toContainText("legacy-player");
+    const joined = await context.request.post(
+      `${base}/api/player/account/join`,
+      {
+        headers: playerHeaders,
+        data: { accessCode: hunt.accessCode },
+      },
+    );
+    expect(joined.ok()).toBe(true);
+    const otherHunt = await hunts.create(
+      {
+        name: "Other hunt",
+        description: hunt.description,
+        beginsAt: hunt.beginsAt,
+        endsAt: null,
+        taskOrderMode: "any",
+      },
+      creator,
+    );
+    await new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    ).join("unrelated-player", otherHunt.id);
+    await page.getByTestId("refresh-hunt-participants").click();
+    await expect(participantList.locator(":scope > li")).toHaveCount(2);
+    await expect(participantList).not.toContainText("unrelated-player");
+    const account = participantList
+      .locator(":scope > li")
+      .filter({ hasText: "0 / 1 tasks completed" });
+    await expect(account).toContainText("Library: Incomplete");
+    const answered = await context.request.post(
+      `${base}/api/player/account/hunts/${hunt.id}/tasks/${task.id}/answer`,
+      {
+        headers: playerHeaders,
+        data: { answer: "Bucky" },
+      },
+    );
+    expect(answered.ok()).toBe(true);
+    await page.getByTestId("refresh-hunt-participants").click();
+    await expect(
+      participantList.getByText("Library: Completed", { exact: true }),
+    ).toHaveCount(2);
+    await expect(participantList).not.toContainText("Incomplete");
+    await new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    ).leave("unrelated-player", otherHunt.id);
     for (const format of ["pdf", "csv"] as const) {
       const downloadEvent = page.waitForEvent("download");
       await page.getByTestId(`export-hunt-${format}`).click();
@@ -107,6 +181,36 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
     );
     await expect(csvButton).toBeEnabled();
     await expect(pdfButton).toBeEnabled();
+    await hunts.addTask(hunt.id, {
+      displayLabel: "Museum",
+      description: "Find the museum",
+      requiredAnswer: "History",
+      location: { latitude: 36, longitude: -82 },
+      order: 2,
+      answerCaseSensitive: false,
+      hint: null,
+      points: 0,
+    });
+    await page.getByTestId("refresh-hunt-participants").click();
+    await expect(
+      participantList.getByText("1 / 2 tasks completed", { exact: true }),
+    ).toHaveCount(2);
+    await expect(
+      participantList.getByText("Library: Completed", { exact: true }),
+    ).toHaveCount(2);
+    await expect(
+      participantList.getByText("Museum: Incomplete", { exact: true }),
+    ).toHaveCount(2);
+    await page.getByTestId("back-to-manage-hunts").click();
+    await page.getByTestId("refresh-my-hunts").click();
+    await page
+      .getByTestId("my-hunts")
+      .getByRole("button", { name: "Other hunt" })
+      .click();
+    await expect(page.getByTestId("hunt-participants-status")).toHaveText(
+      "No participants have joined this hunt yet.",
+    );
+    await expect(participantList.locator(":scope > li")).toHaveCount(0);
   } finally {
     await page.goto("about:blank");
     await new Promise<void>((resolve, reject) =>

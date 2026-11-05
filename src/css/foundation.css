@@ -3506,9 +3506,10 @@ body[data-page="admin"] .hunt-owner {
   overflow-wrap: anywhere;
 }
 body[data-page="admin"] .hunt-access-code {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto auto;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.3rem 0.6rem;
   color: #9eb4ce;
   font-size: 0.82rem;
   font-weight: 700;
@@ -3545,15 +3546,16 @@ body[data-page="admin"] .hunt-access-code .hunt-access-code-copy:hover {
 }
 
 body[data-page="admin"] .hunt-access-code-copy-status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  grid-column: 1 / -1;
+  min-height: 1.5em;
+  contain: inline-size;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+body[data-page="admin"] .hunt-export-status {
+  min-height: 1.5em;
+  margin: 1rem 0 -0.5rem;
+  overflow-wrap: anywhere;
 }
 body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   margin-top: 1.35rem;

@@ -2149,6 +2149,30 @@ body[data-page="hunt-details"] .hunt-id-toggle {
   gap: 1rem;
   margin-top: 0.8rem;
 }
+.participant-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0.9rem 0;
+}
+.participant-progress-stats > div {
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 3%);
+}
+.participant-progress-stats dt {
+  color: #aab3c1;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.participant-progress-stats dd {
+  margin: 0.3rem 0 0;
+  color: #ffc72c;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
 .participant-progress-toolbar .details-muted {
   margin: 0;
 }
@@ -3455,6 +3479,11 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-tasks {
 }
 body[data-page="admin"] dialog.hunt-details-dialog .details-overview {
   margin-top: 0;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-overview.participant-progress {
+  margin-top: 1.35rem;
 }
 body[data-page="admin"] .hunt-overview-lead {
   display: flex;

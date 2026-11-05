@@ -1,5 +1,6 @@
 import type {
   HuntDefinition,
+  HuntParticipationSummary,
   HuntParticipantProgress,
   HuntRole,
   TaskDefinition,
@@ -47,7 +48,10 @@ function updateParticipantControls(): void {
   if (button) button.disabled = loadingParticipants || !canViewProgress;
 }
 
-function renderParticipants(participants: HuntParticipantProgress[]): void {
+function renderParticipants(
+  participants: HuntParticipantProgress[],
+  summary: HuntParticipationSummary,
+): void {
   const list = dialog?.querySelector<HTMLElement>(
     '[data-testid="participant-progress-list"]',
   );
@@ -55,6 +59,16 @@ function renderParticipants(participants: HuntParticipantProgress[]): void {
     '[data-testid="participant-progress-empty"]',
   );
   if (!list || !empty) return;
+  for (const [testId, count] of [
+    ["participant-active-count", summary.activeCount],
+    ["participant-left-completed-count", summary.leftCompletedCount],
+    ["participant-left-incomplete-count", summary.leftIncompleteCount],
+  ] as const) {
+    const output = dialog?.querySelector<HTMLElement>(
+      `[data-testid="${testId}"]`,
+    );
+    if (output) output.textContent = String(count);
+  }
   const fragment = document.createDocumentFragment();
   participants.forEach((participant, index) => {
     const card = document.createElement("li");
@@ -108,7 +122,7 @@ async function loadParticipants(): Promise<void> {
   updateParticipantControls();
   if (status) status.textContent = "Loading participant progress…";
   try {
-    const result = await repository.getHuntParticipants(huntId);
+    const result = await repository.getHuntParticipationProgress(huntId);
     if (
       requestId !== activeRequest ||
       progressRequest !== participantRequest ||
@@ -119,7 +133,7 @@ async function loadParticipants(): Promise<void> {
       if (status) status.textContent = result.message;
       return;
     }
-    renderParticipants(result.value);
+    renderParticipants(result.value, result.summary);
     if (status) status.textContent = "Participant progress is up to date.";
   } finally {
     if (progressRequest === participantRequest) {
@@ -295,6 +309,16 @@ function resetDialog(): void {
     '[data-testid="participant-progress-empty"]',
   );
   if (participantEmpty) participantEmpty.hidden = true;
+  for (const testId of [
+    "participant-active-count",
+    "participant-left-completed-count",
+    "participant-left-incomplete-count",
+  ]) {
+    const output = dialog?.querySelector<HTMLElement>(
+      `[data-testid="${testId}"]`,
+    );
+    if (output) output.textContent = "—";
+  }
   const idOutput = dialog?.querySelector<HTMLOutputElement>(
     '[data-testid="hunt-detail-id"]',
   );

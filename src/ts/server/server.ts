@@ -599,10 +599,13 @@ export function createApplication(options: ServerOptions = {}) {
               });
               return;
             }
-            const [accounts, legacy] = await Promise.all([
-              accountProgress.participants(hunt.id),
-              progress.participants(hunt.id),
-            ]);
+            const [accounts, legacy, departedAccounts, departedLegacy] =
+              await Promise.all([
+                accountProgress.participants(hunt.id),
+                progress.participants(hunt.id),
+                accountProgress.departedParticipants(hunt.id),
+                progress.departedParticipants(hunt.id),
+              ]);
             const completedByParticipant = new Map<string, Set<string>>();
             for (const participant of [...legacy, ...accounts]) {
               const completed =
@@ -611,9 +614,31 @@ export function createApplication(options: ServerOptions = {}) {
                 completed.add(taskId);
               completedByParticipant.set(participant.playerId, completed);
             }
+            const departedByParticipant = new Map<string, Set<string>>();
+            for (const participant of [
+              ...departedLegacy,
+              ...departedAccounts,
+            ]) {
+              if (completedByParticipant.has(participant.playerId)) continue;
+              const completed =
+                departedByParticipant.get(participant.playerId) ?? new Set();
+              for (const taskId of participant.completedTaskIds)
+                completed.add(taskId);
+              departedByParticipant.set(participant.playerId, completed);
+            }
             const tasks = [...hunt.tasks].sort(
               (left, right) => left.order - right.order,
             );
+            let leftCompletedCount = 0;
+            let leftIncompleteCount = 0;
+            for (const completed of departedByParticipant.values()) {
+              if (
+                tasks.length > 0 &&
+                tasks.every((task) => completed.has(task.id))
+              )
+                leftCompletedCount++;
+              else leftIncompleteCount++;
+            }
             const participants: HuntParticipantProgress[] = await Promise.all(
               [...completedByParticipant.entries()]
                 .sort(([left], [right]) => left.localeCompare(right))
@@ -632,7 +657,15 @@ export function createApplication(options: ServerOptions = {}) {
                   };
                 }),
             );
-            json(response, 200, { ok: true, value: participants });
+            json(response, 200, {
+              ok: true,
+              value: participants,
+              summary: {
+                activeCount: participants.length,
+                leftCompletedCount,
+                leftIncompleteCount,
+              },
+            });
             return;
           }
           if (exportMatch && method === "GET") {

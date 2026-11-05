@@ -1211,6 +1211,103 @@ test("saved progress for departed accounts stays restorable but is omitted from 
   }
 });
 
+test("hunt participation progress is current, task-specific, and restricted to Owners and Officers", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "buchunt-participant-progress-"),
+  );
+  const app = createApplication({ dataDirectory: directory });
+  try {
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const session = async () => {
+      const response = await fetch(base + "/api/admin/session");
+      return {
+        value: (await response.json()).value as { id: string },
+        cookie: response.headers.get("set-cookie")!.split(";")[0],
+      };
+    };
+    const owner = await session();
+    const officer = await session();
+    const contributor = await session();
+    const hunts = new HuntStore(join(directory, "hunts.json"));
+    const hunt = await hunts.create(input, owner.value.id);
+    const first = await hunts.addTask(hunt.id, task);
+    const second = await hunts.addTask(hunt.id, {
+      ...task,
+      displayLabel: "Library",
+      order: 2,
+    });
+    const accountProgress = new PlayerProgressStore(
+      join(directory, "account-player-progress.json"),
+    );
+    const profiles = new PlayerProfileStore(
+      join(directory, "player-profiles.json"),
+    );
+    const activePlayer = `google-${"a".repeat(64)}`;
+    const zeroProgressPlayer = `google-${"b".repeat(64)}`;
+    await accountProgress.join(activePlayer, hunt.id);
+    await accountProgress.complete(activePlayer, hunt.id, first.id);
+    await profiles.save(activePlayer, { displayName: "Baja" });
+    await accountProgress.join(zeroProgressPlayer, hunt.id);
+
+    const members = new ContributorStore(
+      join(directory, "hunt-contributors.json"),
+    );
+    await members.add(hunt.id, officer.value.id);
+    await members.setRole(hunt.id, officer.value.id, "officer", owner.value.id);
+    await members.add(hunt.id, contributor.value.id);
+    const url = `${base}/api/admin/hunts/${hunt.id}/participants`;
+    const participantRequest = (cookie: string) =>
+      fetch(url, { headers: { Cookie: cookie } });
+
+    const initial = await participantRequest(owner.cookie);
+    expect(initial.status).toBe(200);
+    expect(initial.headers.get("cache-control")).toBe("no-store");
+    const initialParticipants = (await initial.json()).value;
+    expect(initialParticipants).toHaveLength(2);
+    expect(initialParticipants).toContainEqual({
+      participantId: activePlayer,
+      displayName: "Baja",
+      tasks: [
+        { id: first.id, displayLabel: "Fountain", completed: true },
+        { id: second.id, displayLabel: "Library", completed: false },
+      ],
+    });
+    expect(
+      initialParticipants
+        .find(
+          (participant: { participantId: string }) =>
+            participant.participantId === zeroProgressPlayer,
+        )
+        .tasks.every((item: { completed: boolean }) => !item.completed),
+    ).toBe(true);
+
+    await accountProgress.complete(activePlayer, hunt.id, second.id);
+    const refreshed = await (await participantRequest(owner.cookie)).json();
+    expect(
+      refreshed.value
+        .find(
+          (participant: { participantId: string }) =>
+            participant.participantId === activePlayer,
+        )
+        .tasks.every((item: { completed: boolean }) => item.completed),
+    ).toBe(true);
+    expect((await participantRequest(officer.cookie)).status).toBe(200);
+    expect((await participantRequest(contributor.cookie)).status).toBe(403);
+
+    const emptyHunt = await hunts.create(input, owner.value.id);
+    const empty = await fetch(
+      `${base}/api/admin/hunts/${emptyHunt.id}/participants`,
+      { headers: { Cookie: owner.cookie } },
+    );
+    expect(empty.status).toBe(200);
+    expect((await empty.json()).value).toEqual([]);
+  } finally {
+    await new Promise<void>((resolve) => app.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("hunt deletion requires the owner and clears related saved records", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-delete-hunt-"));
   const app = createApplication({ dataDirectory: directory });

@@ -546,6 +546,13 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
     .getByRole("button", { name: "Shared hunt (owner)", exact: true })
     .click();
   await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  const participantProgress = page.getByTestId("participant-progress");
+  await expect(participantProgress).toBeVisible();
+  await expect(page.getByTestId("participant-progress-empty")).toBeVisible();
+  await page.getByTestId("refresh-participant-progress").click();
+  await expect(page.getByTestId("participant-progress-status")).toHaveText(
+    "Participant progress is up to date.",
+  );
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
   const contributor = await browser.newContext({ baseURL });
   const stranger = await browser.newContext({ baseURL });

@@ -3,6 +3,7 @@ import type {
   GoogleAuthConfig,
   HuntDefinition,
   HuntInput,
+  HuntParticipantProgress,
   OperationResult,
   PlayerIdentity,
   PlayerProfile,
@@ -43,6 +44,9 @@ export interface HuntRepository {
     confirmationName: string,
   ): Promise<OperationResult<{ deleted: true }>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
+  getHuntParticipants(
+    huntId: string,
+  ): Promise<OperationResult<HuntParticipantProgress[]>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
   getAccountProfile(
     identity: PlayerIdentity,

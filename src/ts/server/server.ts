@@ -1,6 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 import type {
   HuntDefinition,
+  HuntParticipantProgress,
   PlayerHunt,
   TaskDefinition,
 } from "../foundation/types.js";
@@ -544,6 +545,8 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
             path,
           );
+        const participantMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/participants$/.exec(path);
         const taskMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/tasks\/([a-zA-Z0-9-]+)$/.exec(
             path,
@@ -556,9 +559,19 @@ export function createApplication(options: ServerOptions = {}) {
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/contributors\/(browser:[a-f0-9]{64}|google-[a-f0-9]{64})\/role$/.exec(
             path,
           );
-        if (match || taskMatch || roleMatch || exportMatch) {
+        if (
+          match ||
+          taskMatch ||
+          roleMatch ||
+          exportMatch ||
+          participantMatch
+        ) {
           const hunt = await hunts.get(
-            match?.[1] ?? taskMatch?.[1] ?? roleMatch?.[1] ?? exportMatch![1],
+            match?.[1] ??
+              taskMatch?.[1] ??
+              roleMatch?.[1] ??
+              exportMatch?.[1] ??
+              participantMatch![1],
           );
           const requesterRole = await contributors.roleFor(
             hunt.id,
@@ -576,6 +589,52 @@ export function createApplication(options: ServerOptions = {}) {
           const canEdit =
             requesterRole === "owner" || requesterRole === "officer";
           const canManage = requesterRole === "owner";
+          if (participantMatch && method === "GET") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message:
+                  "Only Owners and Officers can view participant progress.",
+              });
+              return;
+            }
+            const [accounts, legacy] = await Promise.all([
+              accountProgress.participants(hunt.id),
+              progress.participants(hunt.id),
+            ]);
+            const completedByParticipant = new Map<string, Set<string>>();
+            for (const participant of [...legacy, ...accounts]) {
+              const completed =
+                completedByParticipant.get(participant.playerId) ?? new Set();
+              for (const taskId of participant.completedTaskIds)
+                completed.add(taskId);
+              completedByParticipant.set(participant.playerId, completed);
+            }
+            const tasks = [...hunt.tasks].sort(
+              (left, right) => left.order - right.order,
+            );
+            const participants: HuntParticipantProgress[] = await Promise.all(
+              [...completedByParticipant.entries()]
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(async ([participantId, completed]) => {
+                  const displayName = participantId.startsWith("google-")
+                    ? (await accountProfiles.get(participantId)).displayName
+                    : null;
+                  return {
+                    participantId,
+                    displayName,
+                    tasks: tasks.map((task) => ({
+                      id: task.id,
+                      displayLabel: task.displayLabel,
+                      completed: completed.has(task.id),
+                    })),
+                  };
+                }),
+            );
+            json(response, 200, { ok: true, value: participants });
+            return;
+          }
           if (exportMatch && method === "GET") {
             if (!canEdit) {
               json(response, 403, {

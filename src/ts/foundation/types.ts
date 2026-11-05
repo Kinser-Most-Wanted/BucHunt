@@ -45,6 +45,7 @@ export interface HuntParticipantProgress {
     completed: boolean;
   }[];
 }
+export type ParticipantAction = "kick" | "ban";
 export interface HuntParticipationSummary {
   activeCount: number;
   leftCompletedCount: number;

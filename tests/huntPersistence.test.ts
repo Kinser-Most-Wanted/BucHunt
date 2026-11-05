@@ -1215,7 +1215,10 @@ test("hunt participation progress is current, task-specific, and restricted to O
   const directory = await mkdtemp(
     join(tmpdir(), "buchunt-participant-progress-"),
   );
-  const app = createApplication({ dataDirectory: directory });
+  const app = createApplication({
+    dataDirectory: directory,
+    verifyPlayerToken,
+  });
   try {
     await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
     const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
@@ -1243,8 +1246,8 @@ test("hunt participation progress is current, task-specific, and restricted to O
     const profiles = new PlayerProfileStore(
       join(directory, "player-profiles.json"),
     );
-    const activePlayer = `google-${"a".repeat(64)}`;
-    const zeroProgressPlayer = `google-${"b".repeat(64)}`;
+    const activePlayer = `google-${createHash("sha256").update("google-subject-a").digest("hex")}`;
+    const zeroProgressPlayer = `google-${createHash("sha256").update("google-subject-b").digest("hex")}`;
     await accountProgress.join(activePlayer, hunt.id);
     await accountProgress.complete(activePlayer, hunt.id, first.id);
     await profiles.save(activePlayer, { displayName: "Baja" });
@@ -1259,6 +1262,16 @@ test("hunt participation progress is current, task-specific, and restricted to O
     const url = `${base}/api/admin/hunts/${hunt.id}/participants`;
     const participantRequest = (cookie: string) =>
       fetch(url, { headers: { Cookie: cookie } });
+    const moderateParticipant = (
+      cookie: string,
+      participantId: string,
+      action: "kick" | "ban",
+    ) =>
+      fetch(`${url}/actions`, {
+        method: "POST",
+        headers: { Cookie: cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId, action }),
+      });
 
     const initial = await participantRequest(owner.cookie);
     expect(initial.status).toBe(200);
@@ -1294,6 +1307,52 @@ test("hunt participation progress is current, task-specific, and restricted to O
     ).toBe(true);
     expect((await participantRequest(officer.cookie)).status).toBe(200);
     expect((await participantRequest(contributor.cookie)).status).toBe(403);
+    expect(
+      (await moderateParticipant(contributor.cookie, activePlayer, "kick"))
+        .status,
+    ).toBe(403);
+    expect(
+      (await moderateParticipant(owner.cookie, activePlayer, "kick")).status,
+    ).toBe(200);
+    expect(await accountProgress.huntsWithProgress(activePlayer)).toEqual([]);
+    expect(
+      (
+        await fetch(`${base}/api/player/account/hunts/${hunt.id}`, {
+          headers: { Authorization: "Bearer player-a" },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await fetch(`${base}/api/player/account/join`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer player-a",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ accessCode: hunt.accessCode }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await moderateParticipant(officer.cookie, zeroProgressPlayer, "ban"))
+        .status,
+    ).toBe(200);
+    expect(await accountProgress.isBanned(zeroProgressPlayer, hunt.id)).toBe(
+      true,
+    );
+    expect(
+      (
+        await fetch(`${base}/api/player/account/join`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer player-b",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ accessCode: hunt.accessCode }),
+        })
+      ).status,
+    ).toBe(403);
 
     const emptyHunt = await hunts.create(input, owner.value.id);
     const empty = await fetch(

@@ -29,7 +29,7 @@ type HuntListFilter =
 
 const huntFilterNotes: Record<HuntListFilter, string> = {
   "recent-3":
-    "Showing the 3 most recently edited hunts. Choose a filter to browse more.",
+    "Showing the 3 most recently created or edited hunts. Choose a filter to browse more.",
   all: "Showing all hunts, most recently edited first.",
   edited: "Showing all hunts by last edit time.",
   created: "Showing all hunts by creation date.",
@@ -166,6 +166,19 @@ export function mountCreateHunt(
     if (!huntsLoaded) void refresh();
   }
 
+  function recentTimestamp(hunt: HuntSummary): number {
+    const timestamps = [hunt.createdAt, hunt.updatedAt]
+      .map((value) => Date.parse(value ?? ""))
+      .filter(Number.isFinite);
+    return timestamps.length ? Math.max(...timestamps) : 0;
+  }
+
+  function sortByRecent(hunts: HuntSummary[]): HuntSummary[] {
+    return hunts.sort(
+      (left, right) => recentTimestamp(right) - recentTimestamp(left),
+    );
+  }
+
   function sortByEdited(hunts: HuntSummary[]): HuntSummary[] {
     return hunts.sort(
       (left, right) =>
@@ -179,10 +192,12 @@ export function mountCreateHunt(
     let matching = [...availableHunts];
     switch (mode) {
       case "recent-3":
+        matching = sortByRecent(matching);
+        if (!query) matching = matching.slice(0, 3);
+        break;
       case "all":
       case "edited":
         matching = sortByEdited(matching);
-        if (mode === "recent-3" && !query) matching = matching.slice(0, 3);
         break;
       case "created":
         matching.sort(
@@ -299,6 +314,11 @@ export function mountCreateHunt(
     },
     { passive: true },
   );
+  manageDialog.addEventListener("close", () => {
+    if (!listSearch.value) return;
+    listSearch.value = "";
+    updateFilteredHunts();
+  });
   listFilter.addEventListener("change", () => updateFilteredHunts());
   listSearch.addEventListener("input", () => updateFilteredHunts());
 

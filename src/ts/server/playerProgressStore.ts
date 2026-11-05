@@ -6,6 +6,9 @@ interface ProgressFile {
   players: Record<string, Record<string, string[]>>;
   // Active membership is separate from durable completion history.
   activeHunts?: Record<string, string[]>;
+  // Completed IDs for accounts that explicitly left; active player records
+  // remain the source used by participant exports.
+  savedProgress?: Record<string, Record<string, string[]>>;
   incorrectChoices?: Record<string, Record<string, Record<string, string[]>>>;
 }
 function progress(value: unknown): ProgressFile {
@@ -35,6 +38,21 @@ function progress(value: unknown): ProgressFile {
     for (const hunts of Object.values(data.activeHunts))
       if (!Array.isArray(hunts) || hunts.some((id) => typeof id !== "string"))
         throw new Error("Invalid memberships");
+  }
+  if (data.savedProgress !== undefined) {
+    if (
+      !data.savedProgress ||
+      typeof data.savedProgress !== "object" ||
+      Array.isArray(data.savedProgress)
+    )
+      throw new Error("Invalid saved progress");
+    for (const hunts of Object.values(data.savedProgress)) {
+      if (!hunts || typeof hunts !== "object" || Array.isArray(hunts))
+        throw new Error("Invalid saved progress");
+      for (const ids of Object.values(hunts))
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string"))
+          throw new Error("Invalid saved progress");
+    }
   }
   if (data.incorrectChoices !== undefined) {
     const object = (value: unknown): value is Record<string, unknown> =>
@@ -82,32 +100,14 @@ export class PlayerProgressStore {
         ? Object.keys(data.players[player])
         : [];
   }
-  async participants(
-    hunt: string,
-  ): Promise<{ playerId: string; completedTaskIds: string[] }[]> {
-    const data = await this.file.get();
-    return Object.entries(data.players)
-      .filter(([playerId, hunts]) => {
-        if (!Object.hasOwn(hunts, hunt)) return false;
-        // Legacy progress records have no membership entry; keep including
-        // them. Account members who explicitly left retain an empty list.
-        return (
-          !data.activeHunts ||
-          !Object.hasOwn(data.activeHunts, playerId) ||
-          data.activeHunts[playerId].includes(hunt)
-        );
-      })
-      .map(([playerId, hunts]) => ({
-        playerId,
-        completedTaskIds: [...hunts[hunt]],
-      }));
-  }
   async completed(player: string, hunt: string): Promise<string[]> {
     const data = await this.file.get();
-    return Object.hasOwn(data.players, player) &&
+    if (
+      Object.hasOwn(data.players, player) &&
       Object.hasOwn(data.players[player], hunt)
-      ? data.players[player][hunt]
-      : [];
+    )
+      return [...data.players[player][hunt]];
+    return [...(data.savedProgress?.[player]?.[hunt] ?? [])];
   }
   async incorrect(
     player: string,
@@ -146,7 +146,14 @@ export class PlayerProgressStore {
       if (!active.includes(hunt)) active.push(hunt);
       if (!Object.hasOwn(data.players, player)) data.players[player] = {};
       if (!Object.hasOwn(data.players[player], hunt))
-        data.players[player][hunt] = [];
+        data.players[player][hunt] = [
+          ...(data.savedProgress?.[player]?.[hunt] ?? []),
+        ];
+      if (data.savedProgress?.[player]) {
+        delete data.savedProgress[player][hunt];
+        if (Object.keys(data.savedProgress[player]).length === 0)
+          delete data.savedProgress[player];
+      }
     });
   }
   async leave(player: string, hunt: string): Promise<void> {
@@ -154,6 +161,16 @@ export class PlayerProgressStore {
       const activeHunts = memberships(data);
       if (Object.hasOwn(activeHunts, player)) {
         activeHunts[player] = activeHunts[player].filter((id) => id !== hunt);
+      }
+      if (Object.hasOwn(data.players, player)) {
+        if (Object.hasOwn(data.players[player], hunt)) {
+          const saved = (data.savedProgress ??= {});
+          const savedHunts = (saved[player] ??= {});
+          savedHunts[hunt] = [...data.players[player][hunt]];
+          delete data.players[player][hunt];
+        }
+        if (Object.keys(data.players[player]).length === 0)
+          delete data.players[player];
       }
       if (data.incorrectChoices?.[player]) {
         delete data.incorrectChoices[player][hunt];
@@ -174,6 +191,10 @@ export class PlayerProgressStore {
         delete hunts[hunt];
         if (Object.keys(hunts).length === 0)
           delete data.incorrectChoices![player];
+      }
+      for (const [player, hunts] of Object.entries(data.savedProgress ?? {})) {
+        delete hunts[hunt];
+        if (Object.keys(hunts).length === 0) delete data.savedProgress![player];
       }
       for (const [player, hunts] of Object.entries(memberships(data))) {
         const remaining = hunts.filter((id) => id !== hunt);

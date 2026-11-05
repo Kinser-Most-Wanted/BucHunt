@@ -1031,10 +1031,13 @@ test("saved progress for departed accounts stays restorable but is omitted from 
 
     expect(await store.completed("player-left", "hunt-a")).toEqual(["task-b"]);
     expect(await store.huntsWithProgress("player-left")).toEqual([]);
-    expect(await store.participants("hunt-a")).toEqual([
-      { playerId: "player-active", completedTaskIds: ["task-a"] },
-      { playerId: "legacy-player", completedTaskIds: ["task-c"] },
-    ]);
+    const saved = JSON.parse(
+      await readFile(join(directory, "account-player-progress.json"), "utf8"),
+    );
+    expect(saved.players["player-active"]["hunt-a"]).toEqual(["task-a"]);
+    expect(saved.players["player-left"]).toBeUndefined();
+    expect(saved.savedProgress["player-left"]["hunt-a"]).toEqual(["task-b"]);
+    expect(saved.players["legacy-player"]["hunt-a"]).toEqual(["task-c"]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

@@ -549,18 +549,49 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
   await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  const id = await page.locator('#define-task [name="huntId"]').inputValue();
+  const participantId = `google-${"a".repeat(64)}`;
+  let moderationApplied = false;
+  let moderationAction: unknown;
+  await page.route(`**/api/admin/hunts/${id}/participants`, (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: moderationApplied
+          ? []
+          : [{ participantId, displayName: "Baja", tasks: [] }],
+        summary: {
+          activeCount: moderationApplied ? 0 : 1,
+          leftCompletedCount: 0,
+          leftIncompleteCount: 0,
+        },
+      },
+    }),
+  );
+  await page.route(`**/api/admin/hunts/${id}/participants/actions`, (route) => {
+    moderationAction = route.request().postDataJSON();
+    moderationApplied = true;
+    return route.fulfill({ json: { ok: true, value: { removed: true } } });
+  });
   await page
     .getByRole("button", { name: "Shared hunt (owner)", exact: true })
     .click();
   await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
   const participantProgress = page.getByTestId("participant-progress");
   await expect(participantProgress).toBeVisible();
+  await expect(page.getByTestId("participant-progress-row")).toContainText(
+    "Baja",
+  );
+  await expect(page.getByTestId("kick-participant")).toBeVisible();
+  await expect(page.getByTestId("ban-participant")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("kick-participant").click();
   await expect(page.getByTestId("participant-progress-empty")).toBeVisible();
+  expect(moderationAction).toEqual({ participantId, action: "kick" });
   await page.getByTestId("refresh-participant-progress").click();
   await expect(page.getByTestId("participant-progress-status")).toHaveText(
     "Participant progress is up to date.",
   );
-  const id = await page.locator('#define-task [name="huntId"]').inputValue();
   const contributor = await browser.newContext({ baseURL });
   const stranger = await browser.newContext({ baseURL });
   try {

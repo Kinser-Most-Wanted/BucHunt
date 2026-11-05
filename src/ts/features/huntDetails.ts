@@ -46,6 +46,37 @@ function updateParticipantControls(): void {
     '[data-testid="refresh-participant-progress"]',
   );
   if (button) button.disabled = loadingParticipants || !canViewProgress;
+  dialog
+    ?.querySelectorAll<HTMLButtonElement>("[data-participant-action]")
+    .forEach((control) => {
+      control.disabled = loadingParticipants || !canViewProgress;
+    });
+}
+
+function participantIcon(kind: "kick" | "ban"): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const paths =
+    kind === "kick"
+      ? ["M4 4h7l1 7 3 2 4 1.5 2 2V20H4l-1-2 1-3 1-1.5L4 4Z", "M8 7v4"]
+      : ["M5 6l4-4 5 5-4 4z", "m10 10 9 9", "m16 15 3-3", "m18 19 3-3"];
+  for (const data of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", data);
+    svg.append(path);
+  }
+  if (kind === "ban") {
+    const slash = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+    slash.setAttribute("d", "M4 20 20 4");
+    slash.setAttribute("class", "participant-ban-slash");
+    svg.append(slash);
+  }
+  return svg;
 }
 
 function renderParticipants(
@@ -86,6 +117,24 @@ function renderParticipants(
       : "No tasks yet";
     heading.append(name, summary);
     card.append(heading);
+    const actions = document.createElement("div");
+    actions.className = "participant-moderation-actions";
+    for (const action of ["kick", "ban"] as const) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `participant-action-button is-${action}`;
+      button.dataset.participantAction = action;
+      button.dataset.participantId = participant.participantId;
+      button.dataset.testid = `${action}-participant`;
+      button.setAttribute(
+        "aria-label",
+        `${action === "kick" ? "Kick" : "Ban"} ${name.textContent} from hunt`,
+      );
+      button.title = action === "kick" ? "Kick from hunt" : "Ban from hunt";
+      button.append(participantIcon(action));
+      actions.append(button);
+    }
+    card.append(actions);
     if (participant.tasks.length) {
       const tasks = document.createElement("ul");
       tasks.className = "participant-task-list";
@@ -148,6 +197,67 @@ dialog
     '[data-testid="refresh-participant-progress"]',
   )
   ?.addEventListener("click", () => void loadParticipants());
+
+dialog
+  ?.querySelector<HTMLElement>('[data-testid="participant-progress-list"]')
+  ?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest<HTMLButtonElement>(
+      "button[data-participant-action]",
+    );
+    const action = button?.dataset.participantAction;
+    const participantId = button?.dataset.participantId;
+    const huntId = activeHunt?.id;
+    if (
+      !button ||
+      !huntId ||
+      !participantId ||
+      (action !== "kick" && action !== "ban") ||
+      loadingParticipants ||
+      !canViewProgress
+    )
+      return;
+    const verb = action === "kick" ? "kick" : "ban";
+    if (
+      !window.confirm(
+        `${verb === "kick" ? "Kick" : "Ban"} this player from the hunt?${action === "ban" ? " They will not be able to rejoin." : ""}`,
+      )
+    )
+      return;
+    const requestId = activeRequest;
+    const status = dialog?.querySelector<HTMLElement>(
+      '[data-testid="participant-progress-status"]',
+    );
+    loadingParticipants = true;
+    updateParticipantControls();
+    if (status) status.textContent = `Removing player from the hunt…`;
+    try {
+      const result = await repository.moderateHuntParticipant(
+        huntId,
+        participantId,
+        action,
+      );
+      if (requestId !== activeRequest || !dialog?.open) return;
+      if (!result.ok) {
+        if (status) status.textContent = result.message;
+        return;
+      }
+      loadingParticipants = false;
+      updateParticipantControls();
+      await loadParticipants();
+      if (status && requestId === activeRequest)
+        status.textContent =
+          action === "kick"
+            ? "Player kicked from this hunt."
+            : "Player banned from this hunt.";
+    } finally {
+      if (requestId === activeRequest) {
+        loadingParticipants = false;
+        updateParticipantControls();
+      }
+    }
+  });
 
 for (const format of ["pdf", "csv"] as const) {
   dialog

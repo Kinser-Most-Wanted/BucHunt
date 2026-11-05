@@ -10,6 +10,7 @@ interface ProgressFile {
   // remain the source used by participant exports.
   savedProgress?: Record<string, Record<string, string[]>>;
   incorrectChoices?: Record<string, Record<string, Record<string, string[]>>>;
+  bannedPlayers?: Record<string, string[]>;
 }
 function progress(value: unknown): ProgressFile {
   if (!value || typeof value !== "object") throw new Error("Invalid progress");
@@ -70,6 +71,20 @@ function progress(value: unknown): ProgressFile {
             throw new Error("Invalid attempts");
       }
     }
+  }
+  if (data.bannedPlayers !== undefined) {
+    if (
+      !data.bannedPlayers ||
+      typeof data.bannedPlayers !== "object" ||
+      Array.isArray(data.bannedPlayers)
+    )
+      throw new Error("Invalid bans");
+    for (const players of Object.values(data.bannedPlayers))
+      if (
+        !Array.isArray(players) ||
+        players.some((id) => typeof id !== "string")
+      )
+        throw new Error("Invalid bans");
   }
   return data;
 }
@@ -163,6 +178,8 @@ export class PlayerProgressStore {
     if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
       throw new StoreError("validation", "Invalid participation identifier.");
     await this.file.update((data) => {
+      if (data.bannedPlayers?.[hunt]?.includes(player))
+        throw new StoreError("forbidden", "You are banned from this hunt.");
       const activeHunts = memberships(data);
       const active = (activeHunts[player] ??= []);
       if (!active.includes(hunt)) active.push(hunt);
@@ -201,6 +218,37 @@ export class PlayerProgressStore {
       }
     });
   }
+  async ban(player: string, hunt: string): Promise<void> {
+    if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
+      throw new StoreError("validation", "Invalid participation identifier.");
+    await this.file.update((data) => {
+      const banned = (data.bannedPlayers ??= {});
+      const players = (banned[hunt] ??= []);
+      if (!players.includes(player)) players.push(player);
+      const activeHunts = memberships(data);
+      if (Object.hasOwn(activeHunts, player))
+        activeHunts[player] = activeHunts[player].filter((id) => id !== hunt);
+      if (Object.hasOwn(data.players, player)) {
+        if (Object.hasOwn(data.players[player], hunt)) {
+          const saved = (data.savedProgress ??= {});
+          const savedHunts = (saved[player] ??= {});
+          savedHunts[hunt] = [...data.players[player][hunt]];
+          delete data.players[player][hunt];
+        }
+        if (Object.keys(data.players[player]).length === 0)
+          delete data.players[player];
+      }
+      if (data.incorrectChoices?.[player]) {
+        delete data.incorrectChoices[player][hunt];
+        if (Object.keys(data.incorrectChoices[player]).length === 0)
+          delete data.incorrectChoices[player];
+      }
+    });
+  }
+  async isBanned(player: string, hunt: string): Promise<boolean> {
+    const data = await this.file.get();
+    return data.bannedPlayers?.[hunt]?.includes(player) ?? false;
+  }
   async removeHunt(hunt: string): Promise<void> {
     await this.file.update((data) => {
       for (const [player, hunts] of Object.entries(data.players)) {
@@ -223,6 +271,7 @@ export class PlayerProgressStore {
         if (remaining.length === 0) delete data.activeHunts![player];
         else data.activeHunts![player] = remaining;
       }
+      delete data.bannedPlayers?.[hunt];
     });
   }
   async complete(player: string, hunt: string, task: string): Promise<void> {

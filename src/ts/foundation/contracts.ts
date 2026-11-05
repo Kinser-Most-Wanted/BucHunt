@@ -4,6 +4,7 @@ import type {
   HuntDefinition,
   HuntInput,
   HuntParticipationResult,
+  ParticipantAction,
   OperationResult,
   PlayerIdentity,
   PlayerProfile,
@@ -47,6 +48,11 @@ export interface HuntRepository {
   getHuntParticipationProgress(
     huntId: string,
   ): Promise<HuntParticipationResult>;
+  moderateHuntParticipant(
+    huntId: string,
+    participantId: string,
+    action: ParticipantAction,
+  ): Promise<OperationResult<{ removed: true }>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
   getAccountProfile(
     identity: PlayerIdentity,

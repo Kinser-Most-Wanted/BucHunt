@@ -2206,6 +2206,57 @@ body[data-page="hunt-details"] .hunt-id-toggle {
   font-size: 0.82rem;
   white-space: nowrap;
 }
+.participant-moderation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+.participant-action-button {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  margin: 0;
+  padding: 0.45rem;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 0.7rem;
+  background: #15345d;
+  color: #e9eef7;
+  cursor: pointer;
+}
+.participant-action-button:hover:not(:disabled) {
+  border-color: rgb(255 199 44 / 50%);
+  background: rgb(255 199 44 / 10%);
+  color: #ffc72c;
+}
+.participant-action-button.is-ban:hover:not(:disabled) {
+  border-color: rgb(255 95 95 / 52%);
+  background: rgb(255 95 95 / 10%);
+  color: #ff8585;
+}
+.participant-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.participant-action-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.participant-action-button.is-kick svg path:first-child {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.participant-action-button .participant-ban-slash {
+  stroke: #ff8585;
+  stroke-width: 2.3;
+}
 .participant-task-list {
   gap: 0.4rem;
   margin-top: 0.7rem;

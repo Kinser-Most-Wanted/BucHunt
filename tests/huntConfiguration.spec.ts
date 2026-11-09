@@ -550,29 +550,52 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
   await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
-  const participantId = `google-${"a".repeat(64)}`;
-  let moderationApplied = false;
+  const participantId = "google-" + "a".repeat(64);
+  const secondParticipantId = "google-" + "b".repeat(64);
+  let firstPlayerKicked = false;
+  let secondPlayerBanned = false;
   let moderationAction: unknown;
-  await page.route(`**/api/admin/hunts/${id}/participants`, (route) =>
-    route.fulfill({
+  await page.route("**/api/admin/hunts/" + id + "/participants", (route) => {
+    const value = [
+      ...(!firstPlayerKicked
+        ? [{ participantId, displayName: "Baja", tasks: [] }]
+        : []),
+      ...(!secondPlayerBanned
+        ? [
+            {
+              participantId: secondParticipantId,
+              displayName: "Morgan",
+              tasks: [],
+            },
+          ]
+        : []),
+    ];
+    return route.fulfill({
       json: {
         ok: true,
-        value: moderationApplied
-          ? []
-          : [{ participantId, displayName: "Baja", tasks: [] }],
+        value,
+        bannedParticipants: secondPlayerBanned
+          ? [{ participantId: secondParticipantId, displayName: "Morgan" }]
+          : [],
         summary: {
-          activeCount: moderationApplied ? 0 : 1,
+          activeCount: value.length,
           leftCompletedCount: 0,
           leftIncompleteCount: 0,
         },
       },
-    }),
-  );
-  await page.route(`**/api/admin/hunts/${id}/participants/actions`, (route) => {
-    moderationAction = route.request().postDataJSON();
-    moderationApplied = true;
-    return route.fulfill({ json: { ok: true, value: { removed: true } } });
+    });
   });
+  await page.route(
+    "**/api/admin/hunts/" + id + "/participants/actions",
+    (route) => {
+      moderationAction = route.request().postDataJSON();
+      const action = (moderationAction as { action: string }).action;
+      if (action === "kick") firstPlayerKicked = true;
+      if (action === "ban") secondPlayerBanned = true;
+      if (action === "unban") secondPlayerBanned = false;
+      return route.fulfill({ json: { ok: true, value: { removed: true } } });
+    },
+  );
   await page
     .getByRole("button", { name: "Shared hunt (owner)", exact: true })
     .click();
@@ -582,12 +605,32 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
   await expect(page.getByTestId("participant-progress-row")).toContainText(
     "Baja",
   );
-  await expect(page.getByTestId("kick-participant")).toBeVisible();
-  await expect(page.getByTestId("ban-participant")).toBeVisible();
+  await expect(page.getByTestId("kick-participant")).toHaveCount(2);
+  await expect(page.getByTestId("ban-participant")).toHaveCount(2);
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByTestId("kick-participant").click();
-  await expect(page.getByTestId("participant-progress-empty")).toBeVisible();
+  await page.getByTestId("kick-participant").first().click();
+  await expect(page.getByTestId("participant-progress-row")).toHaveCount(1);
   expect(moderationAction).toEqual({ participantId, action: "kick" });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("ban-participant").click();
+  await expect(page.getByTestId("participant-progress-empty")).toBeVisible();
+  await expect(page.getByTestId("banned-participant-row")).toContainText(
+    "Morgan",
+  );
+  expect(moderationAction).toEqual({
+    participantId: secondParticipantId,
+    action: "ban",
+  });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("unban-participant").click();
+  await expect(page.getByTestId("banned-participant-empty")).toBeVisible();
+  await expect(page.getByTestId("participant-progress-row")).toContainText(
+    "Morgan",
+  );
+  expect(moderationAction).toEqual({
+    participantId: secondParticipantId,
+    action: "unban",
+  });
   await page.getByTestId("refresh-participant-progress").click();
   await expect(page.getByTestId("participant-progress-status")).toHaveText(
     "Participant progress is up to date.",

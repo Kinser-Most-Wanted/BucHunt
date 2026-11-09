@@ -45,7 +45,11 @@ export interface HuntParticipantProgress {
     completed: boolean;
   }[];
 }
-export type ParticipantAction = "kick" | "ban";
+export type ParticipantAction = "kick" | "ban" | "unban";
+export interface HuntBannedParticipant {
+  participantId: string;
+  displayName: string | null;
+}
 export interface HuntParticipationSummary {
   activeCount: number;
   leftCompletedCount: number;
@@ -56,6 +60,7 @@ export type HuntParticipationResult =
       ok: true;
       value: HuntParticipantProgress[];
       summary: HuntParticipationSummary;
+      bannedParticipants: HuntBannedParticipant[];
     }
   | Extract<OperationResult<never>, { ok: false }>;
 export interface TaskDefinition extends TaskInput {

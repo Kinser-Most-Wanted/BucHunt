@@ -1265,7 +1265,7 @@ test("hunt participation progress is current, task-specific, and restricted to O
     const moderateParticipant = (
       cookie: string,
       participantId: string,
-      action: "kick" | "ban",
+      action: "kick" | "ban" | "unban",
     ) =>
       fetch(`${url}/actions`, {
         method: "POST",
@@ -1355,6 +1355,20 @@ test("hunt participation progress is current, task-specific, and restricted to O
     expect(await accountProgress.isBanned(zeroProgressPlayer, hunt.id)).toBe(
       true,
     );
+    const bannedResponse = await participantRequest(owner.cookie);
+    expect((await bannedResponse.json()).bannedParticipants).toContainEqual({
+      participantId: zeroProgressPlayer,
+      displayName: null,
+    });
+    expect(
+      (
+        await moderateParticipant(
+          contributor.cookie,
+          zeroProgressPlayer,
+          "unban",
+        )
+      ).status,
+    ).toBe(403);
     expect(
       (
         await fetch(`${base}/api/player/account/join`, {
@@ -1367,6 +1381,25 @@ test("hunt participation progress is current, task-specific, and restricted to O
         })
       ).status,
     ).toBe(403);
+    expect(
+      (await moderateParticipant(officer.cookie, zeroProgressPlayer, "unban"))
+        .status,
+    ).toBe(200);
+    expect(await accountProgress.isBanned(zeroProgressPlayer, hunt.id)).toBe(
+      false,
+    );
+    expect(
+      (
+        await fetch(`${base}/api/player/account/join`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer player-b",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ accessCode: hunt.accessCode }),
+        })
+      ).status,
+    ).toBe(200);
 
     const emptyHunt = await hunts.create(input, owner.value.id);
     const empty = await fetch(

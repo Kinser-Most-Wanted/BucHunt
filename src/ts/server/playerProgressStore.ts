@@ -249,6 +249,21 @@ export class PlayerProgressStore {
     const data = await this.file.get();
     return data.bannedPlayers?.[hunt]?.includes(player) ?? false;
   }
+  async banned(hunt: string): Promise<string[]> {
+    const data = await this.file.get();
+    return [...(data.bannedPlayers?.[hunt] ?? [])];
+  }
+  async unban(player: string, hunt: string): Promise<void> {
+    if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
+      throw new StoreError("validation", "Invalid participation identifier.");
+    await this.file.update((data) => {
+      const players = data.bannedPlayers?.[hunt];
+      if (!players) return;
+      const remaining = players.filter((id) => id !== player);
+      if (remaining.length) data.bannedPlayers![hunt] = remaining;
+      else delete data.bannedPlayers![hunt];
+    });
+  }
   async removeHunt(hunt: string): Promise<void> {
     await this.file.update((data) => {
       for (const [player, hunts] of Object.entries(data.players)) {

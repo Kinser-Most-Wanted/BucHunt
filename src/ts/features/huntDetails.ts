@@ -1,4 +1,5 @@
 import type {
+  HuntBannedParticipant,
   HuntDefinition,
   HuntParticipationSummary,
   HuntParticipantProgress,
@@ -87,6 +88,7 @@ function renderParticipants(
   participants: HuntParticipantProgress[],
   summary: HuntParticipationSummary,
   currentCreatorId: string | null,
+  bannedParticipants: HuntBannedParticipant[],
 ): void {
   const list = dialog?.querySelector<HTMLElement>(
     '[data-testid="participant-progress-list"]',
@@ -94,7 +96,13 @@ function renderParticipants(
   const empty = dialog?.querySelector<HTMLElement>(
     '[data-testid="participant-progress-empty"]',
   );
-  if (!list || !empty) return;
+  const bannedList = dialog?.querySelector<HTMLElement>(
+    '[data-testid="banned-participant-list"]',
+  );
+  const bannedEmpty = dialog?.querySelector<HTMLElement>(
+    '[data-testid="banned-participant-empty"]',
+  );
+  if (!list || !empty || !bannedList || !bannedEmpty) return;
   for (const [testId, count] of [
     ["participant-active-count", summary.activeCount],
     ["participant-left-completed-count", summary.leftCompletedCount],
@@ -171,6 +179,27 @@ function renderParticipants(
   });
   list.replaceChildren(fragment);
   empty.hidden = participants.length !== 0;
+  const bannedFragment = document.createDocumentFragment();
+  bannedParticipants.forEach((participant, index) => {
+    const row = document.createElement("li");
+    row.className = "banned-participant-row";
+    row.dataset.testid = "banned-participant-row";
+    const name = document.createElement("span");
+    name.textContent =
+      participant.displayName?.trim() || `Banned player ${index + 1}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "participant-unban-button";
+    button.dataset.participantAction = "unban";
+    button.dataset.participantId = participant.participantId;
+    button.dataset.testid = "unban-participant";
+    button.setAttribute("aria-label", `Unban ${name.textContent}`);
+    button.textContent = "Unban";
+    row.append(name, button);
+    bannedFragment.append(row);
+  });
+  bannedList.replaceChildren(bannedFragment);
+  bannedEmpty.hidden = bannedParticipants.length !== 0;
 }
 
 async function loadParticipants(): Promise<void> {
@@ -203,6 +232,7 @@ async function loadParticipants(): Promise<void> {
       result.value,
       result.summary,
       session.ok ? session.value.id : null,
+      result.bannedParticipants,
     );
     if (status) status.textContent = "Participant progress is up to date.";
   } finally {
@@ -219,66 +249,66 @@ dialog
   )
   ?.addEventListener("click", () => void loadParticipants());
 
-dialog
-  ?.querySelector<HTMLElement>('[data-testid="participant-progress-list"]')
-  ?.addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const button = target.closest<HTMLButtonElement>(
-      "button[data-participant-action]",
+dialog?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>(
+    "button[data-participant-action]",
+  );
+  const action = button?.dataset.participantAction;
+  const participantId = button?.dataset.participantId;
+  const huntId = activeHunt?.id;
+  if (
+    !button ||
+    !huntId ||
+    !participantId ||
+    (action !== "kick" && action !== "ban" && action !== "unban") ||
+    loadingParticipants ||
+    !canViewProgress
+  )
+    return;
+  const confirmation =
+    action === "kick"
+      ? "Kick this player from the hunt?"
+      : action === "ban"
+        ? "Ban this player from the hunt? They will not be able to rejoin."
+        : "Unban this player from the hunt? They will be able to join again.";
+  if (!window.confirm(confirmation)) return;
+  const requestId = activeRequest;
+  const status = dialog?.querySelector<HTMLElement>(
+    '[data-testid="participant-progress-status"]',
+  );
+  loadingParticipants = true;
+  updateParticipantControls();
+  if (status) status.textContent = "Updating player access…";
+  try {
+    const result = await repository.moderateHuntParticipant(
+      huntId,
+      participantId,
+      action,
     );
-    const action = button?.dataset.participantAction;
-    const participantId = button?.dataset.participantId;
-    const huntId = activeHunt?.id;
-    if (
-      !button ||
-      !huntId ||
-      !participantId ||
-      (action !== "kick" && action !== "ban") ||
-      loadingParticipants ||
-      !canViewProgress
-    )
+    if (requestId !== activeRequest || !dialog?.open) return;
+    if (!result.ok) {
+      if (status) status.textContent = result.message;
       return;
-    const verb = action === "kick" ? "kick" : "ban";
-    if (
-      !window.confirm(
-        `${verb === "kick" ? "Kick" : "Ban"} this player from the hunt?${action === "ban" ? " They will not be able to rejoin." : ""}`,
-      )
-    )
-      return;
-    const requestId = activeRequest;
-    const status = dialog?.querySelector<HTMLElement>(
-      '[data-testid="participant-progress-status"]',
-    );
-    loadingParticipants = true;
+    }
+    loadingParticipants = false;
     updateParticipantControls();
-    if (status) status.textContent = `Removing player from the hunt…`;
-    try {
-      const result = await repository.moderateHuntParticipant(
-        huntId,
-        participantId,
-        action,
-      );
-      if (requestId !== activeRequest || !dialog?.open) return;
-      if (!result.ok) {
-        if (status) status.textContent = result.message;
-        return;
-      }
+    await loadParticipants();
+    if (status && requestId === activeRequest)
+      status.textContent =
+        action === "kick"
+          ? "Player kicked from this hunt."
+          : action === "ban"
+            ? "Player banned from this hunt."
+            : "Player unbanned and can join this hunt again.";
+  } finally {
+    if (requestId === activeRequest) {
       loadingParticipants = false;
       updateParticipantControls();
-      await loadParticipants();
-      if (status && requestId === activeRequest)
-        status.textContent =
-          action === "kick"
-            ? "Player kicked from this hunt."
-            : "Player banned from this hunt.";
-    } finally {
-      if (requestId === activeRequest) {
-        loadingParticipants = false;
-        updateParticipantControls();
-      }
     }
-  });
+  }
+});
 
 for (const format of ["pdf", "csv"] as const) {
   dialog
@@ -432,6 +462,9 @@ function resetDialog(): void {
   dialog
     ?.querySelector<HTMLElement>('[data-testid="participant-progress-list"]')
     ?.replaceChildren();
+  dialog
+    ?.querySelector<HTMLElement>('[data-testid="banned-participant-list"]')
+    ?.replaceChildren();
   const participantStatus = dialog?.querySelector<HTMLElement>(
     '[data-testid="participant-progress-status"]',
   );
@@ -440,6 +473,10 @@ function resetDialog(): void {
     '[data-testid="participant-progress-empty"]',
   );
   if (participantEmpty) participantEmpty.hidden = true;
+  const bannedParticipantEmpty = dialog?.querySelector<HTMLElement>(
+    '[data-testid="banned-participant-empty"]',
+  );
+  if (bannedParticipantEmpty) bannedParticipantEmpty.hidden = true;
   for (const testId of [
     "participant-active-count",
     "participant-left-completed-count",

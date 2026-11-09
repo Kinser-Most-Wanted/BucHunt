@@ -2267,6 +2267,46 @@ body[data-page="hunt-details"] .hunt-id-toggle {
   stroke: #ff8585;
   stroke-width: 2.3;
 }
+.banned-participants {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+}
+.banned-participants h4 {
+  margin: 0;
+  color: #f4f5f9;
+}
+.banned-participant-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.banned-participant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.7rem;
+  background: rgb(255 255 255 / 3%);
+  color: #dce2ec;
+}
+.participant-unban-button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid rgb(255 199 44 / 34%);
+  border-radius: 0.55rem;
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+  cursor: pointer;
+}
+.participant-unban-button:hover:not(:disabled) {
+  background: rgb(255 199 44 / 17%);
+}
 .participant-task-list {
   gap: 0.4rem;
   margin-top: 0.7rem;

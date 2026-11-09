@@ -277,6 +277,12 @@
                 Owner · Creator information unavailable
               </p>
               <p class="hunt-access-code">
+                <span
+                  class="hunt-access-code-copy-status"
+                  data-testid="hunt-access-code-copy-status"
+                  role="status"
+                  aria-live="polite"
+                ></span>
                 <span>Access code</span>
                 <strong data-testid="hunt-access-code">Not set</strong>
                 <button
@@ -294,12 +300,6 @@
                     ></path>
                   </svg>
                 </button>
-                <span
-                  class="hunt-access-code-copy-status"
-                  data-testid="hunt-access-code-copy-status"
-                  role="status"
-                  aria-live="polite"
-                ></span>
               </p>
             </div>
             <p
@@ -317,6 +317,12 @@
               class="details-description"
               data-testid="hunt-detail-description"
             ></p>
+            <p
+              class="hunt-export-status"
+              role="status"
+              aria-live="polite"
+              data-testid="hunt-export-status"
+            ></p>
             <div class="details-actions">
               <button
                 type="button"
@@ -332,12 +338,6 @@
               >
                 Export CSV
               </button>
-              <span
-                role="status"
-                aria-live="polite"
-                data-testid="hunt-export-status"
-              ></span>
-
               <button
                 type="button"
                 class="action"

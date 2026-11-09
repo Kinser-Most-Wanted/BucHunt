@@ -904,4 +904,3 @@ test("task type selection creates multiple-choice configuration and resets after
     page.getByLabel("Incorrect Answer 1", { exact: true }),
   ).toHaveValue("Circle");
 });
-

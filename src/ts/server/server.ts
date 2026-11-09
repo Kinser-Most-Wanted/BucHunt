@@ -746,6 +746,11 @@ export function createApplication(options: ServerOptions = {}) {
               json(response, 200, { ok: true, value: { removed: true } });
               return;
             }
+            if (participantId === creatorId)
+              throw new StoreError(
+                "forbidden",
+                "You cannot kick or ban yourself from this hunt.",
+              );
             const [accountParticipants, legacyParticipants] = await Promise.all(
               [
                 accountProgress.participants(hunt.id),
@@ -1179,4 +1184,3 @@ if (
     console.log("BucHunt server ready"),
   );
 }
-

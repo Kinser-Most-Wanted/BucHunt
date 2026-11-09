@@ -123,6 +123,11 @@ export function createHuntRepository(): HuntRepository {
       );
       return result.ok ? (result as HuntParticipationResult) : result;
     },
+    moderateHuntParticipant: (id, participantId, action) =>
+      creatorRequest(
+        `/api/admin/hunts/${encodeURIComponent(id)}/participants/actions`,
+        { participantId, action },
+      ),
     getPlayerHunt: (id) =>
       request(`/api/player/hunts/${encodeURIComponent(id)}`),
     joinHunt: (accessCode, identity) =>

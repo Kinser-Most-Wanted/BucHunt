@@ -1,7 +1,9 @@
 import { OAuth2Client } from "google-auth-library";
 import type {
   HuntDefinition,
+  HuntBannedParticipant,
   HuntParticipantProgress,
+  ParticipantAction,
   PlayerHunt,
   TaskDefinition,
 } from "../foundation/types.js";
@@ -547,6 +549,10 @@ export function createApplication(options: ServerOptions = {}) {
           );
         const participantMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/participants$/.exec(path);
+        const participantActionMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/participants\/actions$/.exec(
+            path,
+          );
         const taskMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/tasks\/([a-zA-Z0-9-]+)$/.exec(
             path,
@@ -564,14 +570,16 @@ export function createApplication(options: ServerOptions = {}) {
           taskMatch ||
           roleMatch ||
           exportMatch ||
-          participantMatch
+          participantMatch ||
+          participantActionMatch
         ) {
           const hunt = await hunts.get(
             match?.[1] ??
               taskMatch?.[1] ??
               roleMatch?.[1] ??
               exportMatch?.[1] ??
-              participantMatch![1],
+              participantMatch?.[1] ??
+              participantActionMatch![1],
           );
           const requesterRole = await contributors.roleFor(
             hunt.id,
@@ -599,13 +607,21 @@ export function createApplication(options: ServerOptions = {}) {
               });
               return;
             }
-            const [accounts, legacy, departedAccounts, departedLegacy] =
-              await Promise.all([
-                accountProgress.participants(hunt.id),
-                progress.participants(hunt.id),
-                accountProgress.departedParticipants(hunt.id),
-                progress.departedParticipants(hunt.id),
-              ]);
+            const [
+              accounts,
+              legacy,
+              departedAccounts,
+              departedLegacy,
+              bannedAccounts,
+              bannedLegacy,
+            ] = await Promise.all([
+              accountProgress.participants(hunt.id),
+              progress.participants(hunt.id),
+              accountProgress.departedParticipants(hunt.id),
+              progress.departedParticipants(hunt.id),
+              accountProgress.banned(hunt.id),
+              progress.banned(hunt.id),
+            ]);
             const completedByParticipant = new Map<string, Set<string>>();
             for (const participant of [...legacy, ...accounts]) {
               const completed =
@@ -657,15 +673,107 @@ export function createApplication(options: ServerOptions = {}) {
                   };
                 }),
             );
+            const bannedParticipants: HuntBannedParticipant[] =
+              await Promise.all(
+                [...new Set([...bannedAccounts, ...bannedLegacy])]
+                  .sort((left, right) => left.localeCompare(right))
+                  .map(async (participantId) => ({
+                    participantId,
+                    displayName: participantId.startsWith("google-")
+                      ? (await accountProfiles.get(participantId)).displayName
+                      : null,
+                  })),
+              );
             json(response, 200, {
               ok: true,
               value: participants,
+              bannedParticipants,
               summary: {
                 activeCount: participants.length,
                 leftCompletedCount,
                 leftIncompleteCount,
               },
             });
+            return;
+          }
+          if (participantActionMatch && method === "POST") {
+            if (!canEdit) {
+              json(response, 403, {
+                ok: false,
+                code: "forbidden",
+                message: "Only Owners and Officers can manage participants.",
+              });
+              return;
+            }
+            const input = await body(request);
+            const participantId =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).participantId
+                : undefined;
+            const action =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).action
+                : undefined;
+            if (
+              participantId === creatorId &&
+              (action === "kick" || action === "ban")
+            )
+              throw new StoreError(
+                "forbidden",
+                "You cannot kick or ban yourself from this hunt.",
+              );
+            if (
+              typeof participantId !== "string" ||
+              !/^[a-zA-Z0-9-]{1,100}$/.test(participantId) ||
+              !["kick", "ban", "unban"].includes(String(action))
+            )
+              throw new StoreError(
+                "validation",
+                "Choose a valid participant and action.",
+              );
+            const participantAction = action as ParticipantAction;
+            const stores = [accountProgress, progress];
+            if (participantAction === "unban") {
+              const [accountBans, legacyBans] = await Promise.all([
+                accountProgress.banned(hunt.id),
+                progress.banned(hunt.id),
+              ]);
+              if (![...accountBans, ...legacyBans].includes(participantId))
+                throw new StoreError("not-found", "This player is not banned.");
+              await Promise.all(
+                stores.map((store) => store.unban(participantId, hunt.id)),
+              );
+              json(response, 200, { ok: true, value: { removed: true } });
+              return;
+            }
+            if (participantId === creatorId)
+              throw new StoreError(
+                "forbidden",
+                "You cannot kick or ban yourself from this hunt.",
+              );
+            const [accountParticipants, legacyParticipants] = await Promise.all(
+              [
+                accountProgress.participants(hunt.id),
+                progress.participants(hunt.id),
+              ],
+            );
+            const isActive = [
+              ...accountParticipants,
+              ...legacyParticipants,
+            ].some((participant) => participant.playerId === participantId);
+            if (!isActive)
+              throw new StoreError(
+                "not-found",
+                "This player is no longer active in the hunt.",
+              );
+            await Promise.all(
+              stores.map((store) =>
+                participantAction === "ban"
+                  ? store.ban(participantId, hunt.id)
+                  : store.leave(participantId, hunt.id),
+              ),
+            );
+            json(response, 200, { ok: true, value: { removed: true } });
             return;
           }
           if (exportMatch && method === "GET") {
@@ -923,6 +1031,14 @@ export function createApplication(options: ServerOptions = {}) {
           );
         }
         const hunt = await hunts.get(match[1]);
+        if (await progress.isBanned(player, hunt.id)) {
+          json(response, 403, {
+            ok: false,
+            code: "forbidden",
+            message: "You are banned from this hunt.",
+          });
+          return;
+        }
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);
           if (!task) throw new StoreError("not-found", "Task not found.");

@@ -715,6 +715,14 @@ export function createApplication(options: ServerOptions = {}) {
                 ? (input as Record<string, unknown>).action
                 : undefined;
             if (
+              participantId === creatorId &&
+              (action === "kick" || action === "ban")
+            )
+              throw new StoreError(
+                "forbidden",
+                "You cannot kick or ban yourself from this hunt.",
+              );
+            if (
               typeof participantId !== "string" ||
               !/^[a-zA-Z0-9-]{1,100}$/.test(participantId) ||
               !["kick", "ban", "unban"].includes(String(action))
@@ -738,11 +746,6 @@ export function createApplication(options: ServerOptions = {}) {
               json(response, 200, { ok: true, value: { removed: true } });
               return;
             }
-            if (participantId === creatorId)
-              throw new StoreError(
-                "forbidden",
-                "You cannot kick or ban yourself from this hunt.",
-              );
             const [accountParticipants, legacyParticipants] = await Promise.all(
               [
                 accountProgress.participants(hunt.id),
@@ -1176,3 +1179,4 @@ if (
     console.log("BucHunt server ready"),
   );
 }
+

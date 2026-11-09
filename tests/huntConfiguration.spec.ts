@@ -602,9 +602,9 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
   await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
   const participantProgress = page.getByTestId("participant-progress");
   await expect(participantProgress).toBeVisible();
-  await expect(page.getByTestId("participant-progress-row")).toContainText(
-    "Baja",
-  );
+  await expect(
+    page.getByTestId("participant-progress-row").first(),
+  ).toContainText("Baja");
   await expect(page.getByTestId("kick-participant")).toHaveCount(2);
   await expect(page.getByTestId("ban-participant")).toHaveCount(2);
   page.once("dialog", (dialog) => dialog.accept());
@@ -904,3 +904,4 @@ test("task type selection creates multiple-choice configuration and resets after
     page.getByLabel("Incorrect Answer 1", { exact: true }),
   ).toHaveValue("Circle");
 });
+

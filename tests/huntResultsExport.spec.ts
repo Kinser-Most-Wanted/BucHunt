@@ -69,13 +69,15 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
       .getByTestId("my-hunts")
       .getByRole("button", { name: "Export test hunt" })
       .click();
+    const exportMenu = page.getByTestId("export-menu");
     const pdfButton = page.getByTestId("export-hunt-pdf");
     const csvButton = page.getByTestId("export-hunt-csv");
-    await expect(pdfButton).toBeEnabled();
-    await expect(csvButton).toBeEnabled();
     for (const format of ["pdf", "csv"] as const) {
+      await exportMenu.locator("summary").click();
+      const button = page.getByTestId(`export-hunt-${format}`);
+      await expect(button).toBeEnabled();
       const downloadEvent = page.waitForEvent("download");
-      await page.getByTestId(`export-hunt-${format}`).click();
+      await button.click();
       const download = await downloadEvent;
       expect(download.suggestedFilename()).toBe(
         `hunt-${hunt.id}-results.${format}`,
@@ -101,10 +103,12 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
         json: { ok: false, message: "Access to this hunt was removed." },
       }),
     );
+    await exportMenu.locator("summary").click();
     await csvButton.click();
     await expect(page.getByTestId("hunt-export-status")).toHaveText(
       "Access to this hunt was removed.",
     );
+    await exportMenu.locator("summary").click();
     await expect(csvButton).toBeEnabled();
     await expect(pdfButton).toBeEnabled();
   } finally {

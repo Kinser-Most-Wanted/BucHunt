@@ -4123,3 +4123,127 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 .player-hunt-details .details-status[data-status="completed"] {
   box-shadow: 0 0 1.5rem rgb(25 183 124 / 18%);
 }
+
+/* Admin hunt actions: group exports and lower-frequency controls into menus. */
+body[data-page="admin"] dialog.hunt-details-dialog .details-actions {
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 0.85rem;
+  background: rgb(4 14 29 / 28%);
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-edit-link {
+  border: 0;
+  background: linear-gradient(135deg, #ffc72c, #ffd45c);
+  color: #041e42;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-action-menu {
+  position: relative;
+  margin: 0;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu
+  > summary {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.65rem;
+  background: #15345d;
+  color: #f1f3f6;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+  white-space: nowrap;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu
+  > summary::after {
+  color: #ffc72c;
+  content: "▾";
+  font-size: 0.8em;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu[open]
+  > summary::after {
+  content: "▴";
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu
+  > summary::-webkit-details-marker {
+  display: none;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu[open]
+  > summary {
+  border-color: rgb(255 199 44 / 45%);
+  color: #ffd45c;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .details-action-menu-items {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 11rem;
+  max-width: min(17rem, calc(100vw - 4rem));
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.75rem;
+  background: #0b203d;
+  box-shadow: 0 14px 32px rgb(0 0 0 / 36%);
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .details-action-menu-items
+  button {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .hunt-more-menu-items {
+  min-width: 15rem;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .hunt-id-control {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .hunt-id-control
+  .hunt-id-toggle {
+  min-height: 2.9rem;
+}
+@media (max-width: 38rem) {
+  body[data-page="admin"] dialog.hunt-details-dialog .details-actions {
+    align-items: stretch;
+  }
+  body[data-page="admin"]
+    dialog.hunt-details-dialog
+    .details-actions
+    > .details-action-menu {
+    flex: 1 1 calc(50% - 0.65rem);
+  }
+  body[data-page="admin"]
+    dialog.hunt-details-dialog
+    .details-action-menu
+    > summary {
+    width: 100%;
+  }
+  body[data-page="admin"]
+    dialog.hunt-details-dialog
+    .details-action-menu-items {
+    right: 0;
+    left: auto;
+  }
+}

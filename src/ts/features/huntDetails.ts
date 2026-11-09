@@ -31,15 +31,15 @@ let participantRequest = 0;
 let loadingParticipants = false;
 
 function updateExportButtons(): void {
-  for (const format of ["pdf", "csv"] as const) {
-    const button = dialog?.querySelector<HTMLButtonElement>(
-      `[data-testid="export-hunt-${format}"]`,
-    );
-    if (button) {
-      button.hidden = !canExport;
+  const menu = dialog?.querySelector<HTMLDetailsElement>(
+    '[data-testid="export-menu"]',
+  );
+  if (menu) menu.hidden = !canExport;
+  dialog
+    ?.querySelectorAll<HTMLButtonElement>("button[data-export-format]")
+    .forEach((button) => {
       button.disabled = exporting || !activeHunt || !canExport;
-    }
-  }
+    });
 }
 
 function updateParticipantControls(): void {
@@ -310,16 +310,28 @@ dialog?.addEventListener("click", async (event) => {
   }
 });
 
-for (const format of ["pdf", "csv"] as const) {
-  dialog
-    ?.querySelector<HTMLButtonElement>(`[data-testid="export-hunt-${format}"]`)
-    ?.addEventListener("click", async () => {
-      if (!activeHunt || !canExport || exporting) return;
+dialog
+  ?.querySelectorAll<HTMLButtonElement>("button[data-export-format]")
+  .forEach((button) => {
+    button.addEventListener("click", async () => {
+      const format = button.dataset.exportFormat;
+      if (
+        !activeHunt ||
+        !canExport ||
+        exporting ||
+        (format !== "pdf" && format !== "csv")
+      ) {
+        return;
+      }
       const huntId = activeHunt.id;
       const requestId = activeRequest;
       const status = dialog?.querySelector<HTMLElement>(
         '[data-testid="hunt-export-status"]',
       );
+      const menu = button.closest<HTMLDetailsElement>(
+        '[data-testid="export-menu"]',
+      );
+      if (menu) menu.open = false;
       exporting = true;
       updateExportButtons();
       if (status)
@@ -335,7 +347,7 @@ for (const format of ["pdf", "csv"] as const) {
         updateExportButtons();
       }
     });
-}
+  });
 
 copyAccessCodeButton?.addEventListener("click", async () => {
   const accessCode = activeHunt?.accessCode;

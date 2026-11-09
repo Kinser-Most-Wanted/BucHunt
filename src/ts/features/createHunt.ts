@@ -94,15 +94,16 @@ export function mountCreateHunt(
   const selector = document.querySelector<HTMLSelectElement>(
     '[data-testid="edit-hunt-selector"]',
   )!;
-  const detailsActions =
-    manageDialog.querySelector<HTMLElement>(".details-actions");
+  const moreActions = manageDialog.querySelector<HTMLElement>(
+    '[data-testid="hunt-more-menu-items"]',
+  );
   const deleteHuntButton = document.createElement("button");
   deleteHuntButton.type = "button";
   deleteHuntButton.className = "action delete-hunt-button";
   deleteHuntButton.dataset.testid = "delete-hunt";
   deleteHuntButton.textContent = "Delete Hunt";
   deleteHuntButton.hidden = true;
-  detailsActions?.append(deleteHuntButton);
+  moreActions?.append(deleteHuntButton);
   const deleteDialog = document.querySelector<HTMLDialogElement>(
     '[data-testid="delete-hunt-dialog"]',
   )!;

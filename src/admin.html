@@ -323,28 +323,7 @@
               aria-live="polite"
               data-testid="hunt-export-status"
             ></p>
-            <div class="details-actions">
-              <button
-                type="button"
-                class="action"
-                data-testid="export-hunt-pdf"
-              >
-                Export PDF
-              </button>
-              <button
-                type="button"
-                class="action"
-                data-testid="export-hunt-csv"
-              >
-                Export CSV
-              </button>
-              <button
-                type="button"
-                class="action"
-                data-testid="back-to-manage-hunts"
-              >
-                Back to my hunts
-              </button>
+            <div class="details-actions" role="group" aria-label="Hunt actions">
               <button
                 type="button"
                 class="action details-edit-link"
@@ -358,22 +337,55 @@
               >
                 Join Hunt
               </a>
-              <div class="hunt-id-control">
-                <button
-                  type="button"
-                  class="action hunt-id-toggle"
-                  data-testid="hunt-id-toggle"
-                  aria-expanded="false"
-                  aria-controls="hunt-detail-id"
+              <details
+                class="details-action-menu"
+                data-testid="export-menu"
+                hidden
+              >
+                <summary>Export results</summary>
+                <div class="details-action-menu-items">
+                  <button
+                    type="button"
+                    class="action"
+                    data-testid="export-hunt-pdf"
+                    data-export-format="pdf"
+                  >
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    class="action"
+                    data-testid="export-hunt-csv"
+                    data-export-format="csv"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              </details>
+              <details class="details-action-menu" data-testid="hunt-more-menu">
+                <summary>More actions</summary>
+                <div
+                  class="details-action-menu-items hunt-more-menu-items"
+                  data-testid="hunt-more-menu-items"
                 >
-                  Reveal hunt ID
-                </button>
-                <output
-                  id="hunt-detail-id"
-                  data-testid="hunt-detail-id"
-                  hidden
-                ></output>
-              </div>
+                  <div class="hunt-id-control">
+                    <button
+                      type="button"
+                      class="action hunt-id-toggle"
+                      data-testid="hunt-id-toggle"
+                      aria-expanded="false"
+                      aria-controls="hunt-detail-id"
+                    >
+                      Reveal hunt ID
+                    </button>
+                    <output
+                      id="hunt-detail-id"
+                      data-testid="hunt-detail-id"
+                      hidden
+                    ></output>
+                  </div>
+                </div>
+              </details>
             </div>
             <section
               class="details-tasks"

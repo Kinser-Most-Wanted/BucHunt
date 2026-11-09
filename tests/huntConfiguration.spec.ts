@@ -243,6 +243,7 @@ test("owners must type the exact hunt name before deleting a hunt", async ({
     { data: { confirmationName: "Wrong name" } },
   );
   expect(wrongNameResponse.status()).toBe(400);
+  await page.getByTestId("hunt-more-menu").locator("summary").click();
   await page.getByTestId("delete-hunt").click();
   await expect(page.getByTestId("delete-hunt-dialog")).toBeVisible();
   await expect(page.getByTestId("delete-hunt-warning")).toContainText(
@@ -467,6 +468,15 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     });
   expect(overviewTopOrder[0]).toBeLessThan(overviewTopOrder[1]);
   await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
+  const exportMenu = page.getByTestId("export-menu");
+  await expect(exportMenu).toBeVisible();
+  await expect(page.getByTestId("back-to-manage-hunts")).toHaveCount(0);
+  await exportMenu.locator("summary").click();
+  await expect(page.getByTestId("export-hunt-pdf")).toBeVisible();
+  await expect(page.getByTestId("export-hunt-csv")).toBeVisible();
+  await exportMenu.locator("summary").click();
+  const moreMenu = page.getByTestId("hunt-more-menu");
+  await moreMenu.locator("summary").click();
   const idControl = page.locator(".hunt-id-control");
   await expect(
     page
@@ -737,7 +747,9 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
       { data: { displayLabel: "Blocked", order: 1 } },
     );
     expect(contributorTaskCreate.status()).toBe(403);
-    await member.getByTestId("back-to-manage-hunts").click();
+    await member.getByTestId("close-hunt-details").click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await member.getByTestId("open-manage-hunts").click();
     await expect(page.getByTestId("contributor-list")).toContainText(
       "Google account · Contributor",
     );
@@ -815,7 +827,9 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
     );
     await member.getByTestId("back-to-hunt-details").click();
     await expect(member.getByTestId("hunt-details-overview")).toBeVisible();
-    await member.getByTestId("back-to-manage-hunts").click();
+    await member.getByTestId("close-hunt-details").click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await member.getByTestId("open-manage-hunts").click();
     await expect(member.getByTestId("manage-hunts-view")).toBeVisible();
     await member.getByTestId("refresh-my-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(

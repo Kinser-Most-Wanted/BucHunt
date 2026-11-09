@@ -2206,6 +2206,16 @@ body[data-page="hunt-details"] .hunt-id-toggle {
   font-size: 0.82rem;
   white-space: nowrap;
 }
+.participant-self-badge {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgb(255 199 44 / 28%);
+  border-radius: 999px;
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
 .participant-moderation-actions {
   display: flex;
   justify-content: flex-end;

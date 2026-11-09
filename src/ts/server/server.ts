@@ -692,6 +692,11 @@ export function createApplication(options: ServerOptions = {}) {
               input && typeof input === "object"
                 ? (input as Record<string, unknown>).action
                 : undefined;
+            if (participantId === creatorId)
+              throw new StoreError(
+                "forbidden",
+                "You cannot kick or ban yourself from this hunt.",
+              );
             if (
               typeof participantId !== "string" ||
               !/^[a-zA-Z0-9-]{1,100}$/.test(participantId) ||

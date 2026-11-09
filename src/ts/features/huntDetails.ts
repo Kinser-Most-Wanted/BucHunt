@@ -5,7 +5,11 @@ import type {
   HuntRole,
   TaskDefinition,
 } from "../foundation/types.js";
-import { createHuntRepository, downloadHuntResults } from "./huntRepository.js";
+import {
+  createHuntRepository,
+  downloadHuntResults,
+  getCreatorSession,
+} from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
@@ -82,6 +86,7 @@ function participantIcon(kind: "kick" | "ban"): SVGSVGElement {
 function renderParticipants(
   participants: HuntParticipantProgress[],
   summary: HuntParticipationSummary,
+  currentCreatorId: string | null,
 ): void {
   const list = dialog?.querySelector<HTMLElement>(
     '[data-testid="participant-progress-list"]',
@@ -116,25 +121,34 @@ function renderParticipants(
       ? `${completed} of ${participant.tasks.length} tasks complete`
       : "No tasks yet";
     heading.append(name, summary);
-    card.append(heading);
-    const actions = document.createElement("div");
-    actions.className = "participant-moderation-actions";
-    for (const action of ["kick", "ban"] as const) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `participant-action-button is-${action}`;
-      button.dataset.participantAction = action;
-      button.dataset.participantId = participant.participantId;
-      button.dataset.testid = `${action}-participant`;
-      button.setAttribute(
-        "aria-label",
-        `${action === "kick" ? "Kick" : "Ban"} ${name.textContent} from hunt`,
-      );
-      button.title = action === "kick" ? "Kick from hunt" : "Ban from hunt";
-      button.append(participantIcon(action));
-      actions.append(button);
+    const isCurrentCreator = participant.participantId === currentCreatorId;
+    if (isCurrentCreator) {
+      const selfBadge = document.createElement("span");
+      selfBadge.className = "participant-self-badge";
+      selfBadge.textContent = "You";
+      heading.append(selfBadge);
     }
-    card.append(actions);
+    card.append(heading);
+    if (!isCurrentCreator) {
+      const actions = document.createElement("div");
+      actions.className = "participant-moderation-actions";
+      for (const action of ["kick", "ban"] as const) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `participant-action-button is-${action}`;
+        button.dataset.participantAction = action;
+        button.dataset.participantId = participant.participantId;
+        button.dataset.testid = `${action}-participant`;
+        button.setAttribute(
+          "aria-label",
+          `${action === "kick" ? "Kick" : "Ban"} ${name.textContent} from hunt`,
+        );
+        button.title = action === "kick" ? "Kick from hunt" : "Ban from hunt";
+        button.append(participantIcon(action));
+        actions.append(button);
+      }
+      card.append(actions);
+    }
     if (participant.tasks.length) {
       const tasks = document.createElement("ul");
       tasks.className = "participant-task-list";
@@ -171,7 +185,10 @@ async function loadParticipants(): Promise<void> {
   updateParticipantControls();
   if (status) status.textContent = "Loading participant progress…";
   try {
-    const result = await repository.getHuntParticipationProgress(huntId);
+    const [result, session] = await Promise.all([
+      repository.getHuntParticipationProgress(huntId),
+      getCreatorSession(),
+    ]);
     if (
       requestId !== activeRequest ||
       progressRequest !== participantRequest ||
@@ -182,7 +199,11 @@ async function loadParticipants(): Promise<void> {
       if (status) status.textContent = result.message;
       return;
     }
-    renderParticipants(result.value, result.summary);
+    renderParticipants(
+      result.value,
+      result.summary,
+      session.ok ? session.value.id : null,
+    );
     if (status) status.textContent = "Participant progress is up to date.";
   } finally {
     if (progressRequest === participantRequest) {

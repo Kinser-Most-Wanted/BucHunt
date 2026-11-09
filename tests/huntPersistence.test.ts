@@ -1312,6 +1312,20 @@ test("hunt participation progress is current, task-specific, and restricted to O
         .status,
     ).toBe(403);
     expect(
+      (await moderateParticipant(owner.cookie, owner.value.id, "kick")).status,
+    ).toBe(403);
+    expect(
+      (await moderateParticipant(owner.cookie, owner.value.id, "ban")).status,
+    ).toBe(403);
+    expect(
+      (await moderateParticipant(officer.cookie, officer.value.id, "kick"))
+        .status,
+    ).toBe(403);
+    expect(
+      (await moderateParticipant(officer.cookie, officer.value.id, "ban"))
+        .status,
+    ).toBe(403);
+    expect(
       (await moderateParticipant(owner.cookie, activePlayer, "kick")).status,
     ).toBe(200);
     expect(await accountProgress.huntsWithProgress(activePlayer)).toEqual([]);

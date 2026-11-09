@@ -724,6 +724,7 @@ test("hunt owners, officers, and contributors get their assigned workspace permi
       ).status(),
     );
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
+    await member.getByTestId("hunt-more-menu").locator("summary").click();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
     await expect(member.getByTestId("hunt-owner")).toHaveText(

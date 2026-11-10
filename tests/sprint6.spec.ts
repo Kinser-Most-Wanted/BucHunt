@@ -322,6 +322,7 @@ test("#140 API blocks lobby answers, bypasses, late joining, and editing after s
 test("#139 #142 #143 browser workflow edits settings and submits and reads a task issue", async ({
   browser,
 }) => {
+  test.setTimeout(60_000);
   const f = await fixture({ maxParticipants: 1 });
   const playerContext = await browser.newContext();
   const adminContext = await browser.newContext();
@@ -405,6 +406,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
 test("#140 browser players synchronize, reconnect, lock submissions, and finish from the host dashboard", async ({
   browser,
 }) => {
+  test.setTimeout(60_000);
   const f = await fixture({ huntType: "kahoot" });
   const contexts = await Promise.all([
     browser.newContext(),

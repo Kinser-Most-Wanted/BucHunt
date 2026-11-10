@@ -64,15 +64,16 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(page.getByTestId("confirm-leave-hunt")).toBeVisible();
   await page.getByTestId("cancel-leave-hunt").click();
   await page.getByTestId("player-hunt-list").getByText("Optional Hunt").click();
-  await expect(page.getByTestId("leave-hunt")).toBeVisible();
+  const leaveHuntButton = page.getByTestId("leave-hunt");
+  const submitIssueButton = page.getByTestId("submit-issue");
+  await expect(leaveHuntButton).toBeVisible();
+  await expect(submitIssueButton).toBeVisible();
   expect(
-    await page
-      .getByTestId("leave-hunt")
-      .evaluate(
-        (button) =>
-          button.parentElement?.matches("dialog.player-hunt-details") &&
-          button === button.parentElement.lastElementChild,
-      ),
+    await leaveHuntButton.evaluate(
+      (button) =>
+        button.parentElement?.matches("dialog.player-hunt-details") &&
+        button.nextElementSibling?.matches('[data-testid="submit-issue"]'),
+    ),
   ).toBe(true);
   await page.getByTestId("leave-hunt").click();
   await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();

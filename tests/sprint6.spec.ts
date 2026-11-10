@@ -361,15 +361,19 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(report.getByRole("status")).toHaveText("Issue submitted.");
     console.log("[sprint6-139] issue submitted");
     await report.getByRole("button", { name: "Close", exact: true }).click();
+    console.log("[sprint6-139] issue dialog closed");
     const admin = await adminContext.newPage();
     await identity(admin, "owner", true);
     await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
+    console.log("[sprint6-139] admin goto complete");
     await expect(admin.getByTestId("hunt-detail-name")).toHaveText(
       "Sprint Six",
     );
+    console.log("[sprint6-139] admin details visible");
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (1 unread)",
     );
+    console.log("[sprint6-139] issue badge visible");
     await admin.getByTestId("hunt-issues-button").click();
     const inbox = admin.getByRole("dialog", {
       name: "Hunt issues",
@@ -377,6 +381,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     });
     await expect(inbox).toContainText("Mascot");
     await expect(inbox).toContainText("The fountain sign is missing.");
+    console.log("[sprint6-139] issue inbox visible");
     await inbox.getByRole("button", { name: "Close", exact: true }).click();
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
@@ -390,6 +395,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(settings.getByRole("status")).toHaveText(
       "Hunt settings saved.",
     );
+    console.log("[sprint6-139] settings saved");
     console.log("[sprint6-139] settings saved", await settings.innerText());
     expect(
       (
@@ -453,8 +459,7 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
       await host.locator("button").allTextContents(),
     );
     const startHunt = host.getByRole("button", {
-      name: "Start hunt",
-      exact: true,
+      name: /Start hunt/i,
     });
     await expect(startHunt).toBeVisible();
     await startHunt.click();

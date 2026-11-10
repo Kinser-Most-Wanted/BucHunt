@@ -4450,8 +4450,13 @@ body[data-page="admin"]
 }
 
 .organization-editor {
+  background: linear-gradient(145deg, rgb(21 52 93 / 72%), rgb(11 32 61 / 88%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.85rem;
+  color: #f4f5f9;
   flex: 1;
   min-width: 0;
+  padding: 1rem;
 }
 
 .organization-member {

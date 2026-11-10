@@ -235,7 +235,36 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       issues: [{ field: "$", message: "Hunt must be an object." }],
     };
   }
-  checkFields(input, huntFields, "", issues);
+  checkFields(
+    input,
+    [
+      ...huntFields,
+      ...["maxParticipants", "participationClosed"].filter((key) =>
+        Object.hasOwn(input, key),
+      ),
+    ],
+    "",
+    issues,
+  );
+  if (
+    input.maxParticipants !== undefined &&
+    input.maxParticipants !== null &&
+    (!Number.isSafeInteger(input.maxParticipants) ||
+      Number(input.maxParticipants) < 1)
+  )
+    issues.push({
+      field: "maxParticipants",
+      message: "Capacity must be a positive whole number or null.",
+    });
+  if (
+    input.participationClosed !== undefined &&
+    typeof input.participationClosed !== "boolean"
+  )
+    issues.push({
+      field: "participationClosed",
+      message: "Participation closed must be a boolean.",
+    });
+
   for (const field of ["id", "name", "description", "ownerId"])
     checkText(input[field], field, issues);
   if (

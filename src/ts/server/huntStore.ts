@@ -213,6 +213,8 @@ export class HuntStore {
   async create(input: unknown, ownerId: string): Promise<HuntDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "maxParticipants",
+      "participationClosed",
       "name",
       "description",
       "ownerId",
@@ -237,6 +239,16 @@ export class HuntStore {
       hunt.accessCode = newAccessCode(data.hunts);
       data.hunts.push(hunt);
       return hunt;
+    });
+  }
+  async updateSettings(id: string, input: unknown): Promise<HuntDefinition> {
+    const fields = object(input);
+    inputFields(fields, ["maxParticipants", "participationClosed"]);
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      Object.assign(hunt, fields, { updatedAt: new Date().toISOString() });
+      return accepted(validateHunt(hunt));
     });
   }
   async list(): Promise<HuntDefinition[]> {

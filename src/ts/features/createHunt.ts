@@ -646,6 +646,10 @@ export function mountCreateHunt(
     try {
       const result = await repository.createHunt({
         name: text("name"),
+        maxParticipants: text("maxParticipants")
+          ? Number(text("maxParticipants"))
+          : null,
+        participationClosed: false,
         description: text("description"),
         ownerId: "",
         beginsAt: date("beginsAt") ?? "",

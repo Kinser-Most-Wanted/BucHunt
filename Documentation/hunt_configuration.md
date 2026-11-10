@@ -223,3 +223,7 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Participation controls
+
+A blank maximum allows unlimited participation. A positive whole number limits active participants; leaving frees a place. Owners and Officers can close or reopen admission in hunt settings. Reopening still enforces capacity. Existing active participants can reopen or refresh their hunts even when full or closed. Players who explicitly leave must satisfy current admission rules to rejoin; their saved task completions are restored when admitted. Capacity checks and membership writes are serialized to prevent concurrent joins from exceeding the limit.

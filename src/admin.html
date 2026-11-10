@@ -171,6 +171,15 @@
                 <legend>Hunt details</legend>
                 <label for="hunt-name">Hunt name</label
                 ><input id="hunt-name" name="name" required />
+                <label for="hunt-capacity"
+                  >Maximum participants (optional)</label
+                ><input
+                  id="hunt-capacity"
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
                 <label for="hunt-description">Description</label
                 ><textarea
                   id="hunt-description"
@@ -323,6 +332,25 @@
               aria-live="polite"
               data-testid="hunt-export-status"
             ></p>
+            <form
+              data-testid="hunt-settings-form"
+              class="hunt-settings-form"
+              hidden
+            >
+              <label
+                >Maximum participants (blank for unlimited)<input
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+              /></label>
+              <label
+                ><input name="participationClosed" type="checkbox" /> Close
+                participation to new players</label
+              >
+              <button type="submit" class="action">Save hunt settings</button>
+              <p role="status" data-settings-status></p>
+            </form>
             <div class="details-actions" role="group" aria-label="Hunt actions">
               <button
                 type="button"

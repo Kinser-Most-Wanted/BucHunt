@@ -171,6 +171,21 @@ export function createApplication(options: ServerOptions = {}) {
       }),
     );
   }
+  // Admission and settings updates share a queue, so closing a hunt cannot race a join.
+  const admissionQueues = new Map<string, Promise<unknown>>();
+  function serializeAdmission<T>(
+    id: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = admissionQueues.get(id) ?? Promise.resolve();
+    const next = previous.then(operation);
+    const settled = next.catch(() => undefined);
+    admissionQueues.set(id, settled);
+    void settled.then(() => {
+      if (admissionQueues.get(id) === settled) admissionQueues.delete(id);
+    });
+    return next;
+  }
   const google = new OAuth2Client(options.googleClientId);
   async function playerId(request: IncomingMessage): Promise<string | null> {
     const match = /^Bearer ([^\s]{1,16384})$/.exec(
@@ -340,7 +355,14 @@ export function createApplication(options: ServerOptions = {}) {
               "validation",
               "Invalid access code. The hunt may be unavailable.",
             );
-          await accountProgress.join(player, hunt.id);
+          await serializeAdmission(hunt.id, async () => {
+            const current = await hunts.get(hunt.id);
+            await accountProgress.join(player, hunt.id, {
+              closed: current.participationClosed,
+              maximum: current.maxParticipants,
+              otherCount: (await progress.participants(hunt.id)).length,
+            });
+          });
           json(response, 200, { ok: true, value: { huntId: hunt.id } });
           return;
         }
@@ -880,6 +902,23 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
+          if (match && !match[2] && method === "PATCH") {
+            if (!canEdit)
+              throw new StoreError(
+                "forbidden",
+                "Only Owners and Officers can edit hunt settings.",
+              );
+            json(response, 200, {
+              ok: true,
+              value: await (async () => {
+                const input = await body(request);
+                return serializeAdmission(hunt.id, () =>
+                  hunts.updateSettings(hunt.id, input),
+                );
+              })(),
+            });
+            return;
+          }
           if (match && !match[2] && method === "GET") {
             const configuration = await hunts.getWithAccessCode(hunt.id);
             json(response, 200, {
@@ -1038,6 +1077,19 @@ export function createApplication(options: ServerOptions = {}) {
             message: "You are banned from this hunt.",
           });
           return;
+        }
+        if (
+          hunt.maxParticipants != null ||
+          hunt.participationClosed !== undefined
+        ) {
+          await serializeAdmission(hunt.id, async () => {
+            const current = await hunts.get(hunt.id);
+            await progress.join(player, hunt.id, {
+              closed: current.participationClosed,
+              maximum: current.maxParticipants,
+              otherCount: (await accountProgress.participants(hunt.id)).length,
+            });
+          });
         }
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);

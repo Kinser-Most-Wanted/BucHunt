@@ -10,6 +10,7 @@ import {
   createHuntRepository,
   downloadHuntResults,
   getCreatorSession,
+  request,
 } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
@@ -447,6 +448,13 @@ function setDetailView(editing: boolean): void {
 }
 
 function resetDialog(): void {
+  const settings = dialog?.querySelector<HTMLFormElement>(
+    '[data-testid="hunt-settings-form"]',
+  );
+  if (settings) {
+    settings.hidden = true;
+    settings.onsubmit = null;
+  }
   activeHunt = undefined;
   canExport = false;
   canViewProgress = false;
@@ -548,6 +556,39 @@ function resetDialog(): void {
 function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
+  const settings = dialog.querySelector<HTMLFormElement>(
+    '[data-testid="hunt-settings-form"]',
+  );
+  if (settings) {
+    settings.hidden = role === "contributor";
+    (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
+      hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
+    (
+      settings.elements.namedItem("participationClosed") as HTMLInputElement
+    ).checked = hunt.participationClosed ?? false;
+    settings.onsubmit = async (event) => {
+      event.preventDefault();
+      const button = settings.querySelector<HTMLButtonElement>("button")!;
+      const output = settings.querySelector<HTMLElement>(
+        "[data-settings-status]",
+      )!;
+      button.disabled = true;
+      const fields = new FormData(settings);
+      const result = await request<HuntDefinition>(
+        `/api/admin/hunts/${hunt.id}`,
+        {
+          maxParticipants: String(fields.get("maxParticipants") ?? "").trim()
+            ? Number(fields.get("maxParticipants"))
+            : null,
+          participationClosed: fields.has("participationClosed"),
+        },
+        "PATCH",
+      );
+      button.disabled = false;
+      output.textContent = result.ok ? "Hunt settings saved." : result.message;
+      if (result.ok && activeHunt?.id === hunt.id) activeHunt = result.value;
+    };
+  }
   canExport = role === "owner" || role === "officer";
   canViewProgress = canExport;
   updateExportButtons();

@@ -3,6 +3,8 @@ export type TaskOrderMode = "sequential" | "any";
 export type HuntRole = "owner" | "officer" | "contributor";
 
 export interface HuntInput {
+  maxParticipants?: number | null;
+  participationClosed?: boolean;
   name: string;
   description: string;
   ownerId: string;

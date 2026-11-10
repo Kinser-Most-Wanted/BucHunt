@@ -207,3 +207,19 @@ test("multiple choice requires four distinct choices and the configured correct 
   delete hunt.tasks[0].choices;
   expect(validateHunt(hunt).ok).toBe(true);
 });
+
+test("capacity and participation settings are validated", () => {
+  expect(
+    validateHunt({
+      ...fixture(),
+      maxParticipants: 10,
+      participationClosed: false,
+    }).ok,
+  ).toBe(true);
+  for (const limit of [0, -1, 1.5, "10"])
+    expectInvalid({ ...fixture(), maxParticipants: limit }, "maxParticipants");
+  expectInvalid(
+    { ...fixture(), participationClosed: "yes" },
+    "participationClosed",
+  );
+});

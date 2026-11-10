@@ -76,7 +76,12 @@ async function fixture(options: Record<string, unknown> = {}) {
     api,
     close: async () => {
       await new Promise<void>((resolve) => app.close(() => resolve()));
-      await rm(directory, { recursive: true, force: true });
+      await rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     },
   };
 }
@@ -357,10 +362,6 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await player
       .getByRole("button", { name: "Join Hunt", exact: true })
       .click();
-    console.log(
-      "[sprint6-139] facts",
-      await player.getByTestId("player-hunt-facts").innerText(),
-    );
     await expect(player.getByTestId("player-hunt-facts")).toContainText("ETSU");
     await player.getByTestId("submit-issue").click();
     const report = player.getByRole("dialog", {
@@ -407,7 +408,6 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     });
     await expect(organizationSelect).toContainText("Computing (owner)");
     await organizationSelect.selectOption("Computing");
-    console.log("[org-debug] organization selected");
     await settings.getByLabel("Close participation to new players").check();
     await settings.getByRole("button", { name: "Save hunt settings" }).click();
     await expect(settings.getByRole("status")).toHaveText(
@@ -468,10 +468,6 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
     await openAdminHunt(admin, f.base);
     const host = admin.getByTestId("kahoot-host");
     await expect(host).toContainText("Connected");
-    console.log(
-      "[sprint6-140] host buttons",
-      await host.locator("button").allTextContents(),
-    );
     const startHunt = host.getByRole("button", {
       name: "Start hunt",
       exact: true,

@@ -598,7 +598,9 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .locator('[data-hunt-id="hunt-1"]')
     .click();
   await expect(detailsDialog).toBeVisible();
-  expect(await detailsDialog.evaluate((dialog) => dialog.scrollTop)).toBe(0);
+  await expect
+    .poll(() => detailsDialog.evaluate((dialog) => dialog.scrollTop))
+    .toBe(0);
   const answerTask = page
     .getByTestId("player-task")
     .filter({ hasText: "Library Steps" });

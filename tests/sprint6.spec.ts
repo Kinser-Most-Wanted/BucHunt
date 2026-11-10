@@ -116,6 +116,7 @@ async function identity(page: Page, token: string, admin = false) {
 async function openAdminHunt(page: Page, base: string): Promise<void> {
   await page.goto(base + "/admin.html");
   await page.getByTestId("open-manage-hunts").click();
+  console.log("[139] manage dialog opened");
   await page
     .getByTestId("my-hunts")
     .getByRole("button", { name: /Sprint Six/ })
@@ -377,18 +378,22 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (1 unread)",
     );
+    console.log("[139] issue badge ready");
     await admin.getByTestId("hunt-issues-button").click();
+    console.log("[139] issue button clicked");
     const inbox = admin.getByRole("dialog", {
       name: "Hunt issues",
       exact: true,
     });
     await expect(inbox).toContainText("Mascot");
     await expect(inbox).toContainText("The fountain sign is missing.");
+    console.log("[139] inbox contents loaded");
     await inbox.getByRole("button", { name: "Close", exact: true }).click();
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
     );
     await admin.getByTestId("edit-hunt-link").click();
+    console.log("[139] edit link clicked");
     const settings = admin.getByTestId("hunt-settings-form");
     await settings
       .getByLabel("Organization", { exact: true })
@@ -398,6 +403,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(settings.getByRole("status")).toHaveText(
       "Hunt settings saved.",
     );
+    console.log("[139] settings saved");
     expect(
       (
         await f.api("/api/player/account/join", "two", {
@@ -406,6 +412,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       ).data.message,
     ).toContain("closed");
     await player.reload();
+    console.log("[139] player reload done");
     await player
       .getByRole("button", { name: "Open Sprint Six", exact: true })
       .click();

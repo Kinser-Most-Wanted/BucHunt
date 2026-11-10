@@ -4295,8 +4295,10 @@ body[data-page="admin"]
 .kahoot-panel {
   margin-block: 1rem;
   padding: 1rem;
-  border: 1px solid #8193aa;
+  border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 0.75rem;
+  background: linear-gradient(145deg, #15345d, #10294a);
+  color: #f4f5f9;
 }
 .kahoot-panel[hidden] {
   display: none;
@@ -4356,9 +4358,12 @@ body[data-page="admin"]
 }
 
 .organization-management-dialog {
+  background:
+    radial-gradient(ellipse at 92% 5%, rgb(255 199 44 / 8%), transparent 25rem),
+    linear-gradient(145deg, #10294a, #0b203d);
   border: 1px solid rgba(255, 203, 42, 0.35);
   border-radius: 1.2rem;
-  color: var(--text, #f5f7fa);
+  color: #f4f5f9;
   max-height: min(88vh, 54rem);
   max-width: min(58rem, calc(100vw - 2rem));
   overflow: auto;

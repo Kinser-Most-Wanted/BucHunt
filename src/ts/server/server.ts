@@ -420,10 +420,7 @@ export function createApplication(options: ServerOptions = {}) {
           if (organizationCollection && method === "GET") {
             json(response, 200, {
               ok: true,
-              value: await organizations.listForAccount(
-                accountIdentity.id,
-                accountIdentity.email,
-              ),
+              value: await organizations.listForAccount(accountIdentity.id),
             });
             return;
           }
@@ -790,10 +787,7 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
-          const memberships = await organizations.listForAccount(
-            account.id,
-            account.email,
-          );
+          const memberships = await organizations.listForAccount(account.id);
           json(response, 200, {
             ok: true,
             value: memberships.map((organization) => ({

@@ -197,7 +197,7 @@ test("organization membership, roles, invitations, and saved data are protected"
 
     const reopened = await new OrganizationStore(
       join(directory, "organizations.json"),
-    ).listForAccount(owner, "owner@example.com");
+    ).listForAccount(owner);
     expect(reopened[0]).toMatchObject({
       id: organizationId,
       name: "Campus Tech",

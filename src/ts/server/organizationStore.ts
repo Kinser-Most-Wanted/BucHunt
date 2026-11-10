@@ -65,10 +65,7 @@ export class OrganizationStore {
     );
   }
 
-  async listForAccount(
-    accountId: string,
-    _email: string,
-  ): Promise<OrganizationDefinition[]> {
+  async listForAccount(accountId: string): Promise<OrganizationDefinition[]> {
     return this.file.query((file) => this.viewsForAccount(file, accountId));
   }
 

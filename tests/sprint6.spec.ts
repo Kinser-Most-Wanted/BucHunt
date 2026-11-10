@@ -343,6 +343,12 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
   const f = await fixture({ maxParticipants: 1 });
   const playerContext = await browser.newContext();
   const adminContext = await browser.newContext();
+  const createdOrganization = await f.api(
+    "/api/player/account/organizations",
+    "owner",
+    { name: "Computing" },
+  );
+  expect(createdOrganization.status).toBe(201);
   try {
     const player = await playerContext.newPage();
     await identity(player, "one");
@@ -395,25 +401,10 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
     );
-    console.log("[org-debug] creating Computing organization");
-    const createdOrganization = await f.api(
-      "/api/player/account/organizations",
-      "owner",
-      { name: "Computing" },
-    );
-    console.log(
-      "[org-debug] organization response",
-      createdOrganization.status,
-    );
-    expect(createdOrganization.status).toBe(201);
     const settings = admin.getByTestId("hunt-settings-form");
     const organizationSelect = settings.getByLabel("Organization", {
       exact: true,
     });
-    console.log(
-      "[org-debug] organization options",
-      await organizationSelect.locator("option").allTextContents(),
-    );
     await expect(organizationSelect).toContainText("Computing (owner)");
     await organizationSelect.selectOption("Computing");
     console.log("[org-debug] organization selected");

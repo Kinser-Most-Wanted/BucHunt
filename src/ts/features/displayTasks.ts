@@ -30,7 +30,7 @@ async function organizationRequest<T>(
   try {
     const response = await fetch(path, {
       method: method ?? (input === undefined ? "GET" : "POST"),
-      credentials: "same-origin",
+      credentials: "omit",
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",

@@ -334,33 +334,29 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await player
       .getByRole("button", { name: "Join Hunt", exact: true })
       .click();
-    console.log("[sprint6-139] player joined");
     await expect(player.getByTestId("player-hunt-facts")).toContainText("ETSU");
-    console.log("[sprint6-139] opening issue form");
     await player.getByTestId("submit-issue").click();
-    console.log("[sprint6-139] issue form opened");
     const report = player.getByRole("dialog", {
       name: "Submit Issue",
       exact: true,
     });
-    await report.getByLabel("Task", { exact: true }).selectOption(f.first.id);
-    console.log("[sprint6-139] issue task selected");
+    const taskSelect = report.getByRole("combobox", {
+      name: "Task",
+      exact: true,
+    });
+    await expect(taskSelect).toBeVisible();
+    await taskSelect.selectOption({ label: "Mascot" });
     await report
       .getByLabel("Issue description")
       .fill("The fountain sign is missing.");
-    console.log("[sprint6-139] issue description filled");
     await report
       .getByRole("button", { name: "Submit Issue", exact: true })
       .click();
-    console.log("[sprint6-139] issue submitted click finished");
     await expect(report.getByRole("status")).toHaveText("Issue submitted.");
-    console.log("[sprint6-139] issue confirmation visible");
     await report.getByRole("button", { name: "Close", exact: true }).click();
-    console.log("[sprint6-139] issue dialog closed");
     const admin = await adminContext.newPage();
     await identity(admin, "owner", true);
     await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
-    console.log("[sprint6-139] admin hunt page opened");
     await expect(admin.getByTestId("hunt-detail-name")).toHaveText(
       "Sprint Six",
     );
@@ -441,18 +437,19 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
     await identity(admin, "owner", true);
     await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
     const host = admin.getByTestId("kahoot-host");
-    console.log("[sprint6-140] admin host page opened");
     await expect(host).toContainText("Connected");
-    console.log("[sprint6-140] players connected");
-    await host.getByRole("button", { name: "Start hunt", exact: true }).click();
-    console.log("[sprint6-140] host started hunt");
+    const startHunt = host.getByRole("button", {
+      name: "Start hunt",
+      exact: true,
+    });
+    await expect(startHunt).toBeVisible();
+    await startHunt.click();
     for (const page of players)
       await expect(
         page
           .getByTestId("kahoot-player")
           .getByRole("heading", { name: "Mascot", exact: true }),
       ).toBeVisible();
-    console.log("[sprint6-140] question visible");
     await players[0]
       .getByTestId("kahoot-player")
       .getByLabel("Your answer")

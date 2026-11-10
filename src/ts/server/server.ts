@@ -250,6 +250,7 @@ export function createApplication(options: ServerOptions = {}) {
     return {
       id: hunt.id,
       name: hunt.name,
+      organizationName: hunt.organizationName,
       description: hunt.description,
       beginsAt: hunt.beginsAt,
       endsAt: hunt.endsAt,
@@ -880,6 +881,18 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
+          if (match && !match[2] && method === "PATCH") {
+            if (!canEdit)
+              throw new StoreError(
+                "forbidden",
+                "Only Owners and Officers can edit hunt settings.",
+              );
+            json(response, 200, {
+              ok: true,
+              value: await hunts.updateSettings(hunt.id, await body(request)),
+            });
+            return;
+          }
           if (match && !match[2] && method === "GET") {
             const configuration = await hunts.getWithAccessCode(hunt.id);
             json(response, 200, {
@@ -1084,6 +1097,7 @@ export function createApplication(options: ServerOptions = {}) {
             value: {
               id: hunt.id,
               name: hunt.name,
+              organizationName: hunt.organizationName,
               description: hunt.description,
               beginsAt: hunt.beginsAt,
               endsAt: hunt.endsAt,

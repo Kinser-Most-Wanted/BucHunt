@@ -214,6 +214,7 @@ export class HuntStore {
     const fields = object(input);
     inputFields(fields, [
       "name",
+      "organizationName",
       "description",
       "ownerId",
       "beginsAt",
@@ -237,6 +238,16 @@ export class HuntStore {
       hunt.accessCode = newAccessCode(data.hunts);
       data.hunts.push(hunt);
       return hunt;
+    });
+  }
+  async updateSettings(id: string, input: unknown): Promise<HuntDefinition> {
+    const fields = object(input);
+    inputFields(fields, ["organizationName"]);
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      Object.assign(hunt, fields, { updatedAt: new Date().toISOString() });
+      return accepted(validateHunt(hunt));
     });
   }
   async list(): Promise<HuntDefinition[]> {

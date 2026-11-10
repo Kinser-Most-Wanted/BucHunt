@@ -1006,6 +1006,7 @@ export function mountDisplayTasks(
       const phase = huntPhase(hunt, now);
       const completed = hunt.tasks.filter((task) => task.completed).length;
       huntName.textContent = hunt.name;
+      if (hunt.organizationName) addFact("Organization", hunt.organizationName);
       huntName.dataset.contentLength = contentLength(hunt.name, 28, 56);
       huntDescription.textContent = hunt.description;
       huntDescription.dataset.contentLength = contentLength(

@@ -222,6 +222,10 @@
           "items": {
             "$ref": "#/$defs/task"
           }
+        },
+        "organizationName": {
+          "type": "string",
+          "maxLength": 120
         }
       }
     }

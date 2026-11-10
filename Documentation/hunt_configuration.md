@@ -223,3 +223,7 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Organizations
+
+Creators can associate an optional organization name (up to 120 characters) with a hunt. Owners and Officers can edit it in the hunt overview. Players see the saved name beside the hunt details when they open or refresh the hunt. Older hunts without an organization remain supported.

@@ -10,6 +10,7 @@ import {
   createHuntRepository,
   downloadHuntResults,
   getCreatorSession,
+  request,
 } from "./huntRepository.js";
 
 const dialog = document.querySelector<HTMLDialogElement>(
@@ -447,6 +448,13 @@ function setDetailView(editing: boolean): void {
 }
 
 function resetDialog(): void {
+  const settings = dialog?.querySelector<HTMLFormElement>(
+    '[data-testid="hunt-settings-form"]',
+  );
+  if (settings) {
+    settings.hidden = true;
+    settings.onsubmit = null;
+  }
   activeHunt = undefined;
   canExport = false;
   canViewProgress = false;
@@ -548,6 +556,35 @@ function resetDialog(): void {
 function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (!dialog) return;
   activeHunt = hunt;
+  const settings = dialog.querySelector<HTMLFormElement>(
+    '[data-testid="hunt-settings-form"]',
+  );
+  if (settings) {
+    settings.hidden = role === "contributor";
+    (
+      settings.elements.namedItem("organizationName") as HTMLInputElement
+    ).value = hunt.organizationName ?? "";
+    settings.onsubmit = async (event) => {
+      event.preventDefault();
+      const button = settings.querySelector<HTMLButtonElement>("button")!;
+      const output = settings.querySelector<HTMLElement>(
+        "[data-settings-status]",
+      )!;
+      button.disabled = true;
+      const result = await request<HuntDefinition>(
+        `/api/admin/hunts/${hunt.id}`,
+        {
+          organizationName: String(
+            new FormData(settings).get("organizationName") ?? "",
+          ).trim(),
+        },
+        "PATCH",
+      );
+      button.disabled = false;
+      output.textContent = result.ok ? "Hunt settings saved." : result.message;
+      if (result.ok && activeHunt?.id === hunt.id) activeHunt = result.value;
+    };
+  }
   canExport = role === "owner" || role === "officer";
   canViewProgress = canExport;
   updateExportButtons();
@@ -611,6 +648,8 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   const facts = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',
   )!;
+  if (hunt.organizationName)
+    addFact(facts, "Organization", hunt.organizationName);
   addFact(facts, "Status", hunt.status);
   addFact(
     facts,

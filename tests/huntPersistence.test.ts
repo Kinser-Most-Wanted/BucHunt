@@ -1855,3 +1855,24 @@ test("access code joins persist before answers and reject unavailable hunts and 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("organization survives creation, edits, and reopening storage", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-org-"));
+  try {
+    const path = join(directory, "hunts.json");
+    const store = new HuntStore(path);
+    const hunt = await store.create(
+      { ...input, organizationName: "ETSU" },
+      "owner",
+    );
+    expect((await new HuntStore(path).get(hunt.id)).organizationName).toBe(
+      "ETSU",
+    );
+    await store.updateSettings(hunt.id, { organizationName: "Computing" });
+    expect((await new HuntStore(path).get(hunt.id)).organizationName).toBe(
+      "Computing",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

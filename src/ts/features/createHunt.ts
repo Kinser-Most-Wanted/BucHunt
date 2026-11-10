@@ -646,6 +646,7 @@ export function mountCreateHunt(
     try {
       const result = await repository.createHunt({
         name: text("name"),
+        organizationName: text("organizationName"),
         description: text("description"),
         ownerId: "",
         beginsAt: date("beginsAt") ?? "",

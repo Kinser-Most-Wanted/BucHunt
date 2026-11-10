@@ -3,6 +3,7 @@ export type TaskOrderMode = "sequential" | "any";
 export type HuntRole = "owner" | "officer" | "contributor";
 
 export interface HuntInput {
+  organizationName?: string;
   name: string;
   description: string;
   ownerId: string;
@@ -79,6 +80,7 @@ export interface PlayerTask {
   location?: TaskLocation;
 }
 export interface PlayerHunt {
+  organizationName?: string;
   id: string;
   name: string;
   description: string;

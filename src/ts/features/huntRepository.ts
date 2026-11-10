@@ -281,6 +281,9 @@ function toPlayerHunt(value: unknown): PlayerHunt {
   return {
     id: candidate.id,
     name: candidate.name,
+    ...(typeof candidate.organizationName === "string"
+      ? { organizationName: candidate.organizationName }
+      : {}),
     description: candidate.description,
     beginsAt: candidate.beginsAt as string,
     endsAt: candidate.endsAt as string | null,

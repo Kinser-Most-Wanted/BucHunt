@@ -207,3 +207,14 @@ test("multiple choice requires four distinct choices and the configured correct 
   delete hunt.tasks[0].choices;
   expect(validateHunt(hunt).ok).toBe(true);
 });
+
+test("organization is optional and length bounded", () => {
+  expect(
+    validateHunt({ ...fixture(), organizationName: "ETSU Computing" }).ok,
+  ).toBe(true);
+  expectInvalid(
+    { ...fixture(), organizationName: "x".repeat(121) },
+    "organizationName",
+  );
+  expectInvalid({ ...fixture(), organizationName: null }, "organizationName");
+});

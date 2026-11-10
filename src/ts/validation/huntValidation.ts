@@ -235,7 +235,24 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       issues: [{ field: "$", message: "Hunt must be an object." }],
     };
   }
-  checkFields(input, huntFields, "", issues);
+  checkFields(
+    input,
+    [
+      ...huntFields,
+      ...(Object.hasOwn(input, "organizationName") ? ["organizationName"] : []),
+    ],
+    "",
+    issues,
+  );
+  if (
+    input.organizationName !== undefined &&
+    (typeof input.organizationName !== "string" ||
+      input.organizationName.length > 120)
+  )
+    issues.push({
+      field: "organizationName",
+      message: "Organization must be at most 120 characters.",
+    });
   for (const field of ["id", "name", "description", "ownerId"])
     checkText(input[field], field, issues);
   if (

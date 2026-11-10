@@ -113,6 +113,16 @@ async function identity(page: Page, token: string, admin = false) {
   );
 }
 
+async function openAdminHunt(page: Page, base: string): Promise<void> {
+  await page.goto(base + "/admin.html");
+  await page.getByTestId("open-manage-hunts").click();
+  await page
+    .getByTestId("my-hunts")
+    .getByRole("button", { name: /Sprint Six/ })
+    .click();
+  await expect(page.getByTestId("hunt-detail-name")).toHaveText("Sprint Six");
+}
+
 test("#139 #143 #142 APIs enforce roles, admission limits, saved membership, and issue isolation", async () => {
   const f = await fixture({ maxParticipants: 1 });
   const admin = `/api/admin/hunts/${f.hunt.id}`;
@@ -360,7 +370,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await report.getByRole("button", { name: "Close", exact: true }).click();
     const admin = await adminContext.newPage();
     await identity(admin, "owner", true);
-    await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
+    await openAdminHunt(admin, f.base);
     await expect(admin.getByTestId("hunt-detail-name")).toHaveText(
       "Sprint Six",
     );
@@ -378,6 +388,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
     );
+    await admin.getByTestId("edit-hunt-link").click();
     const settings = admin.getByTestId("hunt-settings-form");
     await settings
       .getByLabel("Organization", { exact: true })
@@ -439,16 +450,17 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
     }
     const admin = await contexts[2].newPage();
     await identity(admin, "owner", true);
-    await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
+    await openAdminHunt(admin, f.base);
     const host = admin.getByTestId("kahoot-host");
     await expect(host).toContainText("Connected");
     console.log(
       "[sprint6-140] host buttons",
       await host.locator("button").allTextContents(),
     );
-    const startHunt = host
-      .locator(".kahoot-controls button")
-      .filter({ hasText: "Start hunt" });
+    const startHunt = host.getByRole("button", {
+      name: "Start hunt",
+      exact: true,
+    });
     await expect(startHunt).toBeVisible();
     await startHunt.click();
     for (const page of players)

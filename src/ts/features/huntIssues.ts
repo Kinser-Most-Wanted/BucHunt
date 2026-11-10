@@ -40,18 +40,11 @@ export function mountAdminIssues(
   let disposed = false;
   let popup: HTMLDialogElement | undefined;
   let loading = false;
-  let openPending = false;
   async function refresh(open = false) {
-    if (disposed || !allowed) return;
-    if (loading) {
-      openPending ||= open;
-      return;
-    }
+    if (disposed || loading || !allowed) return;
     loading = true;
     const result = await request<Inbox>(`/api/admin/hunts/${huntId}/issues`);
     loading = false;
-    open ||= openPending;
-    openPending = false;
     if (disposed) return;
     if (!result.ok) {
       button!.textContent = "Issues (unavailable)";
@@ -185,4 +178,3 @@ export function mountPlayerIssues(
     };
   };
 }
-

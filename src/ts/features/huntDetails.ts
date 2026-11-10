@@ -12,6 +12,9 @@ import {
   getCreatorSession,
 } from "./huntRepository.js";
 
+import { mountAdminIssues } from "./huntIssues.js";
+
+let stopIssues: (() => void) | undefined;
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
 );
@@ -447,6 +450,7 @@ function setDetailView(editing: boolean): void {
 }
 
 function resetDialog(): void {
+  stopIssues?.();
   activeHunt = undefined;
   canExport = false;
   canViewProgress = false;
@@ -550,6 +554,8 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   activeHunt = hunt;
   canExport = role === "owner" || role === "officer";
   canViewProgress = canExport;
+  stopIssues?.();
+  stopIssues = mountAdminIssues(dialog, hunt.id, canExport);
   updateExportButtons();
   updateParticipantControls();
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(

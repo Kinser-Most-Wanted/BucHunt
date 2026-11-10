@@ -1,3 +1,4 @@
+import { mountPlayerIssues } from "./huntIssues.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
@@ -1001,6 +1002,7 @@ export function mountDisplayTasks(
       if (requestId !== huntRequest) return;
       const hunt = result.value;
       updateDisplayedHunt(hunt);
+      mountPlayerIssues(huntDetails, hunt.id, identity);
       huntId = hunt.id;
       const now = Date.now();
       const phase = huntPhase(hunt, now);

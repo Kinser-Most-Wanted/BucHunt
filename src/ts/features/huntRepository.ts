@@ -169,7 +169,7 @@ export function createHuntRepository(): HuntRepository {
   };
 }
 
-async function accountRequest<T>(
+export async function accountRequest<T>(
   path: string,
   identity: PlayerIdentity,
   input?: unknown,

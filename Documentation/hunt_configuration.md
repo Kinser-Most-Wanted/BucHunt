@@ -223,3 +223,7 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Issue reports
+
+Players can select Submit Issue below Leave Hunt, choose a task or Hunt in general, and submit up to 4000 characters. Reports store the hunt, task label, description, and creation time without storing the submitter. Owners and Officers can open Issues between Join Hunt and Export results. Unread counts are tracked separately for each administrator; opening the inbox marks only displayed reports read. New reports remain unread until viewed. Reports are persisted in hunt-issues.json under DATA_DIRECTORY and removed with a deleted hunt.

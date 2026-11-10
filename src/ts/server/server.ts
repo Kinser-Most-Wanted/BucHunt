@@ -23,6 +23,7 @@ import {
   isHuntActive,
   isHuntJoinable,
 } from "./huntStore.js";
+import { HuntIssueStore } from "./huntIssueStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 import { PlayerProfileStore } from "./playerProfileStore.js";
 import {
@@ -140,6 +141,9 @@ function rejectFutureTask(
 export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
+  const issueReports = new HuntIssueStore(
+    resolve(directory, "hunt-issues.json"),
+  );
   const hunts = new HuntStore(resolve(directory, "hunts.json"));
   const contributors = new ContributorStore(
     resolve(directory, "hunt-contributors.json"),
@@ -365,6 +369,34 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const issueMatch =
+          /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(tasks))?$/.exec(
+            path,
+          );
+        if (issueMatch) {
+          const hunt = await hunts.get(issueMatch[1]);
+          if (
+            !(await accountProgress.huntsWithProgress(player)).includes(hunt.id)
+          )
+            throw new StoreError("forbidden", "Join this hunt first.");
+          if (issueMatch[2] && method === "GET") {
+            json(response, 200, {
+              ok: true,
+              value: hunt.tasks.map(({ id, displayLabel }) => ({
+                id,
+                displayLabel,
+              })),
+            });
+            return;
+          }
+          if (!issueMatch[2] && method === "POST") {
+            json(response, 201, {
+              ok: true,
+              value: await issueReports.submit(hunt, await body(request)),
+            });
+            return;
+          }
+        }
         const accountMatch =
           /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)(?:\/tasks\/([a-zA-Z0-9-]+)\/answer)?$/.exec(
             path,
@@ -542,6 +574,41 @@ export function createApplication(options: ServerOptions = {}) {
               })),
           });
           return;
+        }
+        const issueAdminMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(read))?$/.exec(
+            path,
+          );
+        if (issueAdminMatch) {
+          const hunt = await hunts.get(issueAdminMatch[1]);
+          const role = await contributors.roleFor(
+            hunt.id,
+            creatorId,
+            hunt.ownerId,
+          );
+          if (role !== "owner" && role !== "officer")
+            throw new StoreError(
+              "forbidden",
+              "Only Owners and Officers can view hunt issues.",
+            );
+          if (method === "GET" && !issueAdminMatch[2]) {
+            json(response, 200, {
+              ok: true,
+              value: await issueReports.list(hunt.id, creatorId),
+            });
+            return;
+          }
+          if (method === "POST" && issueAdminMatch[2]) {
+            json(response, 200, {
+              ok: true,
+              value: await issueReports.markRead(
+                hunt.id,
+                creatorId,
+                await body(request),
+              ),
+            });
+            return;
+          }
         }
         const exportMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
@@ -839,6 +906,7 @@ export function createApplication(options: ServerOptions = {}) {
               );
             await Promise.all([
               contributors.removeHunt(hunt.id),
+              issueReports.removeHunt(hunt.id),
               progress.removeHunt(hunt.id),
               accountProgress.removeHunt(hunt.id),
             ]);

@@ -171,6 +171,26 @@
                 <legend>Hunt details</legend>
                 <label for="hunt-name">Hunt name</label
                 ><input id="hunt-name" name="name" required />
+                <label for="hunt-type">Hunt type</label
+                ><select id="hunt-type" name="huntType">
+                  <option value="traditional">Traditional Hunt</option>
+                  <option value="kahoot">Kahoot Hunt</option>
+                </select>
+                <label for="hunt-capacity"
+                  >Maximum participants (optional)</label
+                ><input
+                  id="hunt-capacity"
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
+                <label for="hunt-organization">Organization (optional)</label
+                ><input
+                  id="hunt-organization"
+                  name="organizationName"
+                  maxlength="120"
+                />
                 <label for="hunt-description">Description</label
                 ><textarea
                   id="hunt-description"
@@ -323,6 +343,34 @@
               aria-live="polite"
               data-testid="hunt-export-status"
             ></p>
+            <section
+              data-testid="kahoot-host"
+              class="kahoot-panel"
+              hidden
+              aria-label="Kahoot host controls"
+            ></section>
+            <form
+              data-testid="hunt-settings-form"
+              class="hunt-settings-form"
+              hidden
+            >
+              <label
+                >Organization <input name="organizationName" maxlength="120"
+              /></label>
+              <label
+                >Maximum participants (blank for unlimited)<input
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+              /></label>
+              <label
+                ><input name="participationClosed" type="checkbox" /> Close
+                participation to new players</label
+              >
+              <button type="submit" class="action">Save hunt settings</button>
+              <p role="status" data-settings-status></p>
+            </form>
             <div class="details-actions" role="group" aria-label="Hunt actions">
               <button
                 type="button"
@@ -337,6 +385,14 @@
               >
                 Join Hunt
               </a>
+              <button
+                type="button"
+                class="action"
+                data-testid="hunt-issues-button"
+                hidden
+              >
+                Issues (0 unread)
+              </button>
               <details
                 class="details-action-menu"
                 data-testid="export-menu"
@@ -763,7 +819,16 @@
                     <summary>More task options</summary>
                     <div class="field-grid">
                       <div>
-                        <label for="task-points">Points</label>
+                        <label for="task-timer"
+                          >Kahoot question timer in seconds (optional)</label
+                        ><input
+                          id="task-timer"
+                          name="timeLimitSeconds"
+                          type="number"
+                          min="1"
+                          max="3600"
+                          step="1"
+                        /><label for="task-points">Points</label>
                         <input
                           id="task-points"
                           name="points"

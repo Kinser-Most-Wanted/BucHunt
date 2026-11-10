@@ -23,6 +23,8 @@ import {
   isHuntActive,
   isHuntJoinable,
 } from "./huntStore.js";
+import { KahootStore } from "./kahootStore.js";
+import { HuntIssueStore } from "./huntIssueStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 import { PlayerProfileStore } from "./playerProfileStore.js";
 import {
@@ -140,6 +142,10 @@ function rejectFutureTask(
 export function createApplication(options: ServerOptions = {}) {
   const directory = resolve(options.dataDirectory ?? "data");
   const staticDirectory = resolve(options.staticDirectory ?? "src");
+  const kahoot = new KahootStore(resolve(directory, "kahoot-games.json"));
+  const issueReports = new HuntIssueStore(
+    resolve(directory, "hunt-issues.json"),
+  );
   const hunts = new HuntStore(resolve(directory, "hunts.json"));
   const contributors = new ContributorStore(
     resolve(directory, "hunt-contributors.json"),
@@ -170,6 +176,21 @@ export function createApplication(options: ServerOptions = {}) {
         };
       }),
     );
+  }
+  // Admission and settings updates share a queue, so closing a hunt cannot race a join.
+  const admissionQueues = new Map<string, Promise<unknown>>();
+  function serializeAdmission<T>(
+    id: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = admissionQueues.get(id) ?? Promise.resolve();
+    const next = previous.then(operation);
+    const settled = next.catch(() => undefined);
+    admissionQueues.set(id, settled);
+    void settled.then(() => {
+      if (admissionQueues.get(id) === settled) admissionQueues.delete(id);
+    });
+    return next;
   }
   const google = new OAuth2Client(options.googleClientId);
   async function playerId(request: IncomingMessage): Promise<string | null> {
@@ -247,9 +268,40 @@ export function createApplication(options: ServerOptions = {}) {
   ): Promise<PlayerHunt> {
     const completed = await accountProgress.completed(player, hunt.id);
     const incorrect = await accountProgress.incorrect(player, hunt.id);
+    if (hunt.huntType === "kahoot") {
+      for (const id of await kahoot.completed(hunt.id, player))
+        if (!completed.includes(id))
+          await accountProgress.complete(player, hunt.id, id);
+      return {
+        id: hunt.id,
+        name: hunt.name,
+        description: hunt.description,
+        organizationName: hunt.organizationName,
+        huntType: "kahoot",
+        beginsAt: hunt.beginsAt,
+        endsAt: hunt.endsAt,
+        status: hunt.status,
+        tasks: [],
+        kahoot: await kahoot.state(
+          hunt.id,
+          (await accountProgress.participants(hunt.id)).map(
+            (player) => player.playerId,
+          ),
+          {
+            id: player,
+            displayName:
+              (await accountProfiles.get(player)).displayName ?? "Player",
+          },
+          Date.now(),
+          !isHuntJoinable(hunt),
+        ),
+      };
+    }
     return {
       id: hunt.id,
       name: hunt.name,
+      organizationName: hunt.organizationName,
+      huntType: hunt.huntType,
       description: hunt.description,
       beginsAt: hunt.beginsAt,
       endsAt: hunt.endsAt,
@@ -340,7 +392,26 @@ export function createApplication(options: ServerOptions = {}) {
               "validation",
               "Invalid access code. The hunt may be unavailable.",
             );
-          await accountProgress.join(player, hunt.id);
+          await serializeAdmission(hunt.id, async () => {
+            const current = await hunts.get(hunt.id);
+            if (
+              current.huntType === "kahoot" &&
+              (await kahoot.hasStarted(hunt.id)) &&
+              !(await accountProgress.huntsWithProgress(player)).includes(
+                hunt.id,
+              )
+            )
+              throw new StoreError(
+                "forbidden",
+                "This Kahoot Hunt has already started. New players cannot join.",
+              );
+            await accountProgress.join(player, hunt.id, {
+              closed: current.participationClosed,
+              maximum: current.maxParticipants,
+              otherCount: (await progress.participants(hunt.id)).length,
+            });
+          });
+          if (hunt.huntType === "kahoot") await playerHunt(player, hunt);
           json(response, 200, { ok: true, value: { huntId: hunt.id } });
           return;
         }
@@ -364,6 +435,43 @@ export function createApplication(options: ServerOptions = {}) {
             ),
           });
           return;
+        }
+        const issueMatch =
+          /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(tasks))?$/.exec(
+            path,
+          );
+        if (issueMatch) {
+          const hunt = await hunts.get(issueMatch[1]);
+          if (
+            !(await accountProgress.huntsWithProgress(player)).includes(hunt.id)
+          )
+            throw new StoreError("forbidden", "Join this hunt first.");
+          if (issueMatch[2] && method === "GET") {
+            const tasks =
+              hunt.huntType === "kahoot"
+                ? await kahoot.reportableTasks(hunt)
+                : hunt.tasks;
+            json(response, 200, {
+              ok: true,
+              value: tasks.map(({ id, displayLabel }) => ({
+                id,
+                displayLabel,
+              })),
+            });
+            return;
+          }
+          if (!issueMatch[2] && method === "POST") {
+            json(response, 201, {
+              ok: true,
+              value: await issueReports.submit(
+                hunt.huntType === "kahoot"
+                  ? { ...hunt, tasks: await kahoot.reportableTasks(hunt) }
+                  : hunt,
+                await body(request),
+              ),
+            });
+            return;
+          }
         }
         const accountMatch =
           /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)(?:\/tasks\/([a-zA-Z0-9-]+)\/answer)?$/.exec(
@@ -394,6 +502,32 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (method === "POST" && accountMatch[2]) {
+            if (hunt.huntType === "kahoot") {
+              if (!isHuntJoinable(hunt))
+                throw new StoreError(
+                  "forbidden",
+                  "Hunt Ended. Answers can no longer be submitted.",
+                );
+              const input = await body(request);
+              const answer =
+                input && typeof input === "object"
+                  ? (input as Record<string, unknown>).answer
+                  : undefined;
+              const result = await kahoot.answer(
+                hunt.id,
+                player,
+                accountMatch[2],
+                answer,
+                (await accountProgress.participants(hunt.id)).map(
+                  (item) => item.playerId,
+                ),
+              );
+              // The game record is authoritative; repair completion mirrors on every answer.
+              for (const id of await kahoot.completed(hunt.id, player))
+                await accountProgress.complete(player, hunt.id, id);
+              json(response, 200, { ok: true, value: result });
+              return;
+            }
             if (!isHuntActive(hunt)) {
               const message =
                 hunt.status === "archived" ||
@@ -542,6 +676,92 @@ export function createApplication(options: ServerOptions = {}) {
               })),
           });
           return;
+        }
+        const gameMatch = /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/kahoot$/.exec(
+          path,
+        );
+        if (gameMatch) {
+          const hunt = await hunts.get(gameMatch[1]);
+          const role = await contributors.roleFor(
+            hunt.id,
+            creatorId,
+            hunt.ownerId,
+          );
+          if (role !== "owner" && role !== "officer")
+            throw new StoreError(
+              "forbidden",
+              "Only Owners and Officers can host this hunt.",
+            );
+          if (hunt.huntType !== "kahoot")
+            throw new StoreError("validation", "This is a Traditional Hunt.");
+          if (method === "GET" || method === "POST") {
+            const input = method === "POST" ? await body(request) : undefined;
+            const value = await serializeAdmission(hunt.id, async () => {
+              const records = await accountProgress.participants(hunt.id);
+              const participants = await Promise.all(
+                records.map(async (person) => ({
+                  id: person.playerId,
+                  displayName:
+                    (await accountProfiles.get(person.playerId)).displayName ??
+                    "Player",
+                })),
+              );
+              if (method === "GET")
+                return kahoot.state(
+                  hunt.id,
+                  participants.map((person) => person.id),
+                  undefined,
+                  Date.now(),
+                  !isHuntJoinable(hunt),
+                );
+              if (!isHuntJoinable(hunt))
+                throw new StoreError("forbidden", "This hunt has ended.");
+              return kahoot.control(
+                await hunts.get(hunt.id),
+                input && typeof input === "object"
+                  ? (input as Record<string, unknown>).action
+                  : undefined,
+                participants,
+              );
+            });
+            json(response, 200, { ok: true, value });
+            return;
+          }
+        }
+        const issueAdminMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(read))?$/.exec(
+            path,
+          );
+        if (issueAdminMatch) {
+          const hunt = await hunts.get(issueAdminMatch[1]);
+          const role = await contributors.roleFor(
+            hunt.id,
+            creatorId,
+            hunt.ownerId,
+          );
+          if (role !== "owner" && role !== "officer")
+            throw new StoreError(
+              "forbidden",
+              "Only Owners and Officers can view hunt issues.",
+            );
+          if (method === "GET" && !issueAdminMatch[2]) {
+            json(response, 200, {
+              ok: true,
+              value: await issueReports.list(hunt.id, creatorId),
+            });
+            return;
+          }
+          if (method === "POST" && issueAdminMatch[2]) {
+            json(response, 200, {
+              ok: true,
+              value: await issueReports.markRead(
+                hunt.id,
+                creatorId,
+                await body(request),
+              ),
+            });
+            return;
+          }
         }
         const exportMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
@@ -839,6 +1059,8 @@ export function createApplication(options: ServerOptions = {}) {
               );
             await Promise.all([
               contributors.removeHunt(hunt.id),
+              issueReports.removeHunt(hunt.id),
+              kahoot.removeHunt(hunt.id),
               progress.removeHunt(hunt.id),
               accountProgress.removeHunt(hunt.id),
             ]);
@@ -846,6 +1068,16 @@ export function createApplication(options: ServerOptions = {}) {
             json(response, 200, { ok: true, value: { deleted: true } });
             return;
           }
+          if (
+            hunt.huntType === "kahoot" &&
+            ((taskMatch && (method === "PATCH" || method === "DELETE")) ||
+              (match?.[2] === "tasks" && method === "POST")) &&
+            (await kahoot.hasStarted(hunt.id))
+          )
+            throw new StoreError(
+              "forbidden",
+              "Questions cannot be changed after a Kahoot Hunt starts.",
+            );
           if (taskMatch && method === "PATCH") {
             if (!canEdit) {
               json(response, 403, {
@@ -857,11 +1089,20 @@ export function createApplication(options: ServerOptions = {}) {
             }
             json(response, 200, {
               ok: true,
-              value: await hunts.updateTask(
-                hunt.id,
-                taskMatch[2],
-                await body(request),
-              ),
+              value: await (async () => {
+                const input = await body(request);
+                return serializeAdmission(hunt.id, async () => {
+                  if (
+                    hunt.huntType === "kahoot" &&
+                    (await kahoot.hasStarted(hunt.id))
+                  )
+                    throw new StoreError(
+                      "forbidden",
+                      "Questions cannot be changed after a Kahoot Hunt starts.",
+                    );
+                  return hunts.updateTask(hunt.id, taskMatch[2], input);
+                });
+              })(),
             });
             return;
           }
@@ -876,7 +1117,34 @@ export function createApplication(options: ServerOptions = {}) {
             }
             json(response, 200, {
               ok: true,
-              value: await hunts.deleteTask(hunt.id, taskMatch[2]),
+              value: await serializeAdmission(hunt.id, async () => {
+                if (
+                  hunt.huntType === "kahoot" &&
+                  (await kahoot.hasStarted(hunt.id))
+                )
+                  throw new StoreError(
+                    "forbidden",
+                    "Questions cannot be changed after a Kahoot Hunt starts.",
+                  );
+                return hunts.deleteTask(hunt.id, taskMatch[2]);
+              }),
+            });
+            return;
+          }
+          if (match && !match[2] && method === "PATCH") {
+            if (!canEdit)
+              throw new StoreError(
+                "forbidden",
+                "Only Owners and Officers can edit hunt settings.",
+              );
+            json(response, 200, {
+              ok: true,
+              value: await (async () => {
+                const input = await body(request);
+                return serializeAdmission(hunt.id, () =>
+                  hunts.updateSettings(hunt.id, input),
+                );
+              })(),
             });
             return;
           }
@@ -907,7 +1175,20 @@ export function createApplication(options: ServerOptions = {}) {
             }
             json(response, 201, {
               ok: true,
-              value: await hunts.addTask(hunt.id, await body(request)),
+              value: await (async () => {
+                const input = await body(request);
+                return serializeAdmission(hunt.id, async () => {
+                  if (
+                    hunt.huntType === "kahoot" &&
+                    (await kahoot.hasStarted(hunt.id))
+                  )
+                    throw new StoreError(
+                      "forbidden",
+                      "Questions cannot be changed after a Kahoot Hunt starts.",
+                    );
+                  return hunts.addTask(hunt.id, input);
+                });
+              })(),
             });
             return;
           }
@@ -1010,7 +1291,10 @@ export function createApplication(options: ServerOptions = {}) {
           path,
         );
       if (match) {
-        if ((await hunts.get(match[1])).accessCode !== null) {
+        if (
+          (await hunts.get(match[1])).accessCode !== null ||
+          (await hunts.get(match[1])).huntType === "kahoot"
+        ) {
           json(response, 403, {
             ok: false,
             code: "forbidden",
@@ -1038,6 +1322,19 @@ export function createApplication(options: ServerOptions = {}) {
             message: "You are banned from this hunt.",
           });
           return;
+        }
+        if (
+          hunt.maxParticipants != null ||
+          hunt.participationClosed !== undefined
+        ) {
+          await serializeAdmission(hunt.id, async () => {
+            const current = await hunts.get(hunt.id);
+            await progress.join(player, hunt.id, {
+              closed: current.participationClosed,
+              maximum: current.maxParticipants,
+              otherCount: (await accountProgress.participants(hunt.id)).length,
+            });
+          });
         }
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);
@@ -1084,6 +1381,8 @@ export function createApplication(options: ServerOptions = {}) {
             value: {
               id: hunt.id,
               name: hunt.name,
+              organizationName: hunt.organizationName,
+              huntType: hunt.huntType,
               description: hunt.description,
               beginsAt: hunt.beginsAt,
               endsAt: hunt.endsAt,

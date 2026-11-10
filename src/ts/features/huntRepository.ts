@@ -169,7 +169,7 @@ export function createHuntRepository(): HuntRepository {
   };
 }
 
-async function accountRequest<T>(
+export async function accountRequest<T>(
   path: string,
   identity: PlayerIdentity,
   input?: unknown,
@@ -281,10 +281,19 @@ function toPlayerHunt(value: unknown): PlayerHunt {
   return {
     id: candidate.id,
     name: candidate.name,
+    ...(typeof candidate.organizationName === "string"
+      ? { organizationName: candidate.organizationName }
+      : {}),
     description: candidate.description,
     beginsAt: candidate.beginsAt as string,
     endsAt: candidate.endsAt as string | null,
     status: candidate.status as HuntStatus,
+    ...(candidate.huntType === "kahoot"
+      ? {
+          huntType: "kahoot" as const,
+          kahoot: candidate.kahoot as PlayerHunt["kahoot"],
+        }
+      : {}),
     tasks,
   };
 }

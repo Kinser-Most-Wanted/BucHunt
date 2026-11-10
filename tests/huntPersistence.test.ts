@@ -1855,3 +1855,57 @@ test("access code joins persist before answers and reject unavailable hunts and 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("organization survives creation, edits, and reopening storage", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-org-"));
+  try {
+    const path = join(directory, "hunts.json");
+    const store = new HuntStore(path);
+    const hunt = await store.create(
+      { ...input, organizationName: "ETSU" },
+      "owner",
+    );
+    expect((await new HuntStore(path).get(hunt.id)).organizationName).toBe(
+      "ETSU",
+    );
+    await store.updateSettings(hunt.id, { organizationName: "Computing" });
+    expect((await new HuntStore(path).get(hunt.id)).organizationName).toBe(
+      "Computing",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("concurrent admissions cannot exceed capacity, while existing participants retain access when closed", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "hunt-capacity-"));
+  try {
+    const path = join(directory, "progress.json");
+    const store = new PlayerProgressStore(path);
+    const admitted = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, i) =>
+        store.join(`p-${i}`, "hunt", { maximum: 3 }),
+      ),
+    );
+    expect(
+      admitted.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(3);
+    await store.complete("p-0", "hunt", "task");
+    await new PlayerProgressStore(path).join("p-0", "hunt", {
+      maximum: 1,
+      closed: true,
+    });
+    expect(await store.completed("p-0", "hunt")).toEqual(["task"]);
+    await expect(store.join("new", "hunt", { closed: true })).rejects.toThrow(
+      "Participation is closed",
+    );
+    await expect(store.join("new", "hunt", { maximum: 3 })).rejects.toThrow(
+      "capacity",
+    );
+    await store.leave("p-1", "hunt");
+    await store.join("new", "hunt", { maximum: 3 });
+    expect(await store.participants("hunt")).toHaveLength(3);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -4247,3 +4247,71 @@ body[data-page="admin"]
     left: auto;
   }
 }
+
+/* Hunt settings and issue dialogs share the existing action and modal styles. */
+.hunt-settings-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+.hunt-settings-form[hidden] {
+  display: none;
+}
+.hunt-settings-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+.hunt-issue-dialog {
+  width: min(92vw, 40rem);
+  max-height: 85dvh;
+  overflow: auto;
+  padding: 1.5rem;
+  border-radius: 1rem;
+}
+.hunt-issue-dialog::backdrop {
+  background: #0009;
+}
+.hunt-issue-dialog form {
+  display: grid;
+  gap: 1rem;
+}
+.hunt-issue-dialog label {
+  display: grid;
+  gap: 0.4rem;
+}
+.hunt-issue-dialog textarea {
+  min-height: 8rem;
+}
+.hunt-issue-dialog li {
+  padding-block: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.player-submit-issue {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.kahoot-panel {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid #8193aa;
+  border-radius: 0.75rem;
+}
+.kahoot-panel[hidden] {
+  display: none;
+}
+.kahoot-panel form,
+.kahoot-panel label {
+  display: grid;
+  gap: 0.75rem;
+}
+.kahoot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.kahoot-panel li {
+  margin-block: 0.4rem;
+  overflow-wrap: anywhere;
+}

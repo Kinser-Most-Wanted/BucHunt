@@ -214,6 +214,10 @@ export class HuntStore {
     const fields = object(input);
     inputFields(fields, [
       "name",
+      "organizationName",
+      "huntType",
+      "maxParticipants",
+      "participationClosed",
       "description",
       "ownerId",
       "beginsAt",
@@ -237,6 +241,20 @@ export class HuntStore {
       hunt.accessCode = newAccessCode(data.hunts);
       data.hunts.push(hunt);
       return hunt;
+    });
+  }
+  async updateSettings(id: string, input: unknown): Promise<HuntDefinition> {
+    const fields = object(input);
+    inputFields(fields, [
+      "organizationName",
+      "maxParticipants",
+      "participationClosed",
+    ]);
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      Object.assign(hunt, fields, { updatedAt: new Date().toISOString() });
+      return accepted(validateHunt(hunt));
     });
   }
   async list(): Promise<HuntDefinition[]> {
@@ -299,6 +317,7 @@ export class HuntStore {
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",
@@ -328,6 +347,7 @@ export class HuntStore {
   ): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",

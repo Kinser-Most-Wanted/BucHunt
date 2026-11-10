@@ -174,7 +174,15 @@ export class PlayerProgressStore {
       if (!choices.includes(choice)) choices.push(choice);
     });
   }
-  async join(player: string, hunt: string): Promise<void> {
+  async join(
+    player: string,
+    hunt: string,
+    admission?: {
+      closed?: boolean;
+      maximum?: number | null;
+      otherCount?: number;
+    },
+  ): Promise<void> {
     if (![player, hunt].every((id) => /^[a-zA-Z0-9-]{1,100}$/.test(id)))
       throw new StoreError("validation", "Invalid participation identifier.");
     await this.file.update((data) => {
@@ -182,6 +190,25 @@ export class PlayerProgressStore {
         throw new StoreError("forbidden", "You are banned from this hunt.");
       const activeHunts = memberships(data);
       const active = (activeHunts[player] ??= []);
+      if (
+        !active.includes(hunt) &&
+        !Object.hasOwn(data.players[player] ?? {}, hunt)
+      ) {
+        if (admission?.closed)
+          throw new StoreError(
+            "forbidden",
+            "Participation is closed for this hunt.",
+          );
+        const count =
+          Object.values(data.players).filter((hunts) =>
+            Object.hasOwn(hunts, hunt),
+          ).length + (admission?.otherCount ?? 0);
+        if (admission?.maximum != null && count >= admission.maximum)
+          throw new StoreError(
+            "forbidden",
+            "This hunt has reached its participant capacity.",
+          );
+      }
       if (!active.includes(hunt)) active.push(hunt);
       if (!Object.hasOwn(data.players, player)) data.players[player] = {};
       if (!Object.hasOwn(data.players[player], hunt))

@@ -207,3 +207,37 @@ test("multiple choice requires four distinct choices and the configured correct 
   delete hunt.tasks[0].choices;
   expect(validateHunt(hunt).ok).toBe(true);
 });
+
+test("organization is optional and length bounded", () => {
+  expect(
+    validateHunt({ ...fixture(), organizationName: "ETSU Computing" }).ok,
+  ).toBe(true);
+  expectInvalid(
+    { ...fixture(), organizationName: "x".repeat(121) },
+    "organizationName",
+  );
+  expectInvalid({ ...fixture(), organizationName: null }, "organizationName");
+});
+
+test("capacity, participation flags, hunt types, and question timers validate without requiring changes to legacy hunts", () => {
+  expect(
+    validateHunt({
+      ...fixture(),
+      maxParticipants: 10,
+      participationClosed: false,
+      huntType: "kahoot",
+    }).ok,
+  ).toBe(true);
+  for (const limit of [0, -1, 1.5, "10"])
+    expectInvalid({ ...fixture(), maxParticipants: limit }, "maxParticipants");
+  expectInvalid(
+    { ...fixture(), participationClosed: "yes" },
+    "participationClosed",
+  );
+  expectInvalid({ ...fixture(), huntType: "other" }, "huntType");
+  for (const timer of [0, 3601, 2.5, "10"]) {
+    const hunt = fixture();
+    Object.assign(hunt.tasks[0], { timeLimitSeconds: timer });
+    expectInvalid(hunt, "tasks[0].timeLimitSeconds");
+  }
+});

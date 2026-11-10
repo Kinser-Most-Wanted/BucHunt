@@ -334,6 +334,11 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await player
       .getByRole("button", { name: "Join Hunt", exact: true })
       .click();
+    console.log("[sprint6-139] opened after reload");
+    console.log(
+      "[sprint6-139] facts",
+      await player.getByTestId("player-hunt-facts").innerText(),
+    );
     await expect(player.getByTestId("player-hunt-facts")).toContainText("ETSU");
     await player.getByTestId("submit-issue").click();
     const report = player.getByRole("dialog", {
@@ -346,6 +351,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     });
     await expect(taskSelect).toBeVisible();
     await taskSelect.selectOption({ label: "Mascot" });
+    console.log("[sprint6-139] task selected");
     await report
       .getByLabel("Issue description")
       .fill("The fountain sign is missing.");
@@ -353,6 +359,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       .getByRole("button", { name: "Submit Issue", exact: true })
       .click();
     await expect(report.getByRole("status")).toHaveText("Issue submitted.");
+    console.log("[sprint6-139] issue submitted");
     await report.getByRole("button", { name: "Close", exact: true }).click();
     const admin = await adminContext.newPage();
     await identity(admin, "owner", true);
@@ -383,6 +390,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(settings.getByRole("status")).toHaveText(
       "Hunt settings saved.",
     );
+    console.log("[sprint6-139] settings saved", await settings.innerText());
     expect(
       (
         await f.api("/api/player/account/join", "two", {
@@ -391,6 +399,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       ).data.message,
     ).toContain("closed");
     await player.reload();
+    console.log("[sprint6-139] player reloaded");
     await player
       .getByRole("button", { name: "Open Sprint Six", exact: true })
       .click();
@@ -438,6 +447,11 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
     await admin.goto(f.base + `/admin.html?huntId=${f.hunt.id}`);
     const host = admin.getByTestId("kahoot-host");
     await expect(host).toContainText("Connected");
+    console.log("[sprint6-140] host text", await host.innerText());
+    console.log(
+      "[sprint6-140] host buttons",
+      await host.locator("button").allTextContents(),
+    );
     const startHunt = host.getByRole("button", {
       name: "Start hunt",
       exact: true,

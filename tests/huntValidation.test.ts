@@ -207,3 +207,13 @@ test("multiple choice requires four distinct choices and the configured correct 
   delete hunt.tasks[0].choices;
   expect(validateHunt(hunt).ok).toBe(true);
 });
+
+test("Kahoot type and optional timers validate", () => {
+  expect(validateHunt({ ...fixture(), huntType: "kahoot" }).ok).toBe(true);
+  expectInvalid({ ...fixture(), huntType: "other" }, "huntType");
+  for (const timer of [0, 3601, 2.5, "10"]) {
+    const hunt = fixture();
+    Object.assign(hunt.tasks[0], { timeLimitSeconds: timer });
+    expectInvalid(hunt, "tasks[0].timeLimitSeconds");
+  }
+});

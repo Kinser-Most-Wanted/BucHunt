@@ -112,6 +112,11 @@
           "type": "integer",
           "minimum": 0,
           "default": 0
+        },
+        "timeLimitSeconds": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 3600
         }
       },
       "allOf": [
@@ -222,6 +227,9 @@
           "items": {
             "$ref": "#/$defs/task"
           }
+        },
+        "huntType": {
+          "enum": ["traditional", "kahoot"]
         }
       }
     }

@@ -128,6 +128,7 @@ function checkTask(
     value,
     [
       ...taskFields,
+      ...(Object.hasOwn(value, "timeLimitSeconds") ? ["timeLimitSeconds"] : []),
       ...(Object.hasOwn(value, "taskType") ? ["taskType"] : []),
       ...(Object.hasOwn(value, "choices") ? ["choices"] : []),
     ],
@@ -142,6 +143,17 @@ function checkTask(
     issues.push({
       field: prefix + "taskType",
       message: "Choose a supported task type.",
+    });
+  if (
+    value.timeLimitSeconds !== undefined &&
+    value.timeLimitSeconds !== null &&
+    (!Number.isInteger(value.timeLimitSeconds) ||
+      Number(value.timeLimitSeconds) < 1 ||
+      Number(value.timeLimitSeconds) > 3600)
+  )
+    issues.push({
+      field: prefix + "timeLimitSeconds",
+      message: "Timer must be 1–3600 seconds or null.",
     });
   if (value.taskType === "multiple-choice") {
     const choices = value.choices;
@@ -235,7 +247,22 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       issues: [{ field: "$", message: "Hunt must be an object." }],
     };
   }
-  checkFields(input, huntFields, "", issues);
+  checkFields(
+    input,
+    [...huntFields, ...(Object.hasOwn(input, "huntType") ? ["huntType"] : [])],
+    "",
+    issues,
+  );
+  if (
+    input.huntType !== undefined &&
+    input.huntType !== "traditional" &&
+    input.huntType !== "kahoot"
+  )
+    issues.push({
+      field: "huntType",
+      message: "Choose Traditional Hunt or Kahoot Hunt.",
+    });
+
   for (const field of ["id", "name", "description", "ownerId"])
     checkText(input[field], field, issues);
   if (

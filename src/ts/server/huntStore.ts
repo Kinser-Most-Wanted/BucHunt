@@ -213,6 +213,7 @@ export class HuntStore {
   async create(input: unknown, ownerId: string): Promise<HuntDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "huntType",
       "name",
       "description",
       "ownerId",
@@ -299,6 +300,7 @@ export class HuntStore {
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",
@@ -328,6 +330,7 @@ export class HuntStore {
   ): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",

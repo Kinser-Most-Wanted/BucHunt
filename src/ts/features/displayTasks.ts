@@ -1,3 +1,4 @@
+import { mountKahootPlayer } from "./kahootHunt.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
 
@@ -126,6 +127,12 @@ function huntPhase(hunt: PlayerHunt, now: number): HuntPhase {
     (hunt.endsAt !== null && Date.parse(hunt.endsAt) <= now)
   )
     return "past";
+  if (hunt.huntType === "kahoot")
+    return hunt.kahoot?.phase === "finished"
+      ? "past"
+      : hunt.kahoot?.phase === "lobby"
+        ? "future"
+        : "active";
   return Date.parse(hunt.beginsAt) > now ? "future" : "active";
 }
 
@@ -142,6 +149,12 @@ function durationText(milliseconds: number): string {
 }
 
 function countdownText(hunt: PlayerHunt, now: number): string {
+  if (hunt.huntType === "kahoot")
+    return hunt.kahoot?.phase === "finished"
+      ? "Hunt complete"
+      : hunt.kahoot?.phase === "lobby"
+        ? "Waiting for host"
+        : "Live Kahoot Hunt";
   const phase = huntPhase(hunt, now);
   if (phase === "past") return "Hunt Ended";
   if (phase === "future")
@@ -163,6 +176,18 @@ function huntStatusPresentation(
   now: number,
 ): HuntStatusPresentation {
   const phase = huntPhase(hunt, now);
+  if (hunt.huntType === "kahoot")
+    return {
+      tone:
+        phase === "past" ? "ended" : phase === "future" ? "upcoming" : "active",
+      label:
+        phase === "past"
+          ? "Hunt complete"
+          : phase === "future"
+            ? "Lobby"
+            : "Live",
+      message: "Kahoot Hunt",
+    };
   if (phase === "past") {
     return {
       tone: "ended",
@@ -203,6 +228,7 @@ function huntStatusPresentation(
 }
 
 function isHuntCompleted(hunt: PlayerHunt): boolean {
+  if (hunt.huntType === "kahoot") return hunt.kahoot?.phase === "finished";
   return hunt.tasks.length > 0 && hunt.tasks.every((task) => task.completed);
 }
 
@@ -306,9 +332,12 @@ function renderHunts(
     const completed = hunt.tasks.filter((task) => task.completed).length;
     const progress = document.createElement("p");
     progress.className = "player-hunt-progress";
-    progress.textContent = hunt.tasks.length
-      ? `${completed} of ${hunt.tasks.length} tasks completed`
-      : "No tasks added yet";
+    progress.textContent =
+      hunt.huntType === "kahoot"
+        ? "Synchronized questions · Host controlled"
+        : hunt.tasks.length
+          ? `${completed} of ${hunt.tasks.length} tasks completed`
+          : "No tasks added yet";
     const leaveButton = document.createElement("button");
     leaveButton.type = "button";
     leaveButton.className = "player-leave-card";
@@ -606,9 +635,12 @@ export function mountDisplayTasks(
     const completed = hunt.tasks.filter((task) => task.completed).length;
     const progress = card.querySelector<HTMLElement>(".player-hunt-progress");
     if (progress) {
-      progress.textContent = hunt.tasks.length
-        ? `${completed} of ${hunt.tasks.length} tasks completed`
-        : "No tasks added yet";
+      progress.textContent =
+        hunt.huntType === "kahoot"
+          ? "Synchronized questions · Host controlled"
+          : hunt.tasks.length
+            ? `${completed} of ${hunt.tasks.length} tasks completed`
+            : "No tasks added yet";
     }
   };
 
@@ -973,7 +1005,15 @@ export function mountDisplayTasks(
       fact.append(label, value);
       huntFacts.append(fact);
     };
+    let stopKahoot: (() => void) | undefined;
+    huntDetails.addEventListener("close", () => {
+      stopKahoot?.();
+      stopKahoot = undefined;
+    });
     const loadHunt = async (huntId: string): Promise<void> => {
+      stopKahoot?.();
+      stopKahoot = undefined;
+      huntDetails.querySelector('[data-testid="kahoot-player"]')?.remove();
       const requestId = ++huntRequest;
       selectedHuntId = huntId;
       const scrollPosition = huntDetails.open ? huntDetails.scrollTop : 0;
@@ -1002,6 +1042,17 @@ export function mountDisplayTasks(
       const hunt = result.value;
       updateDisplayedHunt(hunt);
       huntId = hunt.id;
+      if (hunt.huntType === "kahoot") {
+        huntName.textContent = hunt.name;
+        huntDescription.textContent = hunt.description;
+        huntStatus.textContent = "Kahoot Hunt";
+        const panel = document.createElement("section");
+        panel.dataset.testid = "kahoot-player";
+        panel.className = "kahoot-panel";
+        huntTasks.before(panel);
+        stopKahoot = mountKahootPlayer(panel, hunt, identity, repository);
+        return;
+      }
       const now = Date.now();
       const phase = huntPhase(hunt, now);
       const completed = hunt.tasks.filter((task) => task.completed).length;

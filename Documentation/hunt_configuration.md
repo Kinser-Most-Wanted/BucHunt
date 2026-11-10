@@ -223,3 +223,7 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Hunt types
+
+Create a Hunt offers Traditional Hunt and Kahoot Hunt. Existing hunts default to Traditional Hunt. Kahoot Hunts use a host-controlled lobby and synchronized questions, with optional timers and a leaderboard. See [Kahoot Hunts](kahoot_hunts.md) for hosting, scoring, persistence, and reconnect behavior.

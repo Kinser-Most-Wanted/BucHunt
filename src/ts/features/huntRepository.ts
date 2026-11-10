@@ -285,6 +285,12 @@ function toPlayerHunt(value: unknown): PlayerHunt {
     beginsAt: candidate.beginsAt as string,
     endsAt: candidate.endsAt as string | null,
     status: candidate.status as HuntStatus,
+    ...(candidate.huntType === "kahoot"
+      ? {
+          huntType: "kahoot" as const,
+          kahoot: candidate.kahoot as PlayerHunt["kahoot"],
+        }
+      : {}),
     tasks,
   };
 }

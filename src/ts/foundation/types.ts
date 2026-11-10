@@ -3,6 +3,7 @@ export type TaskOrderMode = "sequential" | "any";
 export type HuntRole = "owner" | "officer" | "contributor";
 
 export interface HuntInput {
+  huntType?: "traditional" | "kahoot";
   name: string;
   description: string;
   ownerId: string;
@@ -16,6 +17,7 @@ export interface TaskLocation {
 }
 export type TaskType = "single-word-trivia" | "multiple-choice";
 export interface TaskInput {
+  timeLimitSeconds?: number | null;
   taskType?: TaskType;
   choices?: string[];
   displayLabel: string;
@@ -79,6 +81,8 @@ export interface PlayerTask {
   location?: TaskLocation;
 }
 export interface PlayerHunt {
+  huntType?: "traditional" | "kahoot";
+  kahoot?: KahootView;
   id: string;
   name: string;
   description: string;
@@ -128,4 +132,31 @@ export type OperationResult<T> =
 export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
+}
+
+export interface KahootView {
+  phase: "lobby" | "question" | "results" | "finished";
+  questionNumber: number;
+  totalQuestions: number;
+  serverNow: number;
+  startedAt: number | null;
+  deadline: number | null;
+  submitted: boolean;
+  correct?: boolean;
+  pointsAwarded?: number;
+  question?: {
+    id: string;
+    displayLabel: string;
+    description: string;
+    taskType: TaskType;
+    choices?: string[];
+  };
+  leaderboard: {
+    participantId: string;
+    displayName: string;
+    score: number;
+    submitted: boolean;
+    active: boolean;
+    connected: boolean;
+  }[];
 }

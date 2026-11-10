@@ -12,6 +12,9 @@ import {
   getCreatorSession,
 } from "./huntRepository.js";
 
+import { mountKahootHost } from "./kahootHunt.js";
+
+let stopKahoot: (() => void) | undefined;
 const dialog = document.querySelector<HTMLDialogElement>(
   '[data-testid="hunt-details-dialog"]',
 );
@@ -447,6 +450,7 @@ function setDetailView(editing: boolean): void {
 }
 
 function resetDialog(): void {
+  stopKahoot?.();
   activeHunt = undefined;
   canExport = false;
   canViewProgress = false;
@@ -550,6 +554,8 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   activeHunt = hunt;
   canExport = role === "owner" || role === "officer";
   canViewProgress = canExport;
+  stopKahoot?.();
+  stopKahoot = mountKahootHost(dialog, hunt, canExport);
   updateExportButtons();
   updateParticipantControls();
   const contributorsPanel = dialog.querySelector<HTMLDetailsElement>(
@@ -611,6 +617,11 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   const facts = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-facts"]',
   )!;
+  addFact(
+    facts,
+    "Hunt type",
+    hunt.huntType === "kahoot" ? "Kahoot Hunt" : "Traditional Hunt",
+  );
   addFact(facts, "Status", hunt.status);
   addFact(
     facts,

@@ -4343,9 +4343,10 @@ body[data-page="admin"]
   margin: 0;
 }
 
-.organization-workspace > button,
+.organization-workspace-actions > button,
 .organization-create-controls > button,
-.organization-member-remove {
+.organization-member-remove,
+.organization-invitation-actions > button {
   background: var(--gold, #ffca28);
   border: 0;
   border-radius: 0.65rem;
@@ -4355,6 +4356,16 @@ body[data-page="admin"]
   font-weight: 700;
   min-height: 2.75rem;
   padding: 0.65rem 1rem;
+}
+
+.organization-workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.organization-workspace-actions > button {
+  flex: 0 0 auto;
 }
 
 .organization-management-dialog {
@@ -4449,6 +4460,60 @@ body[data-page="admin"]
   border-color: var(--gold, #ffca28);
 }
 
+.organization-invitations-panel {
+  background: linear-gradient(145deg, rgb(21 52 93 / 78%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 199 44 / 30%);
+  border-radius: 0.85rem;
+  color: #f4f5f9;
+  margin: 0 0 1rem;
+  padding: 1rem;
+}
+
+.organization-invitations-panel[hidden] {
+  display: none;
+}
+
+.organization-invitations-panel > .eyebrow {
+  color: #ffc72c;
+}
+
+.organization-invitations-panel > h3 {
+  margin-top: 0.25rem;
+}
+
+.organization-invitations {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.organization-invitations > li {
+  align-items: center;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: space-between;
+  padding: 0.75rem;
+}
+
+.organization-invitation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.organization-invitation-actions
+  button[data-organization-invitation-action="decline"] {
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  color: #f4f5f9;
+}
+
 .organization-editor {
   background: linear-gradient(145deg, rgb(21 52 93 / 72%), rgb(11 32 61 / 88%));
   border: 1px solid rgb(255 255 255 / 10%);
@@ -4486,6 +4551,7 @@ body[data-page="admin"]
 
 @media (max-width: 640px) {
   .organization-workspace,
+  .organization-workspace-actions,
   .organization-management-layout,
   .organization-create-controls {
     align-items: stretch;
@@ -4497,6 +4563,7 @@ body[data-page="admin"]
     width: 100%;
   }
 
+  .organization-workspace-actions > button,
   .organization-create-controls > button {
     width: 100%;
   }

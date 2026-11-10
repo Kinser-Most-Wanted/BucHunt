@@ -368,17 +368,52 @@ export function createApplication(options: ServerOptions = {}) {
         }
         const organizationCollection =
           path === "/api/player/account/organizations";
+        const organizationInvitationCollection =
+          path === "/api/player/account/organization-invitations";
+        const organizationInvitationRoute =
+          /^\/api\/player\/account\/organization-invitations\/([a-f0-9-]{36})$/.exec(
+            path,
+          );
         const organizationRoute =
           /^\/api\/player\/account\/organizations\/([a-f0-9-]{36})(?:\/(members)(?:\/(.+))?)?$/.exec(
             path,
           );
-        if (organizationCollection || organizationRoute) {
+        if (
+          organizationCollection ||
+          organizationRoute ||
+          organizationInvitationCollection ||
+          organizationInvitationRoute
+        ) {
           const accountIdentity = await googleCreator(request);
           if (!accountIdentity) {
             json(response, 401, {
               ok: false,
               code: "unauthorized",
               message: "Sign in with Google again to manage organizations.",
+            });
+            return;
+          }
+          if (organizationInvitationCollection && method === "GET") {
+            json(response, 200, {
+              ok: true,
+              value: await organizations.listInvitations(accountIdentity.email),
+            });
+            return;
+          }
+          if (organizationInvitationRoute && method === "POST") {
+            const input = await body(request);
+            const action =
+              input && typeof input === "object"
+                ? (input as Record<string, unknown>).action
+                : undefined;
+            json(response, 200, {
+              ok: true,
+              value: await organizations.respondToInvitation(
+                organizationInvitationRoute[1],
+                accountIdentity.id,
+                accountIdentity.email,
+                action,
+              ),
             });
             return;
           }

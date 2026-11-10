@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { JsonFile, StoreError } from "./huntStore.js";
 import type {
   OrganizationDefinition,
+  OrganizationInvitationDefinition,
+  OrganizationInvitationResponse,
   OrganizationMember,
   OrganizationRole,
 } from "../foundation/types.js";
@@ -46,12 +48,9 @@ function organizationName(value: unknown): string {
 function roleFor(
   organization: StoredOrganization,
   accountId: string,
-  email: string,
 ): OrganizationRole | undefined {
   return organization.members.find(
-    (member) =>
-      member.accountId === accountId ||
-      (email && member.pending && member.email === email),
+    (member) => member.accountId === accountId && !member.pending,
   )?.role;
 }
 
@@ -68,35 +67,74 @@ export class OrganizationStore {
 
   async listForAccount(
     accountId: string,
-    email: string,
+    _email: string,
   ): Promise<OrganizationDefinition[]> {
+    return this.file.query((file) => this.viewsForAccount(file, accountId));
+  }
+
+  listInvitations(email: string): Promise<OrganizationInvitationDefinition[]> {
     const normalized = normalizeEmail(email);
-    const snapshot = await this.file.get();
-    const hasInvitation = snapshot.organizations.some((organization) =>
-      organization.members.some(
-        (member) => member.pending && member.email === normalized,
+    return this.file.query((file) =>
+      file.organizations.flatMap((organization) =>
+        organization.members.some(
+          (member) => member.pending && member.email === normalized,
+        )
+          ? [
+              {
+                organizationId: organization.id,
+                organizationName: organization.name,
+                role:
+                  organization.members.find(
+                    (member) => member.pending && member.email === normalized,
+                  )?.role ?? "contributor",
+              },
+            ]
+          : [],
       ),
     );
-    if (!hasInvitation)
-      return this.viewsForAccount(snapshot, accountId, normalized);
+  }
+
+  respondToInvitation(
+    organizationId: string,
+    accountId: string,
+    email: string,
+    action: unknown,
+  ): Promise<OrganizationInvitationResponse> {
+    if (action !== "accept" && action !== "decline")
+      throw new StoreError(
+        "validation",
+        "Choose whether to accept or decline this invitation.",
+      );
+    const normalized = normalizeEmail(email);
     return this.file.update((file) => {
-      for (const organization of file.organizations)
-        for (const member of organization.members)
-          if (member.pending && member.email === normalized) {
-            member.accountId = accountId;
-            member.pending = false;
-          }
-      return this.viewsForAccount(file, accountId, normalized);
+      const organization = file.organizations.find(
+        (item) => item.id === organizationId,
+      );
+      if (!organization)
+        throw new StoreError("not-found", "Organization invitation not found.");
+      const index = organization.members.findIndex(
+        (member) => member.pending && member.email === normalized,
+      );
+      if (index < 0)
+        throw new StoreError("not-found", "Organization invitation not found.");
+      if (action === "accept") {
+        const member = organization.members[index]!;
+        member.accountId = accountId;
+        member.pending = false;
+      } else {
+        organization.members.splice(index, 1);
+      }
+      organization.updatedAt = new Date().toISOString();
+      return { organizationId, accepted: action === "accept" };
     });
   }
 
   private viewsForAccount(
     file: OrganizationFile,
     accountId: string,
-    email: string,
   ): OrganizationDefinition[] {
     return file.organizations.flatMap((organization) => {
-      const role = roleFor(organization, accountId, email);
+      const role = roleFor(organization, accountId);
       return role
         ? [
             {
@@ -152,16 +190,15 @@ export class OrganizationStore {
 
   async isMemberOfName(
     accountId: string,
-    email: string,
+    _email: string,
     name: string,
   ): Promise<boolean> {
-    const normalized = normalizeEmail(email);
     return this.file.query((file) =>
       file.organizations.some(
         (organization) =>
           organization.name.toLocaleLowerCase() ===
             name.trim().toLocaleLowerCase() &&
-          roleFor(organization, accountId, normalized) !== undefined,
+          roleFor(organization, accountId) !== undefined,
       ),
     );
   }
@@ -183,7 +220,7 @@ export class OrganizationStore {
       );
       if (!organization)
         throw new StoreError("not-found", "Organization not found.");
-      const role = roleFor(organization, accountId, normalizeEmail(email));
+      const role = roleFor(organization, accountId);
       if (role !== "owner" && role !== "officer")
         throw new StoreError(
           "forbidden",
@@ -220,9 +257,7 @@ export class OrganizationStore {
       );
       if (!organization)
         throw new StoreError("not-found", "Organization not found.");
-      if (
-        roleFor(organization, accountId, normalizeEmail(actorEmail)) !== "owner"
-      )
+      if (roleFor(organization, accountId) !== "owner")
         throw new StoreError(
           "forbidden",
           "Only Organization Owners can invite people.",
@@ -263,9 +298,7 @@ export class OrganizationStore {
       );
       if (!organization)
         throw new StoreError("not-found", "Organization not found.");
-      if (
-        roleFor(organization, accountId, normalizeEmail(actorEmail)) !== "owner"
-      )
+      if (roleFor(organization, accountId) !== "owner")
         throw new StoreError(
           "forbidden",
           "Only Organization Owners can change member roles.",
@@ -304,9 +337,7 @@ export class OrganizationStore {
       );
       if (!organization)
         throw new StoreError("not-found", "Organization not found.");
-      if (
-        roleFor(organization, accountId, normalizeEmail(actorEmail)) !== "owner"
-      )
+      if (roleFor(organization, accountId) !== "owner")
         throw new StoreError(
           "forbidden",
           "Only Organization Owners can remove members.",

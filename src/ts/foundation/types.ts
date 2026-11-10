@@ -21,6 +21,17 @@ export interface OrganizationDefinition {
   members: OrganizationMember[];
 }
 
+export interface OrganizationInvitationDefinition {
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
+}
+
+export interface OrganizationInvitationResponse {
+  organizationId: string;
+  accepted: boolean;
+}
+
 export interface HuntInput {
   huntType?: "traditional" | "kahoot";
   organizationName?: string;

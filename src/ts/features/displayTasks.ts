@@ -3,6 +3,8 @@ import { mountPlayerIssues } from "./huntIssues.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
   OrganizationDefinition,
+  OrganizationInvitationDefinition,
+  OrganizationInvitationResponse,
   OperationResult,
   PlayerHunt,
   PlayerIdentity,
@@ -506,6 +508,18 @@ export function mountDisplayTasks(
   const openOrganizations = root.querySelector<HTMLButtonElement>(
     '[data-testid="open-organizations"]',
   );
+  const openOrganizationInvitations = root.querySelector<HTMLButtonElement>(
+    '[data-testid="open-organization-invitations"]',
+  );
+  const organizationInvitationsPanel = root.querySelector<HTMLElement>(
+    '[data-testid="organization-invitations-panel"]',
+  );
+  const organizationInvitations = root.querySelector<HTMLUListElement>(
+    '[data-testid="organization-invitations"]',
+  );
+  const organizationInvitationsStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-invitations-status"]',
+  );
   const closeOrganizations = root.querySelector<HTMLButtonElement>(
     '[data-testid="close-organizations"]',
   );
@@ -567,6 +581,10 @@ export function mountDisplayTasks(
     !organizationWorkspace ||
     !organizationDialog ||
     !openOrganizations ||
+    !openOrganizationInvitations ||
+    !organizationInvitationsPanel ||
+    !organizationInvitations ||
+    !organizationInvitationsStatus ||
     !closeOrganizations ||
     !organizationCreateForm ||
     !organizationCreateStatus ||
@@ -623,6 +641,8 @@ export function mountDisplayTasks(
   let pastHuntFilter: PastHuntFilter = "recent-3";
   let categorySignature = "";
   let organizations: OrganizationDefinition[] = [];
+  let pendingOrganizationInvitations: OrganizationInvitationDefinition[] = [];
+  let promptedInvitationsForAccount: string | null = null;
   let selectedOrganizationId: string | null = null;
   let selectedHuntId: string | null = null;
   let reloadSelectedHunt: (() => void) | undefined;
@@ -724,10 +744,109 @@ export function mountDisplayTasks(
     renderOrganizationEditor();
   };
 
-  openOrganizations.addEventListener("click", () => {
+  const renderOrganizationInvitations = (): void => {
+    organizationInvitations.replaceChildren();
+    openOrganizationInvitations.hidden =
+      pendingOrganizationInvitations.length === 0;
+    openOrganizationInvitations.textContent = `Organization invitations (${pendingOrganizationInvitations.length})`;
+    organizationInvitationsPanel.hidden =
+      pendingOrganizationInvitations.length === 0;
+    for (const invitation of pendingOrganizationInvitations) {
+      const item = document.createElement("li");
+      const copy = document.createElement("span");
+      copy.textContent = `${invitation.organizationName} invited you to join as a ${invitation.role}.`;
+      const actions = document.createElement("div");
+      actions.className = "organization-invitation-actions";
+      for (const action of ["accept", "decline"] as const) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.organizationInvitationAction = action;
+        button.dataset.organizationId = invitation.organizationId;
+        button.textContent = action === "accept" ? "Accept" : "Decline";
+        actions.append(button);
+      }
+      item.append(copy, actions);
+      organizationInvitations.append(item);
+    }
+  };
+
+  const refreshOrganizationInvitations = async (
+    identity = activeIdentity,
+    showPrompt = false,
+  ): Promise<void> => {
+    if (!identity) return;
+    const result = await organizationRequest<
+      OrganizationInvitationDefinition[]
+    >(identity, "/api/player/account/organization-invitations");
+    if (identity.accountId !== activeIdentity?.accountId) return;
+    if (!result.ok) {
+      organizationInvitationsStatus.textContent = result.message;
+      organizationInvitationsStatus.hidden = false;
+      return;
+    }
+    pendingOrganizationInvitations = result.value;
+    renderOrganizationInvitations();
+    if (
+      showPrompt &&
+      pendingOrganizationInvitations.length > 0 &&
+      promptedInvitationsForAccount !== identity.accountId
+    ) {
+      promptedInvitationsForAccount = identity.accountId;
+      organizationInvitationsStatus.hidden = true;
+      if (!organizationDialog.open) organizationDialog.showModal();
+    }
+  };
+
+  const openOrganizationManager = (): void => {
     organizationDialog.showModal();
     organizationCreateStatus.textContent = "";
+    organizationInvitationsStatus.hidden = true;
     void refreshOrganizations();
+    void refreshOrganizationInvitations();
+  };
+
+  openOrganizations.addEventListener("click", openOrganizationManager);
+  openOrganizationInvitations.addEventListener(
+    "click",
+    openOrganizationManager,
+  );
+
+  organizationInvitations.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "button[data-organization-invitation-action]",
+    );
+    const identity = activeIdentity;
+    const organizationId = button?.dataset.organizationId;
+    const action = button?.dataset.organizationInvitationAction;
+    if (
+      !button ||
+      !identity ||
+      !organizationId ||
+      (action !== "accept" && action !== "decline")
+    )
+      return;
+    button.disabled = true;
+    organizationInvitationsStatus.hidden = true;
+    void organizationRequest<OrganizationInvitationResponse>(
+      identity,
+      `/api/player/account/organization-invitations/${encodeURIComponent(organizationId)}`,
+      { action },
+    ).then(async (result) => {
+      if (!result.ok) {
+        organizationInvitationsStatus.textContent = result.message;
+        organizationInvitationsStatus.hidden = false;
+        button.disabled = false;
+        return;
+      }
+      organizationInvitationsStatus.textContent = result.value.accepted
+        ? "Organization invitation accepted."
+        : "Organization invitation declined.";
+      organizationInvitationsStatus.hidden = false;
+      await Promise.all([
+        refreshOrganizationInvitations(identity),
+        refreshOrganizations(identity),
+      ]);
+    });
   });
   closeOrganizations.addEventListener("click", () =>
     organizationDialog.close(),
@@ -812,7 +931,7 @@ export function mountDisplayTasks(
     ).then(async (result) => {
       button.disabled = false;
       organizationInviteStatus.textContent = result.ok
-        ? `Invitation saved for ${email}. They will join as a Contributor when they sign in.`
+        ? `Invitation sent to ${email}. They must accept before joining as a Contributor.`
         : result.message;
       if (result.ok) {
         organizationInviteForm.reset();
@@ -992,6 +1111,7 @@ export function mountDisplayTasks(
     currentNickname = name;
     organizationWorkspace.hidden = false;
     void refreshOrganizations(signedIn);
+    void refreshOrganizationInvitations(signedIn, true);
     setGoogleSignInEnabled(false);
     providerStatus.hidden = true;
     nameForm.hidden = true;
@@ -1731,9 +1851,17 @@ export function mountDisplayTasks(
     const timer = window.setInterval(() => {
       if (!huntDetails.open) renderCategories();
     }, 1000);
-    window.addEventListener("pagehide", () => window.clearInterval(timer), {
-      once: true,
-    });
+    const organizationInvitationTimer = window.setInterval(() => {
+      if (activeIdentity) void refreshOrganizationInvitations();
+    }, 30_000);
+    window.addEventListener(
+      "pagehide",
+      () => {
+        window.clearInterval(timer);
+        window.clearInterval(organizationInvitationTimer);
+      },
+      { once: true },
+    );
     if (sharedCode && !autoJoin) huntInput.value = sharedCode;
     const requestedHunt = new URLSearchParams(location.search).get("huntId");
     if (

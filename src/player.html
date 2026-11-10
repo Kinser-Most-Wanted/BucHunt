@@ -134,9 +134,18 @@
             <h2>Organizations</h2>
             <p>Create a group, invite people by email, and choose its role.</p>
           </div>
-          <button type="button" data-testid="open-organizations">
-            Manage organizations
-          </button>
+          <div class="organization-workspace-actions">
+            <button type="button" data-testid="open-organizations">
+              Manage organizations
+            </button>
+            <button
+              type="button"
+              data-testid="open-organization-invitations"
+              hidden
+            >
+              Organization invitations
+            </button>
+          </div>
         </section>
         <dialog
           class="organization-management-dialog"
@@ -157,6 +166,29 @@
               ×
             </button>
           </div>
+          <section
+            class="organization-invitations-panel"
+            data-testid="organization-invitations-panel"
+            aria-labelledby="organization-invitations-heading"
+            hidden
+          >
+            <p class="eyebrow">YOU’RE INVITED</p>
+            <h3 id="organization-invitations-heading">
+              Organization invitations
+            </h3>
+            <ul
+              class="organization-invitations"
+              data-testid="organization-invitations"
+              aria-label="Pending organization invitations"
+            ></ul>
+          </section>
+          <p
+            class="organization-status"
+            data-testid="organization-invitations-status"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></p>
           <form data-testid="organization-create-form">
             <label for="organization-create-name">Create an organization</label>
             <div class="organization-create-controls">

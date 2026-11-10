@@ -68,6 +68,38 @@ test("organization membership, roles, invitations, and saved data are protected"
       `/api/player/account/organizations/${organizationId}/members`,
       { email: "member@example.com" },
     );
+    const pending = await api(
+      "member",
+      "/api/player/account/organization-invitations",
+    );
+    expect(pending.data.value).toEqual([
+      {
+        organizationId,
+        organizationName: "Campus Explorers",
+        role: "contributor",
+      },
+    ]);
+    expect(
+      (await api("member", "/api/player/account/organizations")).data.value,
+    ).toEqual([]);
+    expect(
+      (
+        await api(
+          "stranger",
+          `/api/player/account/organization-invitations/${organizationId}`,
+          { action: "accept" },
+        )
+      ).status,
+    ).toBe(404);
+    const accepted = await api(
+      "member",
+      `/api/player/account/organization-invitations/${organizationId}`,
+      { action: "accept" },
+    );
+    expect(accepted.data.value).toEqual({
+      organizationId,
+      accepted: true,
+    });
     const memberList = await api("member", "/api/player/account/organizations");
     const organization = memberList.data.value[0];
     expect(organization.role).toBe("contributor");
@@ -95,6 +127,28 @@ test("organization membership, roles, invitations, and saved data are protected"
         })
       ).status,
     ).toBe(403);
+    await api(
+      "owner",
+      `/api/player/account/organizations/${organizationId}/members`,
+      { email: "other@example.com" },
+    );
+    expect(
+      (await api("other", "/api/player/account/organization-invitations")).data
+        .value,
+    ).toHaveLength(1);
+    const declined = await api(
+      "other",
+      `/api/player/account/organization-invitations/${organizationId}`,
+      { action: "decline" },
+    );
+    expect(declined.data.value).toEqual({
+      organizationId,
+      accepted: false,
+    });
+    expect(
+      (await api("other", "/api/player/account/organization-invitations")).data
+        .value,
+    ).toEqual([]);
 
     await api(
       "owner",

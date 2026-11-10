@@ -294,9 +294,61 @@ test("players can create, edit, and invite people to organizations", async ({
       isSelf: boolean;
     }[];
   }[] = [];
+  const invitations: {
+    organizationId: string;
+    organizationName: string;
+    role: "owner" | "officer" | "contributor";
+  }[] = [];
   await page.route("**/api/player/account/**", async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    if (url.pathname === "/api/player/account/organization-invitations") {
+      await route.fulfill({ json: { ok: true, value: invitations } });
+      return;
+    }
+    const invitationMatch =
+      /^\/api\/player\/account\/organization-invitations\/(organization-2|organization-3)$/.exec(
+        url.pathname,
+      );
+    if (invitationMatch && method === "POST") {
+      const input = route.request().postDataJSON() as {
+        action: "accept" | "decline";
+      };
+      const invitation = invitations.find(
+        (item) => item.organizationId === invitationMatch[1],
+      )!;
+      if (input.action === "accept") {
+        const now = new Date().toISOString();
+        organizations.push({
+          id: invitation.organizationId,
+          name: invitation.organizationName,
+          createdAt: now,
+          updatedAt: now,
+          role: "contributor",
+          members: [
+            {
+              accountId: "player-account",
+              email: "owner@example.com",
+              role: "contributor",
+              originalOwner: false,
+              pending: false,
+              isSelf: true,
+            },
+          ],
+        });
+      }
+      invitations.splice(invitations.indexOf(invitation), 1);
+      await route.fulfill({
+        json: {
+          ok: true,
+          value: {
+            organizationId: invitation.organizationId,
+            accepted: input.action === "accept",
+          },
+        },
+      });
+      return;
+    }
     if (url.pathname === "/api/player/account/profile") {
       await route.fulfill({
         json: { ok: true, value: { displayName: "Owner" } },
@@ -394,11 +446,57 @@ test("players can create, edit, and invite people to organizations", async ({
     .getByRole("button", { name: "Invite as Contributor", exact: true })
     .click();
   await expect(page.getByTestId("organization-invite-status")).toContainText(
-    "They will join as a Contributor",
+    "They must accept before joining as a Contributor",
   );
   await expect(page.getByTestId("organization-members")).toContainText(
     "friend@example.com",
   );
+
+  invitations.push(
+    {
+      organizationId: "organization-2",
+      organizationName: "Robotics Society",
+      role: "contributor",
+    },
+    {
+      organizationId: "organization-3",
+      organizationName: "Outdoor Club",
+      role: "contributor",
+    },
+  );
+  await page.reload();
+  const dialog = page.getByTestId("organization-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Robotics Society invited you to join as a contributor.");
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Outdoor Club invited you to join as a contributor.");
+  const roboticsInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Robotics Society" });
+  await roboticsInvite
+    .getByRole("button", { name: "Accept", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation accepted.",
+  );
+  await expect(page.getByTestId("organization-list")).toContainText(
+    "Robotics Society (contributor)",
+  );
+  const outdoorInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Outdoor Club" });
+  await outdoorInvite
+    .getByRole("button", { name: "Decline", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation declined.",
+  );
+  await expect(page.getByTestId("organization-invitations-panel")).toBeHidden();
 });
 
 test("create hunt organization selector lists current memberships", async ({

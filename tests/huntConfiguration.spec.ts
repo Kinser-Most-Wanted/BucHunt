@@ -264,6 +264,174 @@ test("owners must type the exact hunt name before deleting a hunt", async ({
   );
 });
 
+test("players can create, edit, and invite people to organizations", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "player-account",
+        email: "owner@example.com",
+        idToken: "test-owner-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.player-account", "Owner");
+  });
+  const organizations: {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    role: "owner" | "officer" | "contributor";
+    members: {
+      accountId: string | null;
+      email: string;
+      role: "owner" | "officer" | "contributor";
+      originalOwner: boolean;
+      pending: boolean;
+      isSelf: boolean;
+    }[];
+  }[] = [];
+  await page.route("**/api/player/account/**", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/api/player/account/profile") {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Owner" } },
+      });
+      return;
+    }
+    if (url.pathname === "/api/player/account/hunts") {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
+    if (url.pathname === "/api/player/account/organizations") {
+      if (method === "GET") {
+        await route.fulfill({ json: { ok: true, value: organizations } });
+        return;
+      }
+      const input = route.request().postDataJSON() as { name: string };
+      const now = new Date().toISOString();
+      const organization = {
+        id: "organization-1",
+        name: input.name,
+        createdAt: now,
+        updatedAt: now,
+        role: "owner" as const,
+        members: [
+          {
+            accountId: "player-account",
+            email: "owner@example.com",
+            role: "owner" as const,
+            originalOwner: true,
+            pending: false,
+            isSelf: true,
+          },
+        ],
+      };
+      organizations.push(organization);
+      await route.fulfill({
+        status: 201,
+        json: { ok: true, value: organization },
+      });
+      return;
+    }
+    const organizationMatch =
+      /^\/api\/player\/account\/organizations\/organization-1(?:\/members)?$/.exec(
+        url.pathname,
+      );
+    if (organizationMatch && method === "PATCH") {
+      const input = route.request().postDataJSON() as { name: string };
+      organizations[0].name = input.name;
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    if (
+      organizationMatch &&
+      method === "POST" &&
+      url.pathname.endsWith("/members")
+    ) {
+      const input = route.request().postDataJSON() as { email: string };
+      organizations[0].members.push({
+        accountId: null,
+        email: input.email,
+        role: "contributor",
+        originalOwner: false,
+        pending: true,
+        isSelf: false,
+      });
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 404,
+      json: { ok: false, code: "not-found", message: "Not found." },
+    });
+  });
+  await page.goto("/player.html");
+  await expect(page.getByTestId("organization-workspace")).toBeVisible();
+  await page.getByTestId("open-organizations").click();
+  await page.getByLabel("Create an organization").fill("Campus Explorers");
+  await page
+    .getByRole("button", { name: "Create organization", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-create-status")).toHaveText(
+    "Organization created.",
+  );
+  await page.getByLabel("Organization name").fill("Campus Discovery Club");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(page.getByTestId("organization-details-status")).toHaveText(
+    "Organization name saved.",
+  );
+  await page.getByLabel("Invite by email").fill("friend@example.com");
+  await page
+    .getByRole("button", { name: "Invite as Contributor", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invite-status")).toContainText(
+    "They will join as a Contributor",
+  );
+  await expect(page.getByTestId("organization-members")).toContainText(
+    "friend@example.com",
+  );
+});
+
+test("create hunt organization selector lists current memberships", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.route("**/api/admin/organizations", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: [
+          {
+            id: "organization-1",
+            name: "Campus Explorers",
+            role: "owner",
+            createdAt: "2026-10-15T00:00:00.000Z",
+            updatedAt: "2026-10-15T00:00:00.000Z",
+            members: [],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  const createOrganization = page.getByTestId("hunt-organization");
+  await expect(createOrganization).toHaveValue("");
+  await expect(createOrganization).toContainText("Campus Explorers (owner)");
+  await createOrganization.selectOption("Campus Explorers");
+  await expect(createOrganization).toHaveValue("Campus Explorers");
+});
+
 test("create hunt, save task and reload configuration", async ({ page }) => {
   await installMapMock(page.context());
   await page.route("https://accounts.google.com/gsi/client", (route) =>

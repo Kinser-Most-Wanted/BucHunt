@@ -1,6 +1,25 @@
 export type HuntStatus = "draft" | "published" | "archived";
 export type TaskOrderMode = "sequential" | "any";
 export type HuntRole = "owner" | "officer" | "contributor";
+export type OrganizationRole = "owner" | "officer" | "contributor";
+
+export interface OrganizationMember {
+  accountId: string | null;
+  email: string;
+  role: OrganizationRole;
+  originalOwner: boolean;
+  pending: boolean;
+  isSelf?: boolean;
+}
+
+export interface OrganizationDefinition {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  role: OrganizationRole;
+  members: OrganizationMember[];
+}
 
 export interface HuntInput {
   huntType?: "traditional" | "kahoot";

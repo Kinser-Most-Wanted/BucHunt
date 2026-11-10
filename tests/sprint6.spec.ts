@@ -146,6 +146,13 @@ test("#139 #143 #142 APIs enforce roles, admission limits, saved membership, and
       "ETSU",
     );
     expect(
+      (
+        await f.api("/api/player/account/organizations", "owner", {
+          name: "Computing",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
       (await f.api(admin, "outsider", { organizationName: "Spoof" }, "PATCH"))
         .status,
     ).toBe(403);
@@ -388,10 +395,16 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
     );
+    const createdOrganization = await f.api(
+      "/api/player/account/organizations",
+      "owner",
+      { name: "Computing" },
+    );
+    expect(createdOrganization.status).toBe(201);
     const settings = admin.getByTestId("hunt-settings-form");
     await settings
       .getByLabel("Organization", { exact: true })
-      .fill("Computing");
+      .selectOption("Computing");
     await settings.getByLabel("Close participation to new players").check();
     await settings.getByRole("button", { name: "Save hunt settings" }).click();
     await expect(settings.getByRole("status")).toHaveText(
@@ -525,4 +538,3 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
     await f.close();
   }
 });
-

@@ -1,5 +1,5 @@
 import type { HuntRepository } from "../foundation/contracts.js";
-import type { HuntRole } from "../foundation/types.js";
+import type { HuntRole, OrganizationDefinition } from "../foundation/types.js";
 import { getCreatorSession, request } from "./huntRepository.js";
 import { openHuntDetails } from "./huntDetails.js";
 interface HuntSummary {
@@ -44,6 +44,9 @@ export function mountCreateHunt(
   repository: HuntRepository,
 ): void {
   const form = root.querySelector<HTMLFormElement>('[data-testid="hunt-form"]');
+  const organizationSelect = form?.querySelector<HTMLSelectElement>(
+    '[name="organizationName"]',
+  );
   const status = root.querySelector<HTMLElement>('[data-testid="hunt-status"]');
   const createDialog = document.querySelector<HTMLDialogElement>(
     '[data-testid="create-hunt-dialog"]',
@@ -137,6 +140,39 @@ export function mountCreateHunt(
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
   );
+
+  async function loadOrganizationOptions(): Promise<void> {
+    if (!organizationSelect) return;
+    const currentValue = organizationSelect.value;
+    const result = await request<OrganizationDefinition[]>(
+      "/api/admin/organizations",
+    );
+    const options = document.createDocumentFragment();
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "No organization";
+    options.append(none);
+    if (result.ok)
+      for (const organization of result.value) {
+        const option = document.createElement("option");
+        option.value = organization.name;
+        option.textContent = `${organization.name} (${organization.role})`;
+        options.append(option);
+      }
+    if (
+      currentValue &&
+      !Array.from(options.querySelectorAll("option")).some(
+        (option) => option.value === currentValue,
+      )
+    ) {
+      const legacy = document.createElement("option");
+      legacy.value = currentValue;
+      legacy.textContent = currentValue;
+      options.append(legacy);
+    }
+    organizationSelect.replaceChildren(options);
+    organizationSelect.value = currentValue;
+  }
 
   function populateHuntSelector(): void {
     const signature = JSON.stringify(
@@ -583,7 +619,10 @@ export function mountCreateHunt(
   }
   document
     .querySelector('[data-testid="open-create-hunt"]')
-    ?.addEventListener("click", () => createDialog.showModal());
+    ?.addEventListener("click", () => {
+      createDialog.showModal();
+      void loadOrganizationOptions();
+    });
   document
     .querySelector('[data-testid="close-create-hunt"]')
     ?.addEventListener("click", () => createDialog.close());

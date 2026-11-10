@@ -1,7 +1,12 @@
 import { mountKahootPlayer } from "./kahootHunt.js";
 import { mountPlayerIssues } from "./huntIssues.js";
 import type { HuntRepository } from "../foundation/contracts.js";
-import type { PlayerHunt, PlayerIdentity } from "../foundation/types.js";
+import type {
+  OrganizationDefinition,
+  OperationResult,
+  PlayerHunt,
+  PlayerIdentity,
+} from "../foundation/types.js";
 
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
@@ -13,6 +18,36 @@ function storedDisplayName(accountId: string): string | null {
     return value || null;
   } catch {
     return null;
+  }
+}
+
+async function organizationRequest<T>(
+  identity: PlayerIdentity,
+  path: string,
+  input?: unknown,
+  method?: string,
+): Promise<OperationResult<T>> {
+  try {
+    const response = await fetch(path, {
+      method: method ?? (input === undefined ? "GET" : "POST"),
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${identity.idToken}`,
+      },
+      ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+    });
+    const result = (await response.json()) as OperationResult<T>;
+    if (typeof result.ok !== "boolean" || response.ok !== result.ok)
+      throw new Error("Invalid organization response");
+    return result;
+  } catch {
+    return {
+      ok: false,
+      code: "network",
+      message: "Organizations could not be reached. Try again.",
+    };
   }
 }
 
@@ -462,6 +497,45 @@ export function mountDisplayTasks(
   const huntLookup = root.querySelector<HTMLElement>(
     '[data-testid="player-hunt-lookup"]',
   );
+  const organizationWorkspace = root.querySelector<HTMLElement>(
+    '[data-testid="organization-workspace"]',
+  );
+  const organizationDialog = root.querySelector<HTMLDialogElement>(
+    '[data-testid="organization-dialog"]',
+  );
+  const openOrganizations = root.querySelector<HTMLButtonElement>(
+    '[data-testid="open-organizations"]',
+  );
+  const closeOrganizations = root.querySelector<HTMLButtonElement>(
+    '[data-testid="close-organizations"]',
+  );
+  const organizationCreateForm = root.querySelector<HTMLFormElement>(
+    '[data-testid="organization-create-form"]',
+  );
+  const organizationCreateStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-create-status"]',
+  );
+  const organizationList = root.querySelector<HTMLUListElement>(
+    '[data-testid="organization-list"]',
+  );
+  const organizationEditor = root.querySelector<HTMLElement>(
+    '[data-testid="organization-editor"]',
+  );
+  const organizationDetailsForm = root.querySelector<HTMLFormElement>(
+    '[data-testid="organization-details-form"]',
+  );
+  const organizationDetailsStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-details-status"]',
+  );
+  const organizationInviteForm = root.querySelector<HTMLFormElement>(
+    '[data-testid="organization-invite-form"]',
+  );
+  const organizationInviteStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-invite-status"]',
+  );
+  const organizationMembers = root.querySelector<HTMLUListElement>(
+    '[data-testid="organization-members"]',
+  );
   if (
     !heading ||
     !status ||
@@ -489,7 +563,20 @@ export function mountDisplayTasks(
     !accountNameStatus ||
     !nameForm ||
     !nameInput ||
-    !huntLookup
+    !huntLookup ||
+    !organizationWorkspace ||
+    !organizationDialog ||
+    !openOrganizations ||
+    !closeOrganizations ||
+    !organizationCreateForm ||
+    !organizationCreateStatus ||
+    !organizationList ||
+    !organizationEditor ||
+    !organizationDetailsForm ||
+    !organizationDetailsStatus ||
+    !organizationInviteForm ||
+    !organizationInviteStatus ||
+    !organizationMembers
   )
     return;
 
@@ -517,6 +604,8 @@ export function mountDisplayTasks(
     nameForm.hidden = true;
     categories.hidden = true;
     huntLookup.hidden = true;
+    organizationWorkspace.hidden = true;
+    if (organizationDialog.open) organizationDialog.close();
     if (huntDetails.open) huntDetails.close();
     heading.hidden = false;
     heading.textContent = "Sign in to see active Hunts";
@@ -533,8 +622,258 @@ export function mountDisplayTasks(
   let currentRoleLabel = "Player";
   let pastHuntFilter: PastHuntFilter = "recent-3";
   let categorySignature = "";
+  let organizations: OrganizationDefinition[] = [];
+  let selectedOrganizationId: string | null = null;
   let selectedHuntId: string | null = null;
   let reloadSelectedHunt: (() => void) | undefined;
+  const selectedOrganization = (): OrganizationDefinition | undefined =>
+    organizations.find(
+      (organization) => organization.id === selectedOrganizationId,
+    );
+
+  const renderOrganizationEditor = (): void => {
+    const organization = selectedOrganization();
+    organizationEditor.hidden = !organization;
+    if (!organization) return;
+    const nameInput = organizationDetailsForm.elements.namedItem(
+      "name",
+    ) as HTMLInputElement;
+    nameInput.value = organization.name;
+    const canEdit =
+      organization.role === "owner" || organization.role === "officer";
+    nameInput.disabled = !canEdit;
+    organizationDetailsForm.querySelector<HTMLButtonElement>(
+      "button",
+    )!.disabled = !canEdit;
+    organizationInviteForm.hidden = organization.role !== "owner";
+    organizationMembers.replaceChildren();
+    for (const member of organization.members) {
+      const item = document.createElement("li");
+      item.className = "organization-member";
+      const label = document.createElement("span");
+      label.className = "organization-member-label";
+      label.textContent = `${member.email} · ${member.role}${member.originalOwner ? " · Original Owner" : ""}${member.pending ? " · Invitation pending" : ""}`;
+      item.append(label);
+      const key = member.accountId ?? `invite:${member.email}`;
+      const isSelf =
+        member.isSelf ?? member.accountId === activeIdentity?.accountId;
+      if (organization.role === "owner" && !member.originalOwner && !isSelf) {
+        const role = document.createElement("select");
+        role.setAttribute("aria-label", `Role for ${member.email}`);
+        role.dataset.organizationMemberKey = key;
+        for (const value of ["owner", "officer", "contributor"] as const) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+          role.append(option);
+        }
+        role.value = member.role;
+        item.append(role);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "organization-member-remove";
+        remove.dataset.organizationMemberKey = key;
+        remove.textContent = "Remove";
+        item.append(remove);
+      }
+      organizationMembers.append(item);
+    }
+    organizationList
+      .querySelectorAll<HTMLButtonElement>("[data-organization-id]")
+      .forEach((button) => {
+        button.setAttribute(
+          "aria-current",
+          button.dataset.organizationId === organization.id ? "true" : "false",
+        );
+      });
+  };
+
+  const refreshOrganizations = async (
+    identity = activeIdentity,
+    selectId = selectedOrganizationId,
+  ): Promise<void> => {
+    if (!identity) return;
+    const result = await organizationRequest<OrganizationDefinition[]>(
+      identity,
+      "/api/player/account/organizations",
+    );
+    if (!result.ok) {
+      organizationCreateStatus.textContent = result.message;
+      return;
+    }
+    organizations = result.value;
+    selectedOrganizationId =
+      organizations.find((organization) => organization.id === selectId)?.id ??
+      organizations[0]?.id ??
+      null;
+    organizationList.replaceChildren();
+    if (!organizations.length) {
+      const empty = document.createElement("li");
+      empty.textContent = "You are not in an organization yet.";
+      organizationList.append(empty);
+    }
+    for (const organization of organizations) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.organizationId = organization.id;
+      button.textContent = `${organization.name} (${organization.role})`;
+      item.append(button);
+      organizationList.append(item);
+    }
+    renderOrganizationEditor();
+  };
+
+  openOrganizations.addEventListener("click", () => {
+    organizationDialog.showModal();
+    organizationCreateStatus.textContent = "";
+    void refreshOrganizations();
+  });
+  closeOrganizations.addEventListener("click", () =>
+    organizationDialog.close(),
+  );
+  organizationCreateForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const identity = activeIdentity;
+    const fields = new FormData(organizationCreateForm);
+    const name = String(fields.get("name") ?? "").trim();
+    if (!identity || !name) return;
+    const submit = organizationCreateForm.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    )!;
+    submit.disabled = true;
+    organizationCreateStatus.textContent = "Creating organization…";
+    void organizationRequest<OrganizationDefinition>(
+      identity,
+      "/api/player/account/organizations",
+      { name },
+    ).then(async (result) => {
+      submit.disabled = false;
+      if (!result.ok) {
+        organizationCreateStatus.textContent = result.message;
+        return;
+      }
+      organizationCreateForm.reset();
+      organizationCreateStatus.textContent = "Organization created.";
+      await refreshOrganizations(identity, result.value.id);
+    });
+  });
+  organizationList.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-organization-id]",
+    );
+    if (!button) return;
+    selectedOrganizationId = button.dataset.organizationId ?? null;
+    renderOrganizationEditor();
+  });
+  organizationDetailsForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const identity = activeIdentity;
+    const organization = selectedOrganization();
+    if (!identity || !organization) return;
+    const name = String(
+      new FormData(organizationDetailsForm).get("name") ?? "",
+    ).trim();
+    const button = organizationDetailsForm.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    )!;
+    button.disabled = true;
+    void organizationRequest<OrganizationDefinition>(
+      identity,
+      `/api/player/account/organizations/${encodeURIComponent(organization.id)}`,
+      { name },
+      "PATCH",
+    ).then(async (result) => {
+      button.disabled = false;
+      organizationDetailsStatus.textContent = result.ok
+        ? "Organization name saved."
+        : result.message;
+      if (result.ok) await refreshOrganizations(identity, organization.id);
+    });
+  });
+  organizationInviteForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const identity = activeIdentity;
+    const organization = selectedOrganization();
+    if (!identity || !organization) return;
+    const email = String(
+      new FormData(organizationInviteForm).get("email") ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const button = organizationInviteForm.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    )!;
+    button.disabled = true;
+    void organizationRequest<OrganizationDefinition>(
+      identity,
+      `/api/player/account/organizations/${encodeURIComponent(organization.id)}/members`,
+      { email },
+    ).then(async (result) => {
+      button.disabled = false;
+      organizationInviteStatus.textContent = result.ok
+        ? `Invitation saved for ${email}. They will join as a Contributor when they sign in.`
+        : result.message;
+      if (result.ok) {
+        organizationInviteForm.reset();
+        await refreshOrganizations(identity, organization.id);
+      }
+    });
+  });
+  organizationMembers.addEventListener("change", (event) => {
+    const role = event.target;
+    const organization = selectedOrganization();
+    const identity = activeIdentity;
+    if (
+      !(role instanceof HTMLSelectElement) ||
+      !role.dataset.organizationMemberKey ||
+      !organization ||
+      !identity
+    )
+      return;
+    const previousRole =
+      organization.members.find(
+        (member) =>
+          (member.accountId ?? `invite:${member.email}`) ===
+          role.dataset.organizationMemberKey,
+      )?.role ?? "contributor";
+    role.disabled = true;
+    void organizationRequest<OrganizationDefinition>(
+      identity,
+      `/api/player/account/organizations/${encodeURIComponent(organization.id)}/members/${encodeURIComponent(role.dataset.organizationMemberKey)}`,
+      { role: role.value },
+      "PATCH",
+    ).then(async (result) => {
+      role.disabled = false;
+      organizationDetailsStatus.textContent = result.ok
+        ? "Member role updated."
+        : result.message;
+      if (result.ok) await refreshOrganizations(identity, organization.id);
+      else role.value = previousRole;
+    });
+  });
+  organizationMembers.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "button[data-organization-member-key]",
+    );
+    const organization = selectedOrganization();
+    const identity = activeIdentity;
+    if (!button || !organization || !identity) return;
+    button.disabled = true;
+    void organizationRequest<OrganizationDefinition>(
+      identity,
+      `/api/player/account/organizations/${encodeURIComponent(organization.id)}/members/${encodeURIComponent(button.dataset.organizationMemberKey!)}`,
+      undefined,
+      "DELETE",
+    ).then(async (result) => {
+      organizationDetailsStatus.textContent = result.ok
+        ? "Member removed."
+        : result.message;
+      if (result.ok) await refreshOrganizations(identity, organization.id);
+      else button.disabled = false;
+    });
+  });
+
   const renderCategories = (force = false): void => {
     const now = Date.now();
     const groups: Record<HuntPhase, PlayerHunt[]> = {
@@ -651,6 +990,8 @@ export function mountDisplayTasks(
   ): Promise<void> => {
     activeIdentity = signedIn;
     currentNickname = name;
+    organizationWorkspace.hidden = false;
+    void refreshOrganizations(signedIn);
     setGoogleSignInEnabled(false);
     providerStatus.hidden = true;
     nameForm.hidden = true;
@@ -733,6 +1074,8 @@ export function mountDisplayTasks(
     nameForm.hidden = false;
     categories.hidden = true;
     huntLookup.hidden = true;
+    organizationWorkspace.hidden = true;
+    if (organizationDialog.open) organizationDialog.close();
     if (huntDetails.open) huntDetails.close();
     signOut.hidden = false;
     nameInput.value = "";

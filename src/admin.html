@@ -186,11 +186,14 @@
                   step="1"
                 />
                 <label for="hunt-organization">Organization (optional)</label
-                ><input
+                ><select
                   id="hunt-organization"
                   name="organizationName"
-                  maxlength="120"
-                />
+                  data-testid="hunt-organization"
+                >
+                  <option value="">No organization</option>
+                </select>
+                <p class="field-help">Choose an organization you belong to.</p>
                 <label for="hunt-description">Description</label
                 ><textarea
                   id="hunt-description"
@@ -354,9 +357,14 @@
               class="hunt-settings-form"
               hidden
             >
-              <label
-                >Organization <input name="organizationName" maxlength="120"
-              /></label>
+              <label for="hunt-settings-organization">Organization</label>
+              <select
+                id="hunt-settings-organization"
+                name="organizationName"
+                data-testid="hunt-settings-organization"
+              >
+                <option value="">No organization</option>
+              </select>
               <label
                 >Maximum participants (blank for unlimited)<input
                   name="maxParticipants"

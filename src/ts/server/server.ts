@@ -27,6 +27,7 @@ import { KahootStore } from "./kahootStore.js";
 import { HuntIssueStore } from "./huntIssueStore.js";
 import { PlayerProgressStore } from "./playerProgressStore.js";
 import { PlayerProfileStore } from "./playerProfileStore.js";
+import { OrganizationStore } from "./organizationStore.js";
 import {
   buildHuntResults,
   resultsCsv,
@@ -158,6 +159,9 @@ export function createApplication(options: ServerOptions = {}) {
   );
   const accountProfiles = new PlayerProfileStore(
     resolve(directory, "player-profiles.json"),
+  );
+  const organizations = new OrganizationStore(
+    resolve(directory, "organizations.json"),
   );
   async function contributorEntries(huntId: string, ownerId: string) {
     const ownerProfile = await accountProfiles.get(ownerId);
@@ -361,6 +365,104 @@ export function createApplication(options: ServerOptions = {}) {
             message: "Sign in with Google again to access saved progress.",
           });
           return;
+        }
+        const organizationCollection =
+          path === "/api/player/account/organizations";
+        const organizationRoute =
+          /^\/api\/player\/account\/organizations\/([a-f0-9-]{36})(?:\/(members)(?:\/(.+))?)?$/.exec(
+            path,
+          );
+        if (organizationCollection || organizationRoute) {
+          const accountIdentity = await googleCreator(request);
+          if (!accountIdentity) {
+            json(response, 401, {
+              ok: false,
+              code: "unauthorized",
+              message: "Sign in with Google again to manage organizations.",
+            });
+            return;
+          }
+          if (organizationCollection && method === "GET") {
+            json(response, 200, {
+              ok: true,
+              value: await organizations.listForAccount(
+                accountIdentity.id,
+                accountIdentity.email,
+              ),
+            });
+            return;
+          }
+          if (organizationCollection && method === "POST") {
+            json(response, 201, {
+              ok: true,
+              value: await organizations.create(
+                accountIdentity.id,
+                accountIdentity.email,
+                await body(request),
+              ),
+            });
+            return;
+          }
+          if (
+            organizationRoute &&
+            !organizationRoute[2] &&
+            method === "PATCH"
+          ) {
+            json(response, 200, {
+              ok: true,
+              value: await organizations.rename(
+                organizationRoute[1],
+                accountIdentity.id,
+                accountIdentity.email,
+                await body(request),
+              ),
+            });
+            return;
+          }
+          if (organizationRoute && organizationRoute[2] === "members") {
+            if (method === "POST") {
+              json(response, 200, {
+                ok: true,
+                value: await organizations.invite(
+                  organizationRoute[1],
+                  accountIdentity.id,
+                  accountIdentity.email,
+                  await body(request),
+                ),
+              });
+              return;
+            }
+            if (method === "PATCH" && organizationRoute[3]) {
+              const input = await body(request);
+              const role =
+                input && typeof input === "object"
+                  ? (input as Record<string, unknown>).role
+                  : undefined;
+              json(response, 200, {
+                ok: true,
+                value: await organizations.setRole(
+                  organizationRoute[1],
+                  accountIdentity.id,
+                  accountIdentity.email,
+                  organizationRoute[3],
+                  role,
+                ),
+              });
+              return;
+            }
+            if (method === "DELETE" && organizationRoute[3]) {
+              json(response, 200, {
+                ok: true,
+                value: await organizations.removeMember(
+                  organizationRoute[1],
+                  accountIdentity.id,
+                  accountIdentity.email,
+                  organizationRoute[3],
+                ),
+              });
+              return;
+            }
+          }
         }
         if (path === "/api/player/account/profile" && method === "GET") {
           json(response, 200, {
@@ -644,10 +746,51 @@ export function createApplication(options: ServerOptions = {}) {
         const creatorId =
           account?.id ??
           "browser:" + createHash("sha256").update(secret!).digest("hex");
+        if (path === "/api/admin/organizations" && method === "GET") {
+          if (!account) {
+            json(response, 401, {
+              ok: false,
+              code: "unauthorized",
+              message: "Sign in with Google to view your organizations.",
+            });
+            return;
+          }
+          const memberships = await organizations.listForAccount(
+            account.id,
+            account.email,
+          );
+          json(response, 200, {
+            ok: true,
+            value: memberships.map((organization) => ({
+              ...organization,
+              members: [],
+            })),
+          });
+          return;
+        }
         if (path === "/api/admin/hunts" && method === "POST") {
+          const input = await body(request);
+          const organizationName =
+            input && typeof input === "object"
+              ? (input as Record<string, unknown>).organizationName
+              : undefined;
+          if (
+            typeof organizationName === "string" &&
+            organizationName.trim() &&
+            (!account ||
+              !(await organizations.isMemberOfName(
+                creatorId,
+                account.email,
+                organizationName,
+              )))
+          )
+            throw new StoreError(
+              "forbidden",
+              "Choose an organization you belong to.",
+            );
           json(response, 201, {
             ok: true,
-            value: await hunts.create(await body(request), creatorId),
+            value: await hunts.create(input, creatorId),
           });
           return;
         }
@@ -1141,6 +1284,25 @@ export function createApplication(options: ServerOptions = {}) {
               ok: true,
               value: await (async () => {
                 const input = await body(request);
+                const organizationName =
+                  input && typeof input === "object"
+                    ? (input as Record<string, unknown>).organizationName
+                    : undefined;
+                if (
+                  typeof organizationName === "string" &&
+                  organizationName.trim() &&
+                  organizationName.trim() !== hunt.organizationName &&
+                  (!account ||
+                    !(await organizations.isMemberOfName(
+                      creatorId,
+                      account.email,
+                      organizationName,
+                    )))
+                )
+                  throw new StoreError(
+                    "forbidden",
+                    "Choose an organization you belong to.",
+                  );
                 return serializeAdmission(hunt.id, () =>
                   hunts.updateSettings(hunt.id, input),
                 );

@@ -4,6 +4,7 @@ import type {
   HuntParticipationSummary,
   HuntParticipantProgress,
   HuntRole,
+  OrganizationDefinition,
   TaskDefinition,
 } from "../foundation/types.js";
 import {
@@ -568,9 +569,45 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   );
   if (settings) {
     settings.hidden = role === "contributor";
-    (
-      settings.elements.namedItem("organizationName") as HTMLInputElement
-    ).value = hunt.organizationName ?? "";
+    const organizationSelect = settings.elements.namedItem(
+      "organizationName",
+    ) as HTMLSelectElement;
+    const currentOrganization = hunt.organizationName ?? "";
+    const renderOrganizationOptions = (
+      organizations: OrganizationDefinition[] = [],
+    ): void => {
+      const options = document.createDocumentFragment();
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "No organization";
+      options.append(none);
+      for (const organization of organizations) {
+        const option = document.createElement("option");
+        option.value = organization.name;
+        option.textContent = `${organization.name} (${organization.role})`;
+        options.append(option);
+      }
+      if (
+        currentOrganization &&
+        !organizations.some(
+          (organization) => organization.name === currentOrganization,
+        )
+      ) {
+        const legacy = document.createElement("option");
+        legacy.value = currentOrganization;
+        legacy.textContent = currentOrganization;
+        options.append(legacy);
+      }
+      organizationSelect.replaceChildren(options);
+      organizationSelect.value = currentOrganization;
+    };
+    renderOrganizationOptions();
+    void request<OrganizationDefinition[]>("/api/admin/organizations").then(
+      (result) => {
+        if (result.ok && activeHunt?.id === hunt.id)
+          renderOrganizationOptions(result.value);
+      },
+    );
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
       hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
     (

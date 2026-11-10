@@ -124,6 +124,115 @@
             </div>
           </form>
         </section>
+        <section
+          class="organization-workspace"
+          data-testid="organization-workspace"
+          hidden
+        >
+          <div class="organization-workspace-copy">
+            <p class="eyebrow">YOUR COMMUNITY</p>
+            <h2>Organizations</h2>
+            <p>Create a group, invite people by email, and choose its role.</p>
+          </div>
+          <button type="button" data-testid="open-organizations">
+            Manage organizations
+          </button>
+        </section>
+        <dialog
+          class="organization-management-dialog"
+          data-testid="organization-dialog"
+          aria-labelledby="organization-dialog-title"
+        >
+          <div class="organization-dialog-heading">
+            <div>
+              <p class="eyebrow">YOUR COMMUNITY</p>
+              <h2 id="organization-dialog-title">Manage organizations</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-organizations"
+              aria-label="Close organizations"
+            >
+              ×
+            </button>
+          </div>
+          <form data-testid="organization-create-form">
+            <label for="organization-create-name">Create an organization</label>
+            <div class="organization-create-controls">
+              <input
+                id="organization-create-name"
+                name="name"
+                maxlength="120"
+                required
+              />
+              <button type="submit">Create organization</button>
+            </div>
+            <p
+              class="organization-status"
+              data-testid="organization-create-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
+          <div class="organization-management-layout">
+            <ul
+              class="organization-list"
+              data-testid="organization-list"
+              aria-label="Your organizations"
+            ></ul>
+            <section
+              class="organization-editor"
+              data-testid="organization-editor"
+              hidden
+              aria-label="Selected organization"
+            >
+              <form data-testid="organization-details-form">
+                <label for="organization-edit-name">Organization name</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-edit-name"
+                    name="name"
+                    maxlength="120"
+                    required
+                  />
+                  <button type="submit">Save name</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-details-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <form data-testid="organization-invite-form">
+                <label for="organization-invite-email">Invite by email</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-invite-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                  />
+                  <button type="submit">Invite as Contributor</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-invite-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <h3>Members</h3>
+              <ul
+                class="organization-members"
+                data-testid="organization-members"
+                aria-label="Organization members"
+              ></ul>
+            </section>
+          </div>
+        </dialog>
         <form data-testid="player-name-form" class="player-name-form" hidden>
           <label for="player-display-name-input"
             >Choose your display name</label

@@ -4315,3 +4315,179 @@ body[data-page="admin"]
   margin-block: 0.4rem;
   overflow-wrap: anywhere;
 }
+
+.organization-workspace {
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 203, 42, 0.14),
+    rgba(14, 30, 49, 0.94)
+  );
+  border: 1px solid rgba(255, 203, 42, 0.34);
+  border-radius: 1.2rem;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin: 1.5rem 0;
+  padding: 1.25rem 1.5rem;
+}
+
+.organization-workspace h2 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.organization-workspace p:not(.eyebrow) {
+  color: var(--muted, #aab7c8);
+  margin: 0;
+}
+
+.organization-workspace > button,
+.organization-create-controls > button,
+.organization-member-remove {
+  background: var(--gold, #ffca28);
+  border: 0;
+  border-radius: 0.65rem;
+  color: #171717;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+}
+
+.organization-management-dialog {
+  border: 1px solid rgba(255, 203, 42, 0.35);
+  border-radius: 1.2rem;
+  color: var(--text, #f5f7fa);
+  max-height: min(88vh, 54rem);
+  max-width: min(58rem, calc(100vw - 2rem));
+  overflow: auto;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  width: 100%;
+}
+
+.organization-management-dialog::backdrop {
+  background: rgba(2, 8, 14, 0.76);
+  backdrop-filter: blur(4px);
+}
+
+.organization-dialog-heading,
+.organization-management-layout,
+.organization-create-controls {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.organization-dialog-heading {
+  margin-bottom: 1.5rem;
+}
+
+.organization-dialog-heading h2 {
+  margin: 0.15rem 0 0;
+}
+
+.organization-management-dialog form {
+  margin: 0 0 1.25rem;
+}
+
+.organization-management-dialog label,
+.organization-management-dialog h3 {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.organization-create-controls input {
+  flex: 1;
+  min-width: 0;
+}
+
+.organization-management-layout {
+  align-items: flex-start;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 1.5rem;
+  padding-top: 1.25rem;
+}
+
+.organization-list,
+.organization-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.organization-list {
+  flex: 0 0 min(14rem, 35%);
+}
+
+.organization-list li + li,
+.organization-members li + li {
+  margin-top: 0.55rem;
+}
+
+.organization-list button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  width: 100%;
+}
+
+.organization-list button[aria-current="true"] {
+  background: rgba(255, 203, 42, 0.14);
+  border-color: var(--gold, #ffca28);
+}
+
+.organization-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.organization-member {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: space-between;
+  padding: 0.65rem 0.8rem;
+}
+
+.organization-member-label {
+  min-width: 12rem;
+  overflow-wrap: anywhere;
+}
+
+.organization-member select {
+  min-width: 8rem;
+}
+
+.organization-status {
+  color: var(--muted, #aab7c8);
+  min-height: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .organization-workspace,
+  .organization-management-layout,
+  .organization-create-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .organization-list {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .organization-create-controls > button {
+    width: 100%;
+  }
+}

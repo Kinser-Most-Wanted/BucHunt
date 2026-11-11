@@ -411,6 +411,8 @@ export function mountDefineTask(
     if (huntInput) huntInput.value = huntId;
     const points = field<HTMLInputElement>(form, "points");
     if (points) points.value = "0";
+    const timer = field<HTMLInputElement>(form, "timeLimitSeconds");
+    if (timer) timer.value = "";
     if (orderInput)
       orderInput.value = String(
         Math.max(0, ...displayedTasks.map((task) => task.order)) + 1,
@@ -463,6 +465,10 @@ export function mountDefineTask(
     if (longitude) longitude.value = String(task.location.longitude);
     if (order) order.value = String(task.order);
     if (points) points.value = String(task.points);
+    const timer = field<HTMLInputElement>(form, "timeLimitSeconds");
+    if (timer)
+      timer.value =
+        task.timeLimitSeconds == null ? "" : String(task.timeLimitSeconds);
     if (hint) hint.value = task.hint ?? "";
     if (answerCaseSensitive)
       answerCaseSensitive.checked = task.answerCaseSensitive;
@@ -656,6 +662,9 @@ export function mountDefineTask(
     }
 
     const task: TaskInput = {
+      timeLimitSeconds: field<HTMLInputElement>(form, "timeLimitSeconds")?.value
+        ? Number(field<HTMLInputElement>(form, "timeLimitSeconds")!.value)
+        : null,
       taskType: multipleChoice ? "multiple-choice" : "single-word-trivia",
       ...(multipleChoice ? { choices } : {}),
       displayLabel,

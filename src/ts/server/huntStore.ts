@@ -214,6 +214,11 @@ export class HuntStore {
     const fields = object(input);
     inputFields(fields, [
       "name",
+      "organizationName",
+      "organizationId",
+      "huntType",
+      "maxParticipants",
+      "participationClosed",
       "description",
       "ownerId",
       "beginsAt",
@@ -239,24 +244,81 @@ export class HuntStore {
       return hunt;
     });
   }
+  async updateSettings(id: string, input: unknown): Promise<HuntDefinition> {
+    const fields = object(input);
+    inputFields(fields, [
+      "organizationName",
+      "organizationId",
+      "maxParticipants",
+      "participationClosed",
+    ]);
+    return this.file.update((data) => {
+      const hunt = data.hunts.find((item) => item.id === id);
+      if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      Object.assign(hunt, fields, { updatedAt: new Date().toISOString() });
+      return accepted(validateHunt(hunt));
+    });
+  }
   async list(): Promise<HuntDefinition[]> {
     return (await this.file.get()).hunts;
   }
   async listSummaries(): Promise<
     Pick<
       HuntDefinition,
-      "id" | "name" | "ownerId" | "createdAt" | "updatedAt"
+      | "id"
+      | "name"
+      | "ownerId"
+      | "createdAt"
+      | "updatedAt"
+      | "organizationId"
+      | "organizationName"
     >[]
   > {
     return this.file.query((data) =>
-      data.hunts.map(({ id, name, ownerId, createdAt, updatedAt }) => ({
-        id,
-        name,
-        ownerId,
-        createdAt,
-        updatedAt,
-      })),
+      data.hunts.map(
+        ({
+          id,
+          name,
+          ownerId,
+          createdAt,
+          updatedAt,
+          organizationId,
+          organizationName,
+        }) => ({
+          id,
+          name,
+          ownerId,
+          createdAt,
+          updatedAt,
+          ...(organizationId ? { organizationId } : {}),
+          ...(organizationName ? { organizationName } : {}),
+        }),
+      ),
     );
+  }
+  async migrateLegacyOrganizationIds(
+    resolveId: (name: string) => Promise<string | undefined>,
+  ): Promise<number> {
+    const matches = new Map<string, string>();
+    const definitions = await this.list();
+    for (const hunt of definitions) {
+      if (!hunt.organizationId && hunt.organizationName) {
+        const id = await resolveId(hunt.organizationName);
+        if (id) matches.set(hunt.id, id);
+      }
+    }
+    if (!matches.size) return 0;
+    return this.file.update((data) => {
+      let migrated = 0;
+      for (const hunt of data.hunts) {
+        const organizationId = matches.get(hunt.id);
+        if (!hunt.organizationId && organizationId) {
+          hunt.organizationId = organizationId;
+          migrated += 1;
+        }
+      }
+      return migrated;
+    });
   }
   async migrateLegacyOwners(accountId: string): Promise<number> {
     return this.file.update((data) => {
@@ -299,6 +361,7 @@ export class HuntStore {
   async addTask(id: string, input: unknown): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",
@@ -328,6 +391,7 @@ export class HuntStore {
   ): Promise<TaskDefinition> {
     const fields = object(input);
     inputFields(fields, [
+      "timeLimitSeconds",
       "taskType",
       "choices",
       "displayLabel",

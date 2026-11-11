@@ -112,6 +112,11 @@
           "type": "integer",
           "minimum": 0,
           "default": 0
+        },
+        "timeLimitSeconds": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 3600
         }
       },
       "allOf": [
@@ -222,6 +227,24 @@
           "items": {
             "$ref": "#/$defs/task"
           }
+        },
+        "organizationName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "organizationId": {
+          "type": ["string", "null"],
+          "pattern": "^[a-fA-F0-9-]{36}$"
+        },
+        "maxParticipants": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "participationClosed": {
+          "type": "boolean"
+        },
+        "huntType": {
+          "enum": ["traditional", "kahoot"]
         }
       }
     }

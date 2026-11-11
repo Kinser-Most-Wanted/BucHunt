@@ -1,8 +1,55 @@
 export type HuntStatus = "draft" | "published" | "archived";
 export type TaskOrderMode = "sequential" | "any";
 export type HuntRole = "owner" | "officer" | "contributor";
+export type OrganizationRole = "owner" | "officer" | "contributor";
+
+export interface OrganizationMember {
+  accountId: string | null;
+  email: string;
+  role: OrganizationRole;
+  originalOwner: boolean;
+  pending: boolean;
+  isSelf?: boolean;
+}
+
+export interface OrganizationDefinition {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  role: OrganizationRole;
+  members: OrganizationMember[];
+}
+
+export interface OrganizationInvitationDefinition {
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
+}
+
+export interface OrganizationInvitationResponse {
+  organizationId: string;
+  accepted: boolean;
+}
+
+export interface OrganizationHuntSummary {
+  id: string;
+  name: string;
+  description: string;
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
+  beginsAt: string;
+  endsAt: string | null;
+  status: HuntStatus;
+}
 
 export interface HuntInput {
+  huntType?: "traditional" | "kahoot";
+  organizationName?: string;
+  organizationId?: string | null;
+  maxParticipants?: number | null;
+  participationClosed?: boolean;
   name: string;
   description: string;
   ownerId: string;
@@ -16,6 +63,7 @@ export interface TaskLocation {
 }
 export type TaskType = "single-word-trivia" | "multiple-choice";
 export interface TaskInput {
+  timeLimitSeconds?: number | null;
   taskType?: TaskType;
   choices?: string[];
   displayLabel: string;
@@ -79,6 +127,12 @@ export interface PlayerTask {
   location?: TaskLocation;
 }
 export interface PlayerHunt {
+  huntType?: "traditional" | "kahoot";
+  kahoot?: KahootView;
+  organizationName?: string;
+  organizationId?: string | null;
+  maxParticipants?: number | null;
+  participationClosed?: boolean;
   id: string;
   name: string;
   description: string;
@@ -128,4 +182,31 @@ export type OperationResult<T> =
 export interface HuntConfigurationFile {
   schemaVersion: 1;
   hunts: HuntDefinition[];
+}
+
+export interface KahootView {
+  phase: "lobby" | "question" | "results" | "finished";
+  questionNumber: number;
+  totalQuestions: number;
+  serverNow: number;
+  startedAt: number | null;
+  deadline: number | null;
+  submitted: boolean;
+  correct?: boolean;
+  pointsAwarded?: number;
+  question?: {
+    id: string;
+    displayLabel: string;
+    description: string;
+    taskType: TaskType;
+    choices?: string[];
+  };
+  leaderboard: {
+    participantId: string;
+    displayName: string;
+    score: number;
+    submitted: boolean;
+    active: boolean;
+    connected: boolean;
+  }[];
 }

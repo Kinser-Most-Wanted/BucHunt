@@ -4247,3 +4247,386 @@ body[data-page="admin"]
     left: auto;
   }
 }
+
+/* Hunt settings and issue dialogs share the existing action and modal styles. */
+.hunt-settings-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+.hunt-settings-form[hidden] {
+  display: none;
+}
+.hunt-settings-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+.hunt-issue-dialog {
+  width: min(92vw, 40rem);
+  max-height: 85dvh;
+  overflow: auto;
+  padding: 1.5rem;
+  border-radius: 1rem;
+}
+.hunt-issue-dialog::backdrop {
+  background: #0009;
+}
+.hunt-issue-dialog form {
+  display: grid;
+  gap: 1rem;
+}
+.hunt-issue-dialog label {
+  display: grid;
+  gap: 0.4rem;
+}
+.hunt-issue-dialog textarea {
+  min-height: 8rem;
+}
+.hunt-issue-dialog li {
+  padding-block: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.player-submit-issue {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.kahoot-panel {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.75rem;
+  background: linear-gradient(145deg, #15345d, #10294a);
+  color: #f4f5f9;
+}
+.kahoot-panel[hidden] {
+  display: none;
+}
+.kahoot-panel form,
+.kahoot-panel label {
+  display: grid;
+  gap: 0.75rem;
+}
+.kahoot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.kahoot-panel li {
+  margin-block: 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.organization-workspace {
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 203, 42, 0.14),
+    rgba(14, 30, 49, 0.94)
+  );
+  border: 1px solid rgba(255, 203, 42, 0.34);
+  border-radius: 1.2rem;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin: 1.5rem 0;
+  padding: 1.25rem 1.5rem;
+}
+
+.organization-workspace h2 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.organization-workspace p:not(.eyebrow) {
+  color: var(--muted, #aab7c8);
+  margin: 0;
+}
+
+.organization-workspace-actions > button,
+.organization-create-controls > button,
+.organization-member-remove,
+.organization-invitation-actions > button {
+  background: var(--gold, #ffca28);
+  border: 0;
+  border-radius: 0.65rem;
+  color: #171717;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+}
+
+.organization-workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.organization-workspace-actions > button {
+  flex: 0 0 auto;
+}
+
+.organization-management-dialog {
+  background:
+    radial-gradient(ellipse at 92% 5%, rgb(255 199 44 / 8%), transparent 25rem),
+    linear-gradient(145deg, #10294a, #0b203d);
+  border: 1px solid rgba(255, 203, 42, 0.35);
+  border-radius: 1.2rem;
+  color: #f4f5f9;
+  max-height: min(88vh, 54rem);
+  max-width: min(58rem, calc(100vw - 2rem));
+  overflow: auto;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  width: 100%;
+}
+
+.organization-management-dialog::backdrop {
+  background: rgba(2, 8, 14, 0.76);
+  backdrop-filter: blur(4px);
+}
+
+.organization-dialog-heading,
+.organization-management-layout,
+.organization-create-controls {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.organization-dialog-heading {
+  margin-bottom: 1.5rem;
+}
+
+.organization-dialog-heading h2 {
+  margin: 0.15rem 0 0;
+}
+
+.organization-management-dialog form {
+  margin: 0 0 1.25rem;
+}
+
+.organization-management-dialog label,
+.organization-management-dialog h3 {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.organization-create-controls input {
+  flex: 1;
+  min-width: 0;
+}
+
+.organization-management-layout {
+  align-items: flex-start;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 1.5rem;
+  padding-top: 1.25rem;
+}
+
+.organization-list,
+.organization-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.organization-list {
+  flex: 0 0 min(14rem, 35%);
+}
+
+.organization-list li + li,
+.organization-members li + li {
+  margin-top: 0.55rem;
+}
+
+.organization-list button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  width: 100%;
+}
+
+.organization-list button[aria-current="true"] {
+  background: rgba(255, 203, 42, 0.14);
+  border-color: var(--gold, #ffca28);
+}
+
+.organization-invitations-panel {
+  background: linear-gradient(145deg, rgb(21 52 93 / 78%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 199 44 / 30%);
+  border-radius: 0.85rem;
+  color: #f4f5f9;
+  margin: 0 0 1rem;
+  padding: 1rem;
+}
+
+.organization-invitations-panel[hidden] {
+  display: none;
+}
+
+.organization-invitations-panel > .eyebrow {
+  color: #ffc72c;
+}
+
+.organization-invitations-panel > h3 {
+  margin-top: 0.25rem;
+}
+
+.organization-invitations {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.organization-invitations > li {
+  align-items: center;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: space-between;
+  padding: 0.75rem;
+}
+
+.organization-invitation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.organization-invitation-actions
+  button[data-organization-invitation-action="decline"] {
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  color: #f4f5f9;
+}
+
+.organization-editor {
+  background: linear-gradient(145deg, rgb(21 52 93 / 72%), rgb(11 32 61 / 88%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.85rem;
+  color: #f4f5f9;
+  flex: 1;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.organization-member {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: space-between;
+  padding: 0.65rem 0.8rem;
+}
+
+.organization-member-label {
+  min-width: 12rem;
+  overflow-wrap: anywhere;
+}
+
+.organization-member select {
+  min-width: 8rem;
+}
+
+.organization-status {
+  color: var(--muted, #aab7c8);
+  min-height: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .organization-workspace,
+  .organization-workspace-actions,
+  .organization-management-layout,
+  .organization-create-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .organization-list {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .organization-workspace-actions > button,
+  .organization-create-controls > button {
+    width: 100%;
+  }
+}
+.organization-hunt-discovery {
+  margin-block: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  color: #f4f7fb;
+  background: linear-gradient(145deg, #10294a, #0b203d);
+  border: 1px solid #315170;
+  border-radius: 1rem;
+}
+
+.organization-hunt-discovery h2,
+.organization-hunt-discovery h3,
+.organization-hunt-discovery p {
+  color: inherit;
+}
+
+.organization-hunt-discovery .eyebrow {
+  color: #ffcb45;
+}
+
+.organization-hunt-discovery ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.organization-hunt-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  color: #f4f7fb;
+  background: #142f50;
+  border: 1px solid #315170;
+  border-radius: 0.85rem;
+}
+
+.organization-hunt-card h3 {
+  margin: 0;
+}
+
+.organization-hunt-card p {
+  margin: 0.35rem 0;
+}
+
+.organization-hunt-card button {
+  flex: 0 0 auto;
+  color: #07182a;
+  background: #ffcb45;
+  border: 0;
+  border-radius: 0.55rem;
+  font-weight: 750;
+}
+
+@media (max-width: 680px) {
+  .organization-hunt-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

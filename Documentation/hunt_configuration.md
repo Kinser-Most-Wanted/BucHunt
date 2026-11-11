@@ -223,3 +223,19 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Organizations
+
+Creators can associate an optional organization name (up to 120 characters) with a hunt. Owners and Officers can edit it in the hunt overview. Players see the saved name beside the hunt details when they open or refresh the hunt. Older hunts without an organization remain supported.
+
+## Participation controls
+
+A blank maximum allows unlimited participation. A positive whole number limits active participants; leaving frees a place. Owners and Officers can close or reopen admission in hunt settings. Reopening still enforces capacity. Existing active participants can reopen or refresh their hunts even when full or closed. Players who explicitly leave must satisfy current admission rules to rejoin; their saved task completions are restored when admitted. Capacity checks and membership writes are serialized to prevent concurrent joins from exceeding the limit.
+
+## Issue reports
+
+Players can select Submit Issue below Leave Hunt, choose a task or Hunt in general, and submit up to 4000 characters. Reports store the hunt, task label, description, and creation time without storing the submitter. Owners and Officers can open Issues between Join Hunt and Export results. Unread counts are tracked separately for each administrator; opening the inbox marks only displayed reports read. New reports remain unread until viewed. Reports are persisted in hunt-issues.json under DATA_DIRECTORY and removed with a deleted hunt.
+
+## Hunt types
+
+Create a Hunt offers Traditional Hunt and Kahoot Hunt. Existing hunts default to Traditional Hunt. Kahoot Hunts use a host-controlled lobby and synchronized questions, with optional timers and a leaderboard. See [Kahoot Hunts](kahoot_hunts.md) for hosting, scoring, persistence, and reconnect behavior.

@@ -2,10 +2,13 @@ import type { HuntRepository } from "../foundation/contracts.js";
 import type { HuntRole } from "../foundation/types.js";
 import { getCreatorSession, request } from "./huntRepository.js";
 import { openHuntDetails } from "./huntDetails.js";
+import { populateOrganizationSelect } from "./organizationManager.js";
 interface HuntSummary {
   id: string;
   name: string;
   role: HuntRole;
+  organizationId?: string | null;
+  organizationName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -44,6 +47,9 @@ export function mountCreateHunt(
   repository: HuntRepository,
 ): void {
   const form = root.querySelector<HTMLFormElement>('[data-testid="hunt-form"]');
+  const organizationSelect = form?.querySelector<HTMLSelectElement>(
+    '[name="organizationId"]',
+  );
   const status = root.querySelector<HTMLElement>('[data-testid="hunt-status"]');
   const createDialog = document.querySelector<HTMLDialogElement>(
     '[data-testid="create-hunt-dialog"]',
@@ -137,6 +143,11 @@ export function mountCreateHunt(
   const requestedHuntId = new URLSearchParams(window.location.search).get(
     "huntId",
   );
+
+  async function loadOrganizationOptions(): Promise<void> {
+    if (!organizationSelect) return;
+    await populateOrganizationSelect(organizationSelect);
+  }
 
   function populateHuntSelector(): void {
     const signature = JSON.stringify(
@@ -450,7 +461,7 @@ export function mountCreateHunt(
       .getElementById("define-task")
       ?.dispatchEvent(new Event("hunt-selected"));
     panel.open = false;
-    panel.hidden = false;
+    panel.hidden = Boolean(hunt.organizationId);
     memberForm.hidden = hunt.role !== "owner";
     memberList.replaceChildren();
     memberStatus.textContent = "";
@@ -538,12 +549,15 @@ export function mountCreateHunt(
       workspaceStatus.textContent = session.message;
       return;
     }
+    if (organizationSelect) void populateOrganizationSelect(organizationSelect);
     const result = await request<HuntSummary[]>("/api/admin/hunts");
     if (!result.ok) {
       workspaceStatus.textContent = result.message;
       return;
     }
     availableHunts = result.value;
+    if (selected)
+      selected = result.value.find((hunt) => hunt.id === selected?.id);
     huntsLoaded = true;
     updateFilteredHunts();
     workspaceStatus.textContent = result.value.length
@@ -583,7 +597,10 @@ export function mountCreateHunt(
   }
   document
     .querySelector('[data-testid="open-create-hunt"]')
-    ?.addEventListener("click", () => createDialog.showModal());
+    ?.addEventListener("click", () => {
+      createDialog.showModal();
+      void loadOrganizationOptions();
+    });
   document
     .querySelector('[data-testid="close-create-hunt"]')
     ?.addEventListener("click", () => createDialog.close());
@@ -593,6 +610,12 @@ export function mountCreateHunt(
   document
     .querySelector('[data-testid="back-to-manage-hunts"]')
     ?.addEventListener("click", showManagerView);
+  document.addEventListener("buchunt:organizations-changed", () => {
+    if (organizationSelect) void populateOrganizationSelect(organizationSelect);
+  });
+  document.addEventListener("buchunt:hunt-settings-saved", () => {
+    void refresh();
+  });
   document
     .querySelector('[data-testid="refresh-my-hunts"]')
     ?.addEventListener("click", () => {
@@ -646,6 +669,12 @@ export function mountCreateHunt(
     try {
       const result = await repository.createHunt({
         name: text("name"),
+        organizationId: text("organizationId") || null,
+        huntType: text("huntType") === "kahoot" ? "kahoot" : "traditional",
+        maxParticipants: text("maxParticipants")
+          ? Number(text("maxParticipants"))
+          : null,
+        participationClosed: false,
         description: text("description"),
         ownerId: "",
         beginsAt: date("beginsAt") ?? "",

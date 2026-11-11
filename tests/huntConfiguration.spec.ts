@@ -264,6 +264,284 @@ test("owners must type the exact hunt name before deleting a hunt", async ({
   );
 });
 
+test("players can create, edit, and invite people to organizations", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "player-account",
+        email: "owner@example.com",
+        idToken: "test-owner-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.player-account", "Owner");
+  });
+  const organizations: {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    role: "owner" | "officer" | "contributor";
+    members: {
+      accountId: string | null;
+      email: string;
+      role: "owner" | "officer" | "contributor";
+      originalOwner: boolean;
+      pending: boolean;
+      isSelf: boolean;
+    }[];
+  }[] = [];
+  const invitations: {
+    organizationId: string;
+    organizationName: string;
+    role: "owner" | "officer" | "contributor";
+  }[] = [];
+  await page.route("**/api/player/account/**", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/api/player/account/organization-invitations") {
+      await route.fulfill({ json: { ok: true, value: invitations } });
+      return;
+    }
+    const invitationMatch =
+      /^\/api\/player\/account\/organization-invitations\/(organization-2|organization-3)$/.exec(
+        url.pathname,
+      );
+    if (invitationMatch && method === "POST") {
+      const input = route.request().postDataJSON() as {
+        action: "accept" | "decline";
+      };
+      const invitation = invitations.find(
+        (item) => item.organizationId === invitationMatch[1],
+      )!;
+      if (input.action === "accept") {
+        const now = new Date().toISOString();
+        organizations.push({
+          id: invitation.organizationId,
+          name: invitation.organizationName,
+          createdAt: now,
+          updatedAt: now,
+          role: "contributor",
+          members: [
+            {
+              accountId: "player-account",
+              email: "owner@example.com",
+              role: "contributor",
+              originalOwner: false,
+              pending: false,
+              isSelf: true,
+            },
+          ],
+        });
+      }
+      invitations.splice(invitations.indexOf(invitation), 1);
+      await route.fulfill({
+        json: {
+          ok: true,
+          value: {
+            organizationId: invitation.organizationId,
+            accepted: input.action === "accept",
+          },
+        },
+      });
+      return;
+    }
+    if (url.pathname === "/api/player/account/profile") {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Owner" } },
+      });
+      return;
+    }
+    if (url.pathname === "/api/player/account/hunts") {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
+    if (url.pathname === "/api/player/account/organizations") {
+      if (method === "GET") {
+        await route.fulfill({ json: { ok: true, value: organizations } });
+        return;
+      }
+      const input = route.request().postDataJSON() as { name: string };
+      const now = new Date().toISOString();
+      const organization = {
+        id: "organization-1",
+        name: input.name,
+        createdAt: now,
+        updatedAt: now,
+        role: "owner" as const,
+        members: [
+          {
+            accountId: "player-account",
+            email: "owner@example.com",
+            role: "owner" as const,
+            originalOwner: true,
+            pending: false,
+            isSelf: true,
+          },
+        ],
+      };
+      organizations.push(organization);
+      await route.fulfill({
+        status: 201,
+        json: { ok: true, value: organization },
+      });
+      return;
+    }
+    const organizationMatch =
+      /^\/api\/player\/account\/organizations\/organization-1(?:\/members)?$/.exec(
+        url.pathname,
+      );
+    if (organizationMatch && method === "PATCH") {
+      const input = route.request().postDataJSON() as { name: string };
+      organizations[0].name = input.name;
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    if (
+      organizationMatch &&
+      method === "POST" &&
+      url.pathname.endsWith("/members")
+    ) {
+      const input = route.request().postDataJSON() as { email: string };
+      organizations[0].members.push({
+        accountId: null,
+        email: input.email,
+        role: "contributor",
+        originalOwner: false,
+        pending: true,
+        isSelf: false,
+      });
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 404,
+      json: { ok: false, code: "not-found", message: "Not found." },
+    });
+  });
+  await page.goto("/player.html");
+  await expect(page.getByTestId("organization-workspace")).toBeVisible();
+  await page.getByTestId("open-organizations").click();
+  await page.getByLabel("Create an organization").fill("Campus Explorers");
+  await page
+    .getByRole("button", { name: "Create organization", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-create-status")).toHaveText(
+    "Organization created.",
+  );
+  await page.getByLabel("Organization name").fill("Campus Discovery Club");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(page.getByTestId("organization-details-status")).toHaveText(
+    "Organization name saved.",
+  );
+  await page.getByLabel("Invite by email").fill("friend@example.com");
+  await page
+    .getByRole("button", { name: "Invite as Contributor", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invite-status")).toContainText(
+    "They must accept before joining as a Contributor",
+  );
+  await expect(page.getByTestId("organization-members")).toContainText(
+    "friend@example.com",
+  );
+
+  invitations.push(
+    {
+      organizationId: "organization-2",
+      organizationName: "Robotics Society",
+      role: "contributor",
+    },
+    {
+      organizationId: "organization-3",
+      organizationName: "Outdoor Club",
+      role: "contributor",
+    },
+  );
+  await page.reload();
+  const dialog = page.getByTestId("organization-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Robotics Society invited you to join as a contributor.");
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Outdoor Club invited you to join as a contributor.");
+  const roboticsInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Robotics Society" });
+  await roboticsInvite
+    .getByRole("button", { name: "Accept", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation accepted.",
+  );
+  await expect(page.getByTestId("organization-list")).toContainText(
+    "Robotics Society (contributor)",
+  );
+  const outdoorInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Outdoor Club" });
+  await outdoorInvite
+    .getByRole("button", { name: "Decline", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation declined.",
+  );
+  await expect(page.getByTestId("organization-invitations-panel")).toBeHidden();
+});
+
+test("create hunt organization selector lists current memberships", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "google-admin-123",
+        email: "admin@example.com",
+        idToken: "test-google-token",
+      }),
+    );
+  });
+  const organizationId = "123e4567-e89b-12d3-a456-426614174000";
+  await page.route("**/api/player/account/organizations", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: [
+          {
+            id: organizationId,
+            name: "Campus Explorers",
+            role: "owner",
+            createdAt: "2026-10-15T00:00:00.000Z",
+            updatedAt: "2026-10-15T00:00:00.000Z",
+            members: [],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  const createOrganization = page.getByTestId("hunt-organization");
+  await expect(createOrganization).toHaveValue("");
+  await expect(createOrganization).toContainText("Campus Explorers (owner)");
+  await createOrganization.selectOption(organizationId);
+  await expect(createOrganization).toHaveValue(organizationId);
+});
+
 test("create hunt, save task and reload configuration", async ({ page }) => {
   await installMapMock(page.context());
   await page.route("https://accounts.google.com/gsi/client", (route) =>

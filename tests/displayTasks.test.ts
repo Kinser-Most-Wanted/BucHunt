@@ -34,6 +34,14 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   let joined = true;
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/profile")) {
       await route.fulfill({
         json: { ok: true, value: { displayName: "Baja" } },
@@ -64,15 +72,16 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(page.getByTestId("confirm-leave-hunt")).toBeVisible();
   await page.getByTestId("cancel-leave-hunt").click();
   await page.getByTestId("player-hunt-list").getByText("Optional Hunt").click();
-  await expect(page.getByTestId("leave-hunt")).toBeVisible();
+  const leaveHuntButton = page.getByTestId("leave-hunt");
+  const submitIssueButton = page.getByTestId("submit-issue");
+  await expect(leaveHuntButton).toBeVisible();
+  await expect(submitIssueButton).toBeVisible();
   expect(
-    await page
-      .getByTestId("leave-hunt")
-      .evaluate(
-        (button) =>
-          button.parentElement?.matches("dialog.player-hunt-details") &&
-          button === button.parentElement.lastElementChild,
-      ),
+    await leaveHuntButton.evaluate(
+      (button) =>
+        button.parentElement?.matches("dialog.player-hunt-details") &&
+        button.nextElementSibling?.matches('[data-testid="submit-issue"]'),
+    ),
   ).toBe(true);
   await page.getByTestId("leave-hunt").click();
   await expect(page.getByTestId("leave-hunt-dialog")).toBeVisible();
@@ -157,6 +166,14 @@ test("admin join links do not fill the access-code form", async ({ page }) => {
   let joins = 0;
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/profile")) {
       await route.fulfill({
         json: { ok: true, value: { displayName: "Baja" } },
@@ -220,6 +237,14 @@ test("manual access-code joins remain in the hunt list after closing details", a
   let joined = false;
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/profile")) {
       await route.fulfill({
         json: { ok: true, value: { displayName: "Baja" } },
@@ -276,6 +301,14 @@ test("manual access-code errors are visible outside the closed hunt details", as
   );
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/profile")) {
       await route.fulfill({
         json: { ok: true, value: { displayName: "Baja" } },
@@ -401,6 +434,14 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     );
     expect(route.request().headers().cookie).toBeUndefined();
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/profile")) {
       if (route.request().method() === "PUT") {
         profileDisplayName = route.request().postDataJSON().displayName;
@@ -597,7 +638,9 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     .locator('[data-hunt-id="hunt-1"]')
     .click();
   await expect(detailsDialog).toBeVisible();
-  expect(await detailsDialog.evaluate((dialog) => dialog.scrollTop)).toBe(0);
+  await expect
+    .poll(() => detailsDialog.evaluate((dialog) => dialog.scrollTop))
+    .toBe(0);
   const answerTask = page
     .getByTestId("player-task")
     .filter({ hasText: "Library Steps" });
@@ -1007,6 +1050,14 @@ test("multiple-choice selections submit immediately, retain rejected options, an
   );
   await page.route("**/api/player/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (
+      path.endsWith("/organizations") ||
+      path.endsWith("/organization-invitations") ||
+      path.endsWith("/organization-hunts")
+    ) {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
     if (path.endsWith("/answer")) {
       const answer = route.request().postDataJSON().answer;
       answers.push(answer);

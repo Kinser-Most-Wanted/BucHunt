@@ -108,6 +108,118 @@
             coordinates that connect each task to a place.
           </p>
         </div>
+        <dialog
+          class="organization-management-dialog"
+          data-testid="organization-dialog"
+          aria-labelledby="organization-dialog-title"
+        >
+          <div class="organization-dialog-heading">
+            <div>
+              <p class="eyebrow">YOUR COMMUNITY</p>
+              <h2 id="organization-dialog-title">Manage organizations</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-organizations"
+              aria-label="Close organizations"
+            >
+              ×
+            </button>
+          </div>
+          <section
+            class="organization-invitations-panel"
+            data-testid="organization-invitations-panel"
+            hidden
+          >
+            <p class="eyebrow">YOU’RE INVITED</p>
+            <h3>Organization invitations</h3>
+            <ul
+              class="organization-invitations"
+              data-testid="organization-invitations"
+              aria-label="Pending organization invitations"
+            ></ul>
+          </section>
+          <p
+            class="organization-status"
+            data-testid="organization-invitations-status"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></p>
+          <form data-testid="organization-create-form">
+            <label for="organization-create-name">Create an organization</label>
+            <div class="organization-create-controls">
+              <input
+                id="organization-create-name"
+                name="name"
+                maxlength="120"
+                required
+              /><button type="submit">Create organization</button>
+            </div>
+            <p
+              class="organization-status"
+              data-testid="organization-create-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
+          <div class="organization-management-layout">
+            <ul
+              class="organization-list"
+              data-testid="organization-list"
+              aria-label="Your organizations"
+            ></ul>
+            <section
+              class="organization-editor"
+              data-testid="organization-editor"
+              hidden
+              aria-label="Selected organization"
+            >
+              <form data-testid="organization-details-form">
+                <label for="organization-edit-name">Organization name</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-edit-name"
+                    name="name"
+                    maxlength="120"
+                    required
+                  /><button type="submit">Save name</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-details-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <form data-testid="organization-invite-form">
+                <label for="organization-invite-email">Invite by email</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-invite-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                  /><button type="submit">Invite as Contributor</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-invite-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <h3>Members</h3>
+              <ul
+                class="organization-members"
+                data-testid="organization-members"
+                aria-label="Organization members"
+              ></ul>
+            </section>
+          </div>
+        </dialog>
         <section
           class="access-panel admin-hunt-actions"
           aria-label="Hunt actions"
@@ -130,6 +242,36 @@
           >
             Manage Hunts
           </button>
+        </section>
+        <section
+          class="organization-workspace"
+          data-testid="organization-workspace"
+          hidden
+        >
+          <div class="organization-workspace-copy">
+            <p class="eyebrow">YOUR COMMUNITY</p>
+            <h2>Organizations</h2>
+            <p>
+              Create a group, invite people, and manage access to its hunts.
+            </p>
+          </div>
+          <div class="organization-workspace-actions">
+            <button
+              type="button"
+              class="refresh-button"
+              data-testid="open-organizations"
+            >
+              Manage organizations
+            </button>
+            <button
+              type="button"
+              class="refresh-button"
+              data-testid="open-organization-invitations"
+              hidden
+            >
+              Organization invitations
+            </button>
+          </div>
         </section>
         <dialog
           class="hunt-details-dialog create-hunt-dialog"
@@ -171,6 +313,29 @@
                 <legend>Hunt details</legend>
                 <label for="hunt-name">Hunt name</label
                 ><input id="hunt-name" name="name" required />
+                <label for="hunt-type">Hunt type</label
+                ><select id="hunt-type" name="huntType">
+                  <option value="traditional">Traditional Hunt</option>
+                  <option value="kahoot">Kahoot Hunt</option>
+                </select>
+                <label for="hunt-capacity"
+                  >Maximum participants (optional)</label
+                ><input
+                  id="hunt-capacity"
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
+                <label for="hunt-organization">Organization</label
+                ><select
+                  id="hunt-organization"
+                  name="organizationId"
+                  data-testid="hunt-organization"
+                >
+                  <option value="">No organization</option>
+                </select>
+                <p class="field-help">Choose an organization you belong to.</p>
                 <label for="hunt-description">Description</label
                 ><textarea
                   id="hunt-description"
@@ -323,6 +488,39 @@
               aria-live="polite"
               data-testid="hunt-export-status"
             ></p>
+            <section
+              data-testid="kahoot-host"
+              class="kahoot-panel"
+              hidden
+              aria-label="Kahoot host controls"
+            ></section>
+            <form
+              data-testid="hunt-settings-form"
+              class="hunt-settings-form"
+              hidden
+            >
+              <label for="hunt-settings-organization">Organization</label>
+              <select
+                id="hunt-settings-organization"
+                name="organizationId"
+                data-testid="hunt-settings-organization"
+              >
+                <option value="">No organization</option>
+              </select>
+              <label
+                >Maximum participants (blank for unlimited)<input
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  step="1"
+              /></label>
+              <label
+                ><input name="participationClosed" type="checkbox" /> Close
+                participation to new players</label
+              >
+              <button type="submit" class="action">Save hunt settings</button>
+              <p role="status" data-settings-status></p>
+            </form>
             <div class="details-actions" role="group" aria-label="Hunt actions">
               <button
                 type="button"
@@ -337,6 +535,14 @@
               >
                 Join Hunt
               </a>
+              <button
+                type="button"
+                class="action"
+                data-testid="hunt-issues-button"
+                hidden
+              >
+                Issues (0 unread)
+              </button>
               <details
                 class="details-action-menu"
                 data-testid="export-menu"
@@ -763,7 +969,16 @@
                     <summary>More task options</summary>
                     <div class="field-grid">
                       <div>
-                        <label for="task-points">Points</label>
+                        <label for="task-timer"
+                          >Kahoot question timer in seconds (optional)</label
+                        ><input
+                          id="task-timer"
+                          name="timeLimitSeconds"
+                          type="number"
+                          min="1"
+                          max="3600"
+                          step="1"
+                        /><label for="task-points">Points</label>
                         <input
                           id="task-points"
                           name="points"

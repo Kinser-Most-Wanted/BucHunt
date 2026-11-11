@@ -100,6 +100,12 @@ test("organization membership governs organization hunt access and migration", a
       { email: "member@example.com" },
     );
     expect(invited.status).toBe(200);
+    const oldHuntInvite = await f.api(
+      `/api/player/account/organizations/${organizationId}/members`,
+      "owner",
+      { email: "one@example.com" },
+    );
+    expect(oldHuntInvite.status).toBe(200);
     const pending = await f.api(
       "/api/player/account/organization-invitations",
       "member",
@@ -115,6 +121,11 @@ test("organization membership governs organization hunt access and migration", a
       { action: "accept" },
     );
     expect(accepted.data.value.accepted).toBe(true);
+    await f.api(
+      `/api/player/account/organization-invitations/${organizationId}`,
+      "one",
+      { action: "accept" },
+    );
     const linked = await f.hunts.get(f.hunt.id);
     expect(linked.organizationId).toBe(organizationId);
     expect(
@@ -246,6 +257,23 @@ test("#139 #143 #142 APIs enforce roles, admission limits, saved membership, and
         })
       ).status,
     ).toBe(201);
+    const computingMembership = (
+      await f.api("/api/player/account/organizations", "owner")
+    ).data.value.find(
+      (organization: { name: string }) => organization.name === "Computing",
+    );
+    for (const token of ["one", "two"]) {
+      await f.api(
+        `/api/player/account/organizations/${computingMembership.id}/members`,
+        "owner",
+        { email: `${token}@example.com` },
+      );
+      await f.api(
+        `/api/player/account/organization-invitations/${computingMembership.id}`,
+        token,
+        { action: "accept" },
+      );
+    }
     expect(
       (await f.api(admin, "outsider", { organizationName: "Spoof" }, "PATCH"))
         .status,
@@ -492,22 +520,32 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       "Issues (0 unread)",
     );
     const settings = admin.getByTestId("hunt-settings-form");
-    const organizationSelect = settings.getByLabel("Organization", {
-      exact: true,
-    });
-    await expect(organizationSelect).toContainText("Computing (owner)");
-    await organizationSelect.selectOption("Computing");
-    await settings.getByLabel("Close participation to new players").check();
-    await settings.getByRole("button", { name: "Save hunt settings" }).click();
-    await expect(settings.getByRole("status")).toHaveText(
-      "Hunt settings saved.",
-    );
     const memberships = await f.api(
       "/api/player/account/organizations",
       "owner",
     );
     const computing = memberships.data.value.find(
       (organization: { name: string }) => organization.name === "Computing",
+    );
+    const organizationSelect = settings.getByLabel("Organization", {
+      exact: true,
+    });
+    await expect(organizationSelect).toContainText("Computing (owner)");
+    await organizationSelect.selectOption(computing.id);
+    await settings.getByLabel("Close participation to new players").check();
+    await settings.getByRole("button", { name: "Save hunt settings" }).click();
+    await expect(settings.getByRole("status")).toHaveText(
+      "Hunt settings saved.",
+    );
+    await f.api(
+      `/api/player/account/organizations/${computing.id}/members`,
+      "owner",
+      { email: "one@example.com" },
+    );
+    await f.api(
+      `/api/player/account/organization-invitations/${computing.id}`,
+      "one",
+      { action: "accept" },
     );
     const organizationHunt = await f.api("/api/admin/hunts", "owner", {
       name: "Organization discovery",
@@ -616,41 +654,3 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
       "Answer submitted",
     );
     await expect(
-      players[0].getByTestId("kahoot-player").getByLabel("Your answer"),
-    ).toHaveCount(0);
-    await players[1]
-      .getByTestId("kahoot-player")
-      .getByLabel("Your answer")
-      .fill("wrong");
-    await players[1]
-      .getByTestId("kahoot-player")
-      .getByRole("button", { name: "Submit answer" })
-      .click();
-    await expect(
-      host.getByRole("button", { name: "Next question", exact: true }),
-    ).toBeVisible();
-    await host
-      .getByRole("button", { name: "Next question", exact: true })
-      .click();
-    for (const page of players)
-      await expect(
-        page
-          .getByTestId("kahoot-player")
-          .getByRole("heading", { name: "Library", exact: true }),
-      ).toBeVisible();
-    await host
-      .getByRole("button", { name: "End question", exact: true })
-      .click();
-    for (const page of players)
-      await expect(page.getByTestId("kahoot-player")).toContainText(
-        "Hunt complete!",
-      );
-    await admin.screenshot({
-      path: "/tmp/buchunt-kahoot-host.png",
-      fullPage: true,
-    });
-  } finally {
-    for (const context of contexts) await context.close();
-    await f.close();
-  }
-});

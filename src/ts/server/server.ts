@@ -920,9 +920,7 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         const organizationHuntsMatch =
-          /^\/api\/admin\/organizations\/([a-f0-9-]{36})\/hunts$/.exec(
-            path,
-          );
+          /^\/api\/admin\/organizations\/([a-f0-9-]{36})\/hunts$/.exec(path);
         if (organizationHuntsMatch && method === "GET") {
           if (!account) {
             json(response, 401, {
@@ -933,9 +931,9 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           await migrateLegacyOrganizationLinks();
-          const organization = (await organizations.listForAccount(account.id)).find(
-            (entry) => entry.id === organizationHuntsMatch[1],
-          );
+          const organization = (
+            await organizations.listForAccount(account.id)
+          ).find((entry) => entry.id === organizationHuntsMatch[1]);
           if (!organization) {
             json(response, 403, {
               ok: false,

@@ -1960,4 +1960,22 @@ export function mountDisplayTasks(
       .catch(() => undefined)
       .finally(() => window.location.assign("./index.html"));
   });
+
+//implementation for closing "player details" menu ("Signed in as...")
+document.addEventListener('click', (event: MouseEvent) => {
+    const target = event.target as Node;
+    //selector for player details menu 
+    const playerDetails = document
+  	.querySelector('details.player-account-menu, [data-testid="player-account-menu"]')?.closest('details');
+
+    //if player details menu is not open, don't do anything
+    if (!playerDetails || !playerDetails.hasAttribute('open')) {
+      return; 
+    }
+
+    //if the page is selected, close the menu
+    if (!playerDetails.contains(target)) {
+        playerDetails.removeAttribute('open');
+    }
+  });
 }

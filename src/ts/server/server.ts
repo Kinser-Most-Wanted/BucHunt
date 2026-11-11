@@ -1839,3 +1839,12 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const host = process.env.HOST ?? "127.0.0.1";
+  const app = createApplication({
+    dataDirectory: process.env.DATA_DIRECTORY,
+    originToken: process.env.ORIGIN_TOKEN,
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+  });
+  app.listen(Number(process.env.PORT ?? 3000), host, () =>
+    console.log("BucHunt server ready"),
+  );
+}

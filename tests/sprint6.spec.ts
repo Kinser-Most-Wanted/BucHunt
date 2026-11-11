@@ -85,6 +85,95 @@ async function fixture(options: Record<string, unknown> = {}) {
     },
   };
 }
+
+test("organization membership governs organization hunt access and migration", async () => {
+  const f = await fixture();
+  try {
+    const created = await f.api("/api/player/account/organizations", "owner", {
+      name: "ETSU",
+    });
+    expect(created.status).toBe(201);
+    const organizationId = created.data.value.id as string;
+    const invited = await f.api(
+      `/api/player/account/organizations/${organizationId}/members`,
+      "owner",
+      { email: "member@example.com" },
+    );
+    expect(invited.status).toBe(200);
+    const pending = await f.api(
+      "/api/player/account/organization-invitations",
+      "member",
+    );
+    expect(pending.data.value).toHaveLength(1);
+    const beforeAccept = await f.api("/api/player/account/join", "member", {
+      huntId: f.hunt.id,
+    });
+    expect(beforeAccept.status).toBe(403);
+    const accepted = await f.api(
+      `/api/player/account/organization-invitations/${organizationId}`,
+      "member",
+      { action: "accept" },
+    );
+    expect(accepted.data.value.accepted).toBe(true);
+    const linked = await f.hunts.get(f.hunt.id);
+    expect(linked.organizationId).toBe(organizationId);
+    expect(
+      (await f.api("/api/player/account/organization-hunts", "member")).data
+        .value,
+    ).toContainEqual(
+      expect.objectContaining({
+        id: f.hunt.id,
+        organizationId,
+        organizationName: "ETSU",
+      }),
+    );
+    expect(
+      (await f.api("/api/player/account/join", "member", { huntId: f.hunt.id }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await f.api("/api/player/account/hunts", "member")).data.value[0],
+    ).toMatchObject({ organizationId, organizationName: "ETSU" });
+    expect(
+      (await f.api("/api/player/account/organization-hunts", "member")).data
+        .value,
+    ).toEqual([]);
+    expect(
+      (await f.api(`/api/admin/hunts/${f.hunt.id}/contributors`, "owner"))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await f.api("/api/player/account/join", "outsider", {
+          accessCode: f.hunt.accessCode,
+        })
+      ).status,
+    ).toBe(403);
+    const promoted = await f.api(
+      `/api/player/account/organizations/${organizationId}/members/google-${createHash("sha256").update("member").digest("hex")}`,
+      "owner",
+      { role: "officer" },
+      "PATCH",
+    );
+    expect(
+      promoted.data.value.members.find(
+        (member: { email: string }) => member.email === "member@example.com",
+      ).role,
+    ).toBe("officer");
+    const removed = await f.api(
+      `/api/player/account/organizations/${organizationId}/members/google-${createHash("sha256").update("member").digest("hex")}`,
+      "owner",
+      undefined,
+      "DELETE",
+    );
+    expect(removed.status).toBe(200);
+    expect(
+      (await f.api("/api/player/account/hunts", "member")).data.value,
+    ).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});
 async function identity(page: Page, token: string, admin = false) {
   await page.addInitScript((token) => {
     localStorage.setItem(
@@ -413,6 +502,22 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(settings.getByRole("status")).toHaveText(
       "Hunt settings saved.",
     );
+    const memberships = await f.api(
+      "/api/player/account/organizations",
+      "owner",
+    );
+    const computing = memberships.data.value.find(
+      (organization: { name: string }) => organization.name === "Computing",
+    );
+    const organizationHunt = await f.api("/api/admin/hunts", "owner", {
+      name: "Organization discovery",
+      description: "A taskless hunt shared by the organization",
+      organizationId: computing.id,
+      beginsAt: "2020-01-01T00:00:00Z",
+      endsAt: null,
+      taskOrderMode: "sequential",
+    });
+    expect(organizationHunt.status).toBe(201);
     expect(
       (
         await f.api("/api/player/account/join", "two", {
@@ -421,6 +526,18 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       ).data.message,
     ).toContain("closed");
     await player.reload();
+    await expect(
+      player.getByTestId("organization-hunt-discovery"),
+    ).toContainText("Organization discovery");
+    await player
+      .getByRole("button", { name: "Join Organization discovery", exact: true })
+      .click();
+    await expect(
+      player.getByRole("button", {
+        name: "Open Organization discovery",
+        exact: true,
+      }),
+    ).toBeVisible();
     await player
       .getByRole("button", { name: "Open Sprint Six", exact: true })
       .click();

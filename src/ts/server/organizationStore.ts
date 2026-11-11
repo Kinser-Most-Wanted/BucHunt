@@ -200,6 +200,34 @@ export class OrganizationStore {
     );
   }
 
+  async uniqueIdForName(name: string): Promise<string | undefined> {
+    const normalized = name.trim().toLocaleLowerCase();
+    return this.file.query((file) => {
+      const matches = file.organizations.filter(
+        (organization) =>
+          organization.name.trim().toLocaleLowerCase() === normalized,
+      );
+      return matches.length === 1 ? matches[0]!.id : undefined;
+    });
+  }
+
+  organizationNameById(id: string): Promise<string | undefined> {
+    return this.file.query(
+      (file) =>
+        file.organizations.find((organization) => organization.id === id)?.name,
+    );
+  }
+
+  roleForOrganization(
+    id: string,
+    accountId: string,
+  ): Promise<OrganizationRole | undefined> {
+    return this.file.query((file) => {
+      const organization = file.organizations.find((item) => item.id === id);
+      return organization ? roleFor(organization, accountId) : undefined;
+    });
+  }
+
   rename(
     organizationId: string,
     accountId: string,

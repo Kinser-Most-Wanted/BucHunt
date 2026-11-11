@@ -4568,3 +4568,65 @@ body[data-page="admin"]
     width: 100%;
   }
 }
+.organization-hunt-discovery {
+  margin-block: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  color: #f4f7fb;
+  background: linear-gradient(145deg, #10294a, #0b203d);
+  border: 1px solid #315170;
+  border-radius: 1rem;
+}
+
+.organization-hunt-discovery h2,
+.organization-hunt-discovery h3,
+.organization-hunt-discovery p {
+  color: inherit;
+}
+
+.organization-hunt-discovery .eyebrow {
+  color: #ffcb45;
+}
+
+.organization-hunt-discovery ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.organization-hunt-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  color: #f4f7fb;
+  background: #142f50;
+  border: 1px solid #315170;
+  border-radius: 0.85rem;
+}
+
+.organization-hunt-card h3 {
+  margin: 0;
+}
+
+.organization-hunt-card p {
+  margin: 0.35rem 0;
+}
+
+.organization-hunt-card button {
+  flex: 0 0 auto;
+  color: #07182a;
+  background: #ffcb45;
+  border: 0;
+  border-radius: 0.55rem;
+  font-weight: 750;
+}
+
+@media (max-width: 680px) {
+  .organization-hunt-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

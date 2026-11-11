@@ -32,9 +32,22 @@ export interface OrganizationInvitationResponse {
   accepted: boolean;
 }
 
+export interface OrganizationHuntSummary {
+  id: string;
+  name: string;
+  description: string;
+  organizationId: string;
+  organizationName: string;
+  role: OrganizationRole;
+  beginsAt: string;
+  endsAt: string | null;
+  status: HuntStatus;
+}
+
 export interface HuntInput {
   huntType?: "traditional" | "kahoot";
   organizationName?: string;
+  organizationId?: string | null;
   maxParticipants?: number | null;
   participationClosed?: boolean;
   name: string;
@@ -117,6 +130,7 @@ export interface PlayerHunt {
   huntType?: "traditional" | "kahoot";
   kahoot?: KahootView;
   organizationName?: string;
+  organizationId?: string | null;
   maxParticipants?: number | null;
   participationClosed?: boolean;
   id: string;

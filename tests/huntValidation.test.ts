@@ -39,6 +39,16 @@ test("accepts empty tasks, nullable fields, bounds, and independent Hunt ownersh
   expect(validateHunt(hunt).ok).toBe(true);
 });
 
+test("accepts a valid organization link and rejects malformed IDs", () => {
+  const hunt = fixture();
+  hunt.organizationId = "123e4567-e89b-12d3-a456-426614174000";
+  expect(validateHunt(hunt).ok).toBe(true);
+  hunt.organizationId = null;
+  expect(validateHunt(hunt).ok).toBe(true);
+  hunt.organizationId = "bad-id";
+  expectInvalid(hunt, "organizationId");
+});
+
 for (const input of [null, undefined, [], "{}", 1, false]) {
   test(`rejects a non-object Hunt: ${String(input)}`, () =>
     expectInvalid(input, "$"));

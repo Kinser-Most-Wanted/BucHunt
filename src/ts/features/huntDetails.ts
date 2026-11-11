@@ -4,7 +4,6 @@ import type {
   HuntParticipationSummary,
   HuntParticipantProgress,
   HuntRole,
-  OrganizationDefinition,
   TaskDefinition,
 } from "../foundation/types.js";
 import {
@@ -13,6 +12,7 @@ import {
   getCreatorSession,
   request,
 } from "./huntRepository.js";
+import { populateOrganizationSelect } from "./organizationManager.js";
 
 import { mountKahootHost } from "./kahootHunt.js";
 import { mountAdminIssues } from "./huntIssues.js";
@@ -570,43 +570,13 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
   if (settings) {
     settings.hidden = role === "contributor";
     const organizationSelect = settings.elements.namedItem(
-      "organizationName",
+      "organizationId",
     ) as HTMLSelectElement;
-    const currentOrganization = hunt.organizationName ?? "";
-    const renderOrganizationOptions = (
-      organizations: OrganizationDefinition[] = [],
-    ): void => {
-      const options = document.createDocumentFragment();
-      const none = document.createElement("option");
-      none.value = "";
-      none.textContent = "No organization";
-      options.append(none);
-      for (const organization of organizations) {
-        const option = document.createElement("option");
-        option.value = organization.name;
-        option.textContent = `${organization.name} (${organization.role})`;
-        options.append(option);
-      }
-      if (
-        currentOrganization &&
-        !organizations.some(
-          (organization) => organization.name === currentOrganization,
-        )
-      ) {
-        const legacy = document.createElement("option");
-        legacy.value = currentOrganization;
-        legacy.textContent = currentOrganization;
-        options.append(legacy);
-      }
-      organizationSelect.replaceChildren(options);
-      organizationSelect.value = currentOrganization;
-    };
-    renderOrganizationOptions();
-    void request<OrganizationDefinition[]>("/api/admin/organizations").then(
-      (result) => {
-        if (result.ok && activeHunt?.id === hunt.id)
-          renderOrganizationOptions(result.value);
-      },
+    organizationSelect.disabled = role !== "owner";
+    void populateOrganizationSelect(
+      organizationSelect,
+      undefined,
+      hunt.organizationId ?? "",
     );
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
       hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
@@ -620,26 +590,31 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
         "[data-settings-status]",
       )!;
       button.disabled = true;
+      const fields = new FormData(settings);
+      const updates: Record<string, unknown> = {
+        maxParticipants: String(fields.get("maxParticipants") ?? "").trim()
+          ? Number(fields.get("maxParticipants"))
+          : null,
+        participationClosed: fields.has("participationClosed"),
+      };
+      if (role === "owner")
+        updates.organizationId =
+          String(fields.get("organizationId") ?? "") || null;
       const result = await request<HuntDefinition>(
         `/api/admin/hunts/${hunt.id}`,
-        {
-          organizationName: String(
-            new FormData(settings).get("organizationName") ?? "",
-          ).trim(),
-          maxParticipants: String(
-            new FormData(settings).get("maxParticipants") ?? "",
-          ).trim()
-            ? Number(new FormData(settings).get("maxParticipants"))
-            : null,
-          participationClosed: new FormData(settings).has(
-            "participationClosed",
-          ),
-        },
+        updates,
         "PATCH",
       );
       button.disabled = false;
       output.textContent = result.ok ? "Hunt settings saved." : result.message;
-      if (result.ok && activeHunt?.id === hunt.id) activeHunt = result.value;
+      if (result.ok && activeHunt?.id === hunt.id) {
+        activeHunt = result.value;
+        const teamPanel = dialog.querySelector<HTMLElement>(
+          '[data-testid="contributors-panel"]',
+        );
+        if (teamPanel) teamPanel.hidden = Boolean(result.value.organizationId);
+        document.dispatchEvent(new Event("buchunt:hunt-settings-saved"));
+      }
     };
   }
   canExport = role === "owner" || role === "officer";
@@ -654,7 +629,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
     '[data-testid="contributors-panel"]',
   );
   if (contributorsPanel) {
-    contributorsPanel.hidden = false;
+    contributorsPanel.hidden = Boolean(hunt.organizationId);
     const management = contributorsPanel.querySelector<HTMLElement>(
       ".contributor-management",
     );

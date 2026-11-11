@@ -253,6 +253,7 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       ...huntFields,
       ...[
         "organizationName",
+        "organizationId",
         "maxParticipants",
         "participationClosed",
         "huntType",
@@ -261,6 +262,16 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
     "",
     issues,
   );
+  if (
+    input.organizationId !== undefined &&
+    input.organizationId !== null &&
+    (typeof input.organizationId !== "string" ||
+      !/^[a-f0-9-]{36}$/i.test(input.organizationId))
+  )
+    issues.push({
+      field: "organizationId",
+      message: "Organization ID must be a valid identifier.",
+    });
   if (
     input.organizationName !== undefined &&
     (typeof input.organizationName !== "string" ||

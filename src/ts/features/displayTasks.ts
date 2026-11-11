@@ -3,6 +3,7 @@ import { mountPlayerIssues } from "./huntIssues.js";
 import type { HuntRepository } from "../foundation/contracts.js";
 import type {
   OrganizationDefinition,
+  OrganizationHuntSummary,
   OrganizationInvitationDefinition,
   OrganizationInvitationResponse,
   OperationResult,
@@ -502,6 +503,15 @@ export function mountDisplayTasks(
   const organizationWorkspace = root.querySelector<HTMLElement>(
     '[data-testid="organization-workspace"]',
   );
+  const organizationDiscovery = root.querySelector<HTMLElement>(
+    '[data-testid="organization-hunt-discovery"]',
+  );
+  const organizationHuntsList = root.querySelector<HTMLUListElement>(
+    '[data-testid="organization-hunts-list"]',
+  );
+  const organizationHuntsStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-hunts-status"]',
+  );
   const organizationDialog = root.querySelector<HTMLDialogElement>(
     '[data-testid="organization-dialog"]',
   );
@@ -579,6 +589,9 @@ export function mountDisplayTasks(
     !nameInput ||
     !huntLookup ||
     !organizationWorkspace ||
+    !organizationDiscovery ||
+    !organizationHuntsList ||
+    !organizationHuntsStatus ||
     !organizationDialog ||
     !openOrganizations ||
     !openOrganizationInvitations ||
@@ -993,6 +1006,62 @@ export function mountDisplayTasks(
     });
   });
 
+  const refreshOrganizationHunts = async (
+    identity: PlayerIdentity,
+  ): Promise<void> => {
+    const result = await organizationRequest<OrganizationHuntSummary[]>(
+      identity,
+      "/api/player/account/organization-hunts",
+    );
+    if (identity.accountId !== activeIdentity?.accountId) return;
+    if (!result.ok) {
+      organizationDiscovery.hidden = false;
+      organizationHuntsStatus.textContent = result.message;
+      organizationHuntsList.replaceChildren();
+      return;
+    }
+    organizationHuntsList.replaceChildren();
+    organizationDiscovery.hidden = result.value.length === 0;
+    organizationHuntsStatus.textContent = result.value.length
+      ? "Choose a Hunt to add it to your dashboard."
+      : "";
+    for (const hunt of result.value) {
+      const item = document.createElement("li");
+      item.className = "organization-hunt-card";
+      const copy = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = hunt.name;
+      const description = document.createElement("p");
+      description.textContent = hunt.description;
+      const organization = document.createElement("p");
+      organization.className = "field-help";
+      organization.textContent = `${hunt.organizationName} · ${hunt.role}`;
+      copy.append(title, description, organization);
+      const join = document.createElement("button");
+      join.type = "button";
+      join.textContent = "Join Hunt";
+      join.setAttribute("aria-label", `Join ${hunt.name}`);
+      join.addEventListener("click", async () => {
+        join.disabled = true;
+        organizationHuntsStatus.textContent = `Joining ${hunt.name}…`;
+        const joined = await organizationRequest<{ huntId: string }>(
+          identity,
+          "/api/player/account/join",
+          { huntId: hunt.id },
+        );
+        if (!joined.ok) {
+          organizationHuntsStatus.textContent = joined.message;
+          join.disabled = false;
+          return;
+        }
+        organizationHuntsStatus.textContent = `${hunt.name} added to your Hunts.`;
+        await loadHunts(identity, currentNickname);
+      });
+      item.append(copy, join);
+      organizationHuntsList.append(item);
+    }
+  };
+
   const renderCategories = (force = false): void => {
     const now = Date.now();
     const groups: Record<HuntPhase, PlayerHunt[]> = {
@@ -1147,6 +1216,7 @@ export function mountDisplayTasks(
     }
     displayedHunts = result.value;
     renderCategories(true);
+    void refreshOrganizationHunts(signedIn);
     status.hidden = result.value.length > 0;
     status.textContent = result.value.length
       ? ""

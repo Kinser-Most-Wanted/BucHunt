@@ -108,6 +108,31 @@ test("JSON survives fresh storage instances; concurrent updates preserve every t
   }
 });
 
+test("organization IDs persist on hunts and legacy names migrate only when uniquely resolved", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "buchunt-org-link-"));
+  try {
+    const store = new HuntStore(join(directory, "hunts.json"));
+    const legacy = await store.create(
+      { ...input, organizationName: "Computing" },
+      "owner",
+    );
+    const organizationId = "123e4567-e89b-12d3-a456-426614174000";
+    expect(
+      await store.migrateLegacyOrganizationIds(async (name) =>
+        name === "Computing" ? organizationId : undefined,
+      ),
+    ).toBe(1);
+    const linked = await new HuntStore(join(directory, "hunts.json")).get(
+      legacy.id,
+    );
+    expect(linked.organizationId).toBe(organizationId);
+    await store.updateSettings(legacy.id, { organizationId: null });
+    expect((await store.get(legacy.id)).organizationId).toBeNull();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("multiple-choice answers persist rejected choices per account and complete only on the configured answer", async () => {
   const directory = await mkdtemp(join(tmpdir(), "buchunt-multiple-"));
   const store = new HuntStore(join(directory, "hunts.json"));

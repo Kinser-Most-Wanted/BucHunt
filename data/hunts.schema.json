@@ -232,6 +232,10 @@
           "type": "string",
           "maxLength": 120
         },
+        "organizationId": {
+          "type": ["string", "null"],
+          "pattern": "^[a-fA-F0-9-]{36}$"
+        },
         "maxParticipants": {
           "type": ["integer", "null"],
           "minimum": 1

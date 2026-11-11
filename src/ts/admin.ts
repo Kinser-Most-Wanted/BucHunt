@@ -1,3 +1,8 @@
+import {
+  mountOrganizationManager,
+  storedPlayerIdentity,
+} from "./features/organizationManager.js";
+
 interface GoogleIdentity {
   accounts: {
     id: {
@@ -78,6 +83,7 @@ const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let google: GoogleIdentity | undefined;
+let organizationManager: ReturnType<typeof mountOrganizationManager>;
 let verifiedCredential: string | undefined;
 function warmGoogleSignIn() {
   return Promise.allSettled([loadGoogle(), request("/api/auth/config")]);
@@ -269,6 +275,7 @@ function setAccountMenu(user: {
   }
 }
 function signedOut(message: string): void {
+  organizationManager?.setIdentity(null);
   clearTimeout(expiryTimer);
   clearPlayerSession();
   if (loginPanel) loginPanel.hidden = false;
@@ -459,6 +466,14 @@ async function showSession(): Promise<void> {
   }
   if (isAdminPage && isAdministrator) await foundationFeaturesReady;
   if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
+  if (isAdminPage && isAdministrator) {
+    organizationManager ??= mountOrganizationManager(
+      document,
+      () => document.dispatchEvent(new Event("buchunt:organizations-changed")),
+      false,
+    );
+    organizationManager?.setIdentity(storedPlayerIdentity());
+  } else if (isAdminPage) organizationManager?.setIdentity(null);
   if (adminDenied) adminDenied.hidden = isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;
   statusText.textContent = isAdministrator

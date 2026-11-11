@@ -6,6 +6,7 @@ import type {
   ParticipantAction,
   PlayerHunt,
   TaskDefinition,
+  OrganizationHuntSummary,
 } from "../foundation/types.js";
 import {
   createServer,
@@ -163,6 +164,44 @@ export function createApplication(options: ServerOptions = {}) {
   const organizations = new OrganizationStore(
     resolve(directory, "organizations.json"),
   );
+  async function migrateLegacyOrganizationLinks(): Promise<void> {
+    await hunts.migrateLegacyOrganizationIds((name) =>
+      organizations.uniqueIdForName(name),
+    );
+  }
+  async function organizationIdForHunt(
+    hunt: Pick<HuntDefinition, "id" | "organizationId" | "organizationName">,
+  ): Promise<string | undefined> {
+    if (hunt.organizationId) return hunt.organizationId;
+    if (!hunt.organizationName) return undefined;
+    const id = await organizations.uniqueIdForName(hunt.organizationName);
+    if (id) await hunts.updateSettings(hunt.id, { organizationId: id });
+    return id;
+  }
+  async function roleForHunt(
+    hunt: Pick<
+      HuntDefinition,
+      "id" | "ownerId" | "organizationId" | "organizationName"
+    >,
+    accountId: string,
+  ) {
+    const organizationId = await organizationIdForHunt(hunt);
+    return organizationId
+      ? organizations.roleForOrganization(organizationId, accountId)
+      : contributors.roleFor(hunt.id, accountId, hunt.ownerId);
+  }
+  async function canAccessOrganizationHunt(
+    hunt: Pick<HuntDefinition, "id" | "organizationId" | "organizationName">,
+    accountId: string,
+  ): Promise<boolean> {
+    const organizationId = await organizationIdForHunt(hunt);
+    return (
+      !organizationId ||
+      Boolean(
+        await organizations.roleForOrganization(organizationId, accountId),
+      )
+    );
+  }
   async function contributorEntries(huntId: string, ownerId: string) {
     const ownerProfile = await accountProfiles.get(ownerId);
     const entries = await contributors.entries(
@@ -280,7 +319,11 @@ export function createApplication(options: ServerOptions = {}) {
         id: hunt.id,
         name: hunt.name,
         description: hunt.description,
-        organizationName: hunt.organizationName,
+        organizationId: hunt.organizationId,
+        organizationName: hunt.organizationId
+          ? ((await organizations.organizationNameById(hunt.organizationId)) ??
+            hunt.organizationName)
+          : hunt.organizationName,
         huntType: "kahoot",
         beginsAt: hunt.beginsAt,
         endsAt: hunt.endsAt,
@@ -368,6 +411,8 @@ export function createApplication(options: ServerOptions = {}) {
         }
         const organizationCollection =
           path === "/api/player/account/organizations";
+        const organizationHuntsRoute =
+          path === "/api/player/account/organization-hunts";
         const organizationInvitationCollection =
           path === "/api/player/account/organization-invitations";
         const organizationInvitationRoute =
@@ -380,12 +425,13 @@ export function createApplication(options: ServerOptions = {}) {
           );
         if (
           organizationCollection ||
+          organizationHuntsRoute ||
           organizationRoute ||
           organizationInvitationCollection ||
           organizationInvitationRoute
         ) {
           const accountIdentity = await googleCreator(request);
-          if (!accountIdentity) {
+          if (!accountIdentity || accountIdentity.id !== player) {
             json(response, 401, {
               ok: false,
               code: "unauthorized",
@@ -406,14 +452,16 @@ export function createApplication(options: ServerOptions = {}) {
               input && typeof input === "object"
                 ? (input as Record<string, unknown>).action
                 : undefined;
+            const result = await organizations.respondToInvitation(
+              organizationInvitationRoute[1],
+              accountIdentity.id,
+              accountIdentity.email,
+              action,
+            );
+            if (result.accepted) await migrateLegacyOrganizationLinks();
             json(response, 200, {
               ok: true,
-              value: await organizations.respondToInvitation(
-                organizationInvitationRoute[1],
-                accountIdentity.id,
-                accountIdentity.email,
-                action,
-              ),
+              value: result,
             });
             return;
           }
@@ -425,14 +473,54 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (organizationCollection && method === "POST") {
+            const created = await organizations.create(
+              accountIdentity.id,
+              accountIdentity.email,
+              await body(request),
+            );
+            await migrateLegacyOrganizationLinks();
             json(response, 201, {
               ok: true,
-              value: await organizations.create(
-                accountIdentity.id,
-                accountIdentity.email,
-                await body(request),
-              ),
+              value: created,
             });
+            return;
+          }
+          if (organizationHuntsRoute && method === "GET") {
+            await migrateLegacyOrganizationLinks();
+            const memberships = await organizations.listForAccount(
+              accountIdentity.id,
+            );
+            const joined = new Set(
+              await accountProgress.huntsWithProgress(accountIdentity.id),
+            );
+            const definitions = await hunts.list();
+            const value: OrganizationHuntSummary[] = definitions.flatMap(
+              (hunt) => {
+                const organizationId = hunt.organizationId;
+                const member = memberships.find(
+                  (organization) => organization.id === organizationId,
+                );
+                return organizationId &&
+                  member &&
+                  !joined.has(hunt.id) &&
+                  isHuntJoinable(hunt)
+                  ? [
+                      {
+                        id: hunt.id,
+                        name: hunt.name,
+                        description: hunt.description,
+                        organizationId,
+                        organizationName: member.name,
+                        role: member.role,
+                        beginsAt: hunt.beginsAt,
+                        endsAt: hunt.endsAt,
+                        status: hunt.status,
+                      },
+                    ]
+                  : [];
+              },
+            );
+            json(response, 200, { ok: true, value });
             return;
           }
           if (
@@ -512,19 +600,34 @@ export function createApplication(options: ServerOptions = {}) {
         }
         if (path === "/api/player/account/join" && method === "POST") {
           const input = await body(request);
-          const code =
+          const fields =
             input && typeof input === "object"
-              ? (input as Record<string, unknown>).accessCode
-              : undefined;
+              ? (input as Record<string, unknown>)
+              : {};
+          const code = fields.accessCode;
+          const requestedHuntId =
+            typeof fields.huntId === "string" ? fields.huntId : "";
           const normalized =
             typeof code === "string" ? code.trim().toUpperCase() : "";
-          const hunt = /^[A-F0-9]{8}$/.test(normalized)
-            ? await hunts.findByAccessCode(normalized)
-            : undefined;
+          const hunt = requestedHuntId
+            ? await hunts.get(requestedHuntId)
+            : /^[A-F0-9]{8}$/.test(normalized)
+              ? await hunts.findByAccessCode(normalized)
+              : undefined;
           if (!hunt || !isHuntJoinable(hunt))
             throw new StoreError(
               "validation",
               "Invalid access code. The hunt may be unavailable.",
+            );
+          if (requestedHuntId && !hunt.organizationId)
+            throw new StoreError(
+              "validation",
+              "Use the hunt access code to join this hunt.",
+            );
+          if (!(await canAccessOrganizationHunt(hunt, player)))
+            throw new StoreError(
+              "forbidden",
+              "Join this organization before joining its hunts.",
             );
           await serializeAdmission(hunt.id, async () => {
             const current = await hunts.get(hunt.id);
@@ -554,14 +657,19 @@ export function createApplication(options: ServerOptions = {}) {
           const definitions = await hunts.list();
           // Read every hunt with saved progress before returning; storage failures must not
           // masquerade as an empty list or reset incomplete/completed states.
-          const available = definitions.filter((hunt) =>
-            savedHunts.includes(hunt.id),
-          );
-          if (available.length !== savedHunts.length)
-            throw new StoreError(
-              "storage",
-              "A hunt with saved progress could not be restored. Contact the hunt creator.",
+          const available: HuntDefinition[] = [];
+          for (const savedHuntId of savedHunts) {
+            const hunt = definitions.find(
+              (definition) => definition.id === savedHuntId,
             );
+            if (!hunt)
+              throw new StoreError(
+                "storage",
+                "A hunt with saved progress could not be restored. Contact the hunt creator.",
+              );
+            if (await canAccessOrganizationHunt(hunt, player))
+              available.push(hunt);
+          }
           json(response, 200, {
             ok: true,
             value: await Promise.all(
@@ -576,6 +684,11 @@ export function createApplication(options: ServerOptions = {}) {
           );
         if (issueMatch) {
           const hunt = await hunts.get(issueMatch[1]);
+          if (!(await canAccessOrganizationHunt(hunt, player)))
+            throw new StoreError(
+              "forbidden",
+              "Join this organization to access its hunts.",
+            );
           if (
             !(await accountProgress.huntsWithProgress(player)).includes(hunt.id)
           )
@@ -613,6 +726,11 @@ export function createApplication(options: ServerOptions = {}) {
           );
         if (accountMatch) {
           const hunt = await hunts.get(accountMatch[1]);
+          if (!(await canAccessOrganizationHunt(hunt, player)))
+            throw new StoreError(
+              "forbidden",
+              "Join this organization to access its hunts.",
+            );
           if (
             !(await accountProgress.huntsWithProgress(player)).includes(hunt.id)
           ) {
@@ -799,24 +917,46 @@ export function createApplication(options: ServerOptions = {}) {
         }
         if (path === "/api/admin/hunts" && method === "POST") {
           const input = await body(request);
-          const organizationName =
-            input && typeof input === "object"
-              ? (input as Record<string, unknown>).organizationName
-              : undefined;
-          if (
-            typeof organizationName === "string" &&
-            organizationName.trim() &&
-            (!account ||
-              !(await organizations.isMemberOfName(
-                creatorId,
-                account.email,
-                organizationName,
-              )))
-          )
-            throw new StoreError(
-              "forbidden",
-              "Choose an organization you belong to.",
-            );
+          if (input && typeof input === "object") {
+            const fields = input as Record<string, unknown>;
+            let organizationId = fields.organizationId;
+            if (
+              (organizationId === undefined || organizationId === null) &&
+              typeof fields.organizationName === "string" &&
+              fields.organizationName.trim()
+            ) {
+              organizationId = await organizations.uniqueIdForName(
+                fields.organizationName,
+              );
+              if (!organizationId)
+                throw new StoreError(
+                  "forbidden",
+                  "Choose an organization you belong to.",
+                );
+              fields.organizationId = organizationId;
+            }
+            if (typeof organizationId === "string" && organizationId) {
+              const role = account
+                ? await organizations.roleForOrganization(
+                    organizationId,
+                    account.id,
+                  )
+                : undefined;
+              if (role !== "owner" && role !== "officer")
+                throw new StoreError(
+                  "forbidden",
+                  "Only Organization Owners and Officers can create organization hunts.",
+                );
+              fields.organizationName =
+                (await organizations.organizationNameById(organizationId)) ??
+                "";
+            } else if (organizationId) {
+              throw new StoreError(
+                "validation",
+                "Choose a valid organization.",
+              );
+            }
+          }
           json(response, 201, {
             ok: true,
             value: await hunts.create(input, creatorId),
@@ -824,15 +964,12 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         if (path === "/api/admin/hunts" && method === "GET") {
+          await migrateLegacyOrganizationLinks();
           const summaries = await hunts.listSummaries();
           const accessible = await Promise.all(
             summaries.map(async (hunt) => ({
               hunt,
-              role: await contributors.roleFor(
-                hunt.id,
-                creatorId,
-                hunt.ownerId,
-              ),
+              role: await roleForHunt(hunt, creatorId),
             })),
           );
           json(response, 200, {
@@ -843,6 +980,8 @@ export function createApplication(options: ServerOptions = {}) {
                 id: hunt.id,
                 name: hunt.name,
                 role,
+                organizationId: hunt.organizationId,
+                organizationName: hunt.organizationName,
                 createdAt: hunt.createdAt,
                 updatedAt: hunt.updatedAt,
               })),
@@ -854,11 +993,7 @@ export function createApplication(options: ServerOptions = {}) {
         );
         if (gameMatch) {
           const hunt = await hunts.get(gameMatch[1]);
-          const role = await contributors.roleFor(
-            hunt.id,
-            creatorId,
-            hunt.ownerId,
-          );
+          const role = await roleForHunt(hunt, creatorId);
           if (role !== "owner" && role !== "officer")
             throw new StoreError(
               "forbidden",
@@ -906,11 +1041,7 @@ export function createApplication(options: ServerOptions = {}) {
           );
         if (issueAdminMatch) {
           const hunt = await hunts.get(issueAdminMatch[1]);
-          const role = await contributors.roleFor(
-            hunt.id,
-            creatorId,
-            hunt.ownerId,
-          );
+          const role = await roleForHunt(hunt, creatorId);
           if (role !== "owner" && role !== "officer")
             throw new StoreError(
               "forbidden",
@@ -973,11 +1104,7 @@ export function createApplication(options: ServerOptions = {}) {
               participantMatch?.[1] ??
               participantActionMatch![1],
           );
-          const requesterRole = await contributors.roleFor(
-            hunt.id,
-            creatorId,
-            hunt.ownerId,
-          );
+          const requesterRole = await roleForHunt(hunt, creatorId);
           if (!requesterRole) {
             json(response, 403, {
               ok: false,
@@ -1313,25 +1440,58 @@ export function createApplication(options: ServerOptions = {}) {
               ok: true,
               value: await (async () => {
                 const input = await body(request);
-                const organizationName =
-                  input && typeof input === "object"
-                    ? (input as Record<string, unknown>).organizationName
-                    : undefined;
                 if (
-                  typeof organizationName === "string" &&
-                  organizationName.trim() &&
-                  organizationName.trim() !== hunt.organizationName &&
-                  (!account ||
-                    !(await organizations.isMemberOfName(
-                      creatorId,
-                      account.email,
-                      organizationName,
-                    )))
-                )
-                  throw new StoreError(
-                    "forbidden",
-                    "Choose an organization you belong to.",
-                  );
+                  input &&
+                  typeof input === "object" &&
+                  Object.hasOwn(input, "organizationId")
+                ) {
+                  if (requesterRole !== "owner")
+                    throw new StoreError(
+                      "forbidden",
+                      "Only hunt Owners can assign an organization.",
+                    );
+                  const fields = input as Record<string, unknown>;
+                  let organizationId = fields.organizationId;
+                  if (
+                    (organizationId === undefined || organizationId === null) &&
+                    typeof fields.organizationName === "string" &&
+                    fields.organizationName.trim()
+                  ) {
+                    organizationId = await organizations.uniqueIdForName(
+                      fields.organizationName,
+                    );
+                    if (!organizationId)
+                      throw new StoreError(
+                        "forbidden",
+                        "Choose an organization you belong to.",
+                      );
+                    fields.organizationId = organizationId;
+                  }
+                  if (organizationId === null || organizationId === "") {
+                    fields.organizationId = null;
+                    fields.organizationName = "";
+                  } else {
+                    if (!account || typeof organizationId !== "string")
+                      throw new StoreError(
+                        "forbidden",
+                        "Sign in with Google to assign an organization.",
+                      );
+                    const role = await organizations.roleForOrganization(
+                      organizationId,
+                      account.id,
+                    );
+                    if (role !== "owner" && role !== "officer")
+                      throw new StoreError(
+                        "forbidden",
+                        "Only Organization Owners and Officers can assign this organization.",
+                      );
+                    fields.organizationName =
+                      (await organizations.organizationNameById(
+                        organizationId,
+                      )) ?? "";
+                    await contributors.removeHunt(hunt.id);
+                  }
+                }
                 return serializeAdmission(hunt.id, () =>
                   hunts.updateSettings(hunt.id, input),
                 );
@@ -1384,6 +1544,11 @@ export function createApplication(options: ServerOptions = {}) {
             return;
           }
           if (match && match[2] === "contributors") {
+            if (await organizationIdForHunt(hunt))
+              throw new StoreError(
+                "forbidden",
+                "Organization membership manages access to this hunt.",
+              );
             if (!canManage) {
               json(response, 403, {
                 ok: false,

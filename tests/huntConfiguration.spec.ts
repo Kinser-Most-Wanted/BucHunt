@@ -504,13 +504,25 @@ test("create hunt organization selector lists current memberships", async ({
 }) => {
   await installMapMock(page.context());
   await installAdminSession(page);
-  await page.route("**/api/admin/organizations", (route) =>
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "google-admin-123",
+        email: "admin@example.com",
+        idToken: "test-google-token",
+      }),
+    );
+  });
+  const organizationId = "123e4567-e89b-12d3-a456-426614174000";
+  await page.route("**/api/player/account/organizations", (route) =>
     route.fulfill({
       json: {
         ok: true,
         value: [
           {
-            id: "organization-1",
+            id: organizationId,
             name: "Campus Explorers",
             role: "owner",
             createdAt: "2026-10-15T00:00:00.000Z",
@@ -526,8 +538,8 @@ test("create hunt organization selector lists current memberships", async ({
   const createOrganization = page.getByTestId("hunt-organization");
   await expect(createOrganization).toHaveValue("");
   await expect(createOrganization).toContainText("Campus Explorers (owner)");
-  await createOrganization.selectOption("Campus Explorers");
-  await expect(createOrganization).toHaveValue("Campus Explorers");
+  await createOrganization.selectOption(organizationId);
+  await expect(createOrganization).toHaveValue(organizationId);
 });
 
 test("create hunt, save task and reload configuration", async ({ page }) => {

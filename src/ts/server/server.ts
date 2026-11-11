@@ -920,7 +920,7 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         const organizationHuntsMatch =
-          /^\\/api\\/admin\\/organizations\\/([a-f0-9-]{36})\\/hunts$/.exec(
+          /^\/api\/admin\/organizations\/([a-f0-9-]{36})\/hunts$/.exec(
             path,
           );
         if (organizationHuntsMatch && method === "GET") {

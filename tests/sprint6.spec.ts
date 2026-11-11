@@ -547,6 +547,16 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
       "one",
       { action: "accept" },
     );
+    await f.api(
+      `/api/player/account/organizations/${computing.id}/members`,
+      "owner",
+      { email: "two@example.com" },
+    );
+    await f.api(
+      `/api/player/account/organization-invitations/${computing.id}`,
+      "two",
+      { action: "accept" },
+    );
     const organizationHunt = await f.api("/api/admin/hunts", "owner", {
       name: "Organization discovery",
       description: "A taskless hunt shared by the organization",

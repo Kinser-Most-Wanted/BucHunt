@@ -347,7 +347,11 @@ export function createApplication(options: ServerOptions = {}) {
     return {
       id: hunt.id,
       name: hunt.name,
-      organizationName: hunt.organizationName,
+      organizationId: hunt.organizationId,
+      organizationName: hunt.organizationId
+        ? ((await organizations.organizationNameById(hunt.organizationId)) ??
+          hunt.organizationName)
+        : hunt.organizationName,
       huntType: hunt.huntType,
       description: hunt.description,
       beginsAt: hunt.beginsAt,
@@ -1443,7 +1447,12 @@ export function createApplication(options: ServerOptions = {}) {
                 if (
                   input &&
                   typeof input === "object" &&
-                  Object.hasOwn(input, "organizationId")
+                  (Object.hasOwn(input, "organizationId") ||
+                    (typeof (input as Record<string, unknown>)
+                      .organizationName === "string" &&
+                      Boolean(
+                        (input as Record<string, unknown>).organizationName,
+                      )))
                 ) {
                   if (requesterRole !== "owner")
                     throw new StoreError(
@@ -1830,12 +1839,3 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const host = process.env.HOST ?? "127.0.0.1";
-  const app = createApplication({
-    dataDirectory: process.env.DATA_DIRECTORY,
-    originToken: process.env.ORIGIN_TOKEN,
-    googleClientId: process.env.GOOGLE_CLIENT_ID,
-  });
-  app.listen(Number(process.env.PORT ?? 3000), host, () =>
-    console.log("BucHunt server ready"),
-  );
-}

@@ -1969,11 +1969,11 @@ export function mountDisplayTasks(
         'details.player-account-menu, [data-testid="player-account-menu"]',
       )
       ?.closest("details");
-  
+
     if (!playerDetails || !playerDetails.hasAttribute("open")) {
       return;
     }
-  
+
     if (!playerDetails.contains(target)) {
       playerDetails.removeAttribute("open");
     }

@@ -1,5 +1,5 @@
 import type { HuntRepository } from "../foundation/contracts.js";
-import type { HuntRole, OrganizationDefinition } from "../foundation/types.js";
+import type { HuntRole } from "../foundation/types.js";
 import { getCreatorSession, request } from "./huntRepository.js";
 import { openHuntDetails } from "./huntDetails.js";
 import { populateOrganizationSelect } from "./organizationManager.js";
@@ -146,35 +146,7 @@ export function mountCreateHunt(
 
   async function loadOrganizationOptions(): Promise<void> {
     if (!organizationSelect) return;
-    const currentValue = organizationSelect.value;
-    const result = await request<OrganizationDefinition[]>(
-      "/api/admin/organizations",
-    );
-    const options = document.createDocumentFragment();
-    const none = document.createElement("option");
-    none.value = "";
-    none.textContent = "No organization";
-    options.append(none);
-    if (result.ok)
-      for (const organization of result.value) {
-        const option = document.createElement("option");
-        option.value = organization.name;
-        option.textContent = `${organization.name} (${organization.role})`;
-        options.append(option);
-      }
-    if (
-      currentValue &&
-      !Array.from(options.querySelectorAll("option")).some(
-        (option) => option.value === currentValue,
-      )
-    ) {
-      const legacy = document.createElement("option");
-      legacy.value = currentValue;
-      legacy.textContent = currentValue;
-      options.append(legacy);
-    }
-    organizationSelect.replaceChildren(options);
-    organizationSelect.value = currentValue;
+    await populateOrganizationSelect(organizationSelect);
   }
 
   function populateHuntSelector(): void {

@@ -654,3 +654,41 @@ test("#140 browser players synchronize, reconnect, lock submissions, and finish 
       "Answer submitted",
     );
     await expect(
+      players[0].getByTestId("kahoot-player").getByLabel("Your answer"),
+    ).toHaveCount(0);
+    await players[1]
+      .getByTestId("kahoot-player")
+      .getByLabel("Your answer")
+      .fill("wrong");
+    await players[1]
+      .getByTestId("kahoot-player")
+      .getByRole("button", { name: "Submit answer" })
+      .click();
+    await expect(
+      host.getByRole("button", { name: "Next question", exact: true }),
+    ).toBeVisible();
+    await host
+      .getByRole("button", { name: "Next question", exact: true })
+      .click();
+    for (const page of players)
+      await expect(
+        page
+          .getByTestId("kahoot-player")
+          .getByRole("heading", { name: "Library", exact: true }),
+      ).toBeVisible();
+    await host
+      .getByRole("button", { name: "End question", exact: true })
+      .click();
+    for (const page of players)
+      await expect(page.getByTestId("kahoot-player")).toContainText(
+        "Hunt complete!",
+      );
+    await admin.screenshot({
+      path: "/tmp/buchunt-kahoot-host.png",
+      fullPage: true,
+    });
+  } finally {
+    for (const context of contexts) await context.close();
+    await f.close();
+  }
+});

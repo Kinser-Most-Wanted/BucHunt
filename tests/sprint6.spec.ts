@@ -128,6 +128,27 @@ test("organization membership governs organization hunt access and migration", a
     );
     const linked = await f.hunts.get(f.hunt.id);
     expect(linked.organizationId).toBe(organizationId);
+    const organizationHunts = await f.api(
+      `/api/admin/organizations/${organizationId}/hunts`,
+      "member",
+    );
+    expect(organizationHunts.status).toBe(200);
+    expect(organizationHunts.data.value).toContainEqual(
+      expect.objectContaining({
+        id: f.hunt.id,
+        organizationId,
+        organizationName: "ETSU",
+        role: "contributor",
+      }),
+    );
+    expect(
+      (
+        await f.api(
+          `/api/admin/organizations/${organizationId}/hunts`,
+          "outsider",
+        )
+      ).status,
+    ).toBe(403);
     expect(
       (await f.api("/api/player/account/organization-hunts", "member")).data
         .value,
@@ -592,6 +613,28 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await expect(player.getByTestId("player-hunt-facts")).toContainText(
       "Computing",
     );
+    await f.api(
+      `/api/player/account/hunts/${f.hunt.id}/tasks/${f.first.id}/answer`,
+      "one",
+      { answer: "Bucky" },
+    );
+    await admin.getByTestId("close-hunt-details").click();
+    await admin.getByTestId("open-organizations").click();
+    const organizationDialog = admin.getByTestId("organization-dialog");
+    const organizationHuntList = organizationDialog.getByTestId(
+      "organization-hunts-list",
+    );
+    await expect(organizationHuntList).toContainText("Sprint Six");
+    await organizationHuntList
+      .getByRole("button", {
+        name: "View progress for Sprint Six",
+        exact: true,
+      })
+      .click();
+    await expect(admin.getByTestId("participant-active-count")).toHaveText("1");
+    const progress = admin.getByTestId("participant-progress-list");
+    await expect(progress).toContainText("Mascot");
+    await expect(progress).toContainText("Completed");
     await player.screenshot({
       path: "/tmp/buchunt-traditional-player.png",
       fullPage: true,

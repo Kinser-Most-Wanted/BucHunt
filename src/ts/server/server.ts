@@ -919,6 +919,48 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const organizationHuntsMatch =
+          /^\/api\/admin\/organizations\/([a-f0-9-]{36})\/hunts$/.exec(path);
+        if (organizationHuntsMatch && method === "GET") {
+          if (!account) {
+            json(response, 401, {
+              ok: false,
+              code: "unauthorized",
+              message: "Sign in with Google to view organization hunts.",
+            });
+            return;
+          }
+          await migrateLegacyOrganizationLinks();
+          const organization = (
+            await organizations.listForAccount(account.id)
+          ).find((entry) => entry.id === organizationHuntsMatch[1]);
+          if (!organization) {
+            json(response, 403, {
+              ok: false,
+              code: "forbidden",
+              message: "You do not have access to this organization.",
+            });
+            return;
+          }
+          const value: OrganizationHuntSummary[] = (await hunts.list())
+            .filter((hunt) => hunt.organizationId === organization.id)
+            .sort((left, right) =>
+              right.updatedAt.localeCompare(left.updatedAt),
+            )
+            .map((hunt) => ({
+              id: hunt.id,
+              name: hunt.name,
+              description: hunt.description,
+              organizationId: organization.id,
+              organizationName: organization.name,
+              role: organization.role,
+              beginsAt: hunt.beginsAt,
+              endsAt: hunt.endsAt,
+              status: hunt.status,
+            }));
+          json(response, 200, { ok: true, value });
+          return;
+        }
         if (path === "/api/admin/hunts" && method === "POST") {
           const input = await body(request);
           if (input && typeof input === "object") {

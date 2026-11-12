@@ -4630,3 +4630,113 @@ body[data-page="admin"]
     flex-direction: column;
   }
 }
+
+.organization-hunts-panel {
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  margin-top: 1.25rem;
+  padding-top: 1.15rem;
+}
+
+.organization-hunts-heading {
+  margin-bottom: 0.8rem;
+}
+
+.organization-hunts-heading h3 {
+  margin: 0;
+}
+
+.organization-hunts-heading p:not(.eyebrow) {
+  color: var(--muted, #aab7c8);
+  margin: 0.4rem 0 0;
+}
+
+.organization-hunts-list {
+  display: grid;
+  gap: 0.7rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.organization-monitor-hunt-card {
+  align-items: center;
+  background: linear-gradient(135deg, rgb(21 52 93 / 76%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.8rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+}
+
+.organization-monitor-hunt-copy {
+  min-width: 0;
+}
+
+.organization-monitor-hunt-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.organization-monitor-hunt-heading h4 {
+  margin: 0;
+}
+
+.organization-monitor-hunt-copy p {
+  color: var(--muted, #aab7c8);
+  margin: 0.35rem 0 0;
+}
+
+.organization-monitor-hunt-meta {
+  font-size: 0.88rem;
+}
+
+.organization-monitor-hunt-status {
+  background: rgb(58 160 255 / 14%);
+  border: 1px solid rgb(58 160 255 / 30%);
+  border-radius: 999px;
+  color: #91caff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  text-transform: capitalize;
+}
+
+.organization-monitor-hunt-status.is-published {
+  background: rgb(66 196 126 / 13%);
+  border-color: rgb(66 196 126 / 30%);
+  color: #83e4ac;
+}
+
+.organization-monitor-hunt-status.is-archived {
+  background: rgb(255 255 255 / 7%);
+  border-color: rgb(255 255 255 / 14%);
+  color: #bdc8d6;
+}
+
+.organization-monitor-hunt-card > button {
+  background: var(--gold, #ffca28);
+  border: 0;
+  border-radius: 0.65rem;
+  color: #171717;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 700;
+  min-height: 2.65rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.organization-monitor-hunt-card > button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .organization-monitor-hunt-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

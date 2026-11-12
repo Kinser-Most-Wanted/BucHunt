@@ -4637,9 +4637,11 @@ body[data-page="admin"]
 }
 
 .organization-hunts-panel {
-  border-top: 1px solid rgb(255 255 255 / 12%);
+  background: linear-gradient(145deg, rgb(21 52 93 / 78%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.85rem;
   margin-top: 1.25rem;
-  padding-top: 1.15rem;
+  padding: 1rem;
 }
 
 .organization-hunts-heading {

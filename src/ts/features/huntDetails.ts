@@ -799,7 +799,7 @@ dialog
         "details.details-action-menu[open]",
       )
       .forEach((menu) => {
-        if (menu !== selectedMenu || action) menu.open = false;
+        if (menu !== selectedMenu) menu.open = false;
       });
   });
 

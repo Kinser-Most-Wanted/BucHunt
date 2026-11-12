@@ -21,8 +21,8 @@ importers:
         specifier: ^9.39.4
         version: 9.39.4
       "@playwright/test":
-        specifier: ^1.59.0
-        version: 1.59.0
+        specifier: ^1.65.0
+        version: 1.65.0
       "@types/node":
         specifier: ^22.0.0
         version: 22.20.5
@@ -136,12 +136,12 @@ packages:
       }
     engines: { node: ">=18.18" }
 
-  "@playwright/test@1.59.0":
+  "@playwright/test@1.65.0":
     resolution:
       {
-        integrity: sha512-TOA5sTLd49rTDaZpYpvCQ9hGefHQq/OYOyCVnGqS2mjMfX+lGZv2iddIJd0I48cfxqSPttS9S3OuLKyylHcO1w==,
+        integrity: sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==,
       }
-    engines: { node: ">=18" }
+    engines: { node: ">=20" }
     hasBin: true
 
   "@types/estree@1.0.8":
@@ -1038,20 +1038,20 @@ packages:
       }
     engines: { node: ">=12" }
 
-  playwright-core@1.59.0:
+  playwright-core@1.65.0:
     resolution:
       {
-        integrity: sha512-PW/X/IoZ6BMUUy8rpwHEZ8Kc0IiLIkgKYGNFaMs5KmQhcfLILNx9yCQD0rnWeWfz1PNeqcFP1BsihQhDOBCwZw==,
+        integrity: sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA==,
       }
-    engines: { node: ">=18" }
+    engines: { node: ">=20" }
     hasBin: true
 
-  playwright@1.59.0:
+  playwright@1.65.0:
     resolution:
       {
-        integrity: sha512-wihGScriusvATUxmhfENxg0tj1vHEFeIwxlnPFKQTOQVd7aG08mUfvvniRP/PtQOC+2Bs52kBOC/Up1jTXeIbw==,
+        integrity: sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==,
       }
-    engines: { node: ">=18" }
+    engines: { node: ">=20" }
     hasBin: true
 
   prelude-ls@1.2.1:
@@ -1761,9 +1761,9 @@ snapshots:
 
   "@humanwhocodes/retry@0.4.3": {}
 
-  "@playwright/test@1.59.0":
+  "@playwright/test@1.65.0":
     dependencies:
-      playwright: 1.59.0
+      playwright: 1.65.0
 
   "@types/estree@1.0.8": {}
 
@@ -2267,13 +2267,11 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  playwright-core@1.59.0: {}
+  playwright-core@1.65.0: {}
 
-  playwright@1.59.0:
+  playwright@1.65.0:
     dependencies:
-      playwright-core: 1.59.0
-    optionalDependencies:
-      fsevents: 2.3.2
+      playwright-core: 1.65.0
 
   prelude-ls@1.2.1: {}
 

@@ -1960,4 +1960,22 @@ export function mountDisplayTasks(
       .catch(() => undefined)
       .finally(() => window.location.assign("./index.html"));
   });
+
+  // Implementation for closing the player account menu when clicking outside it.
+  document.addEventListener("click", (event: MouseEvent) => {
+    const target = event.target as Node;
+    const playerDetails = document
+      .querySelector(
+        'details.player-account-menu, [data-testid="player-account-menu"]',
+      )
+      ?.closest("details");
+
+    if (!playerDetails || !playerDetails.hasAttribute("open")) {
+      return;
+    }
+
+    if (!playerDetails.contains(target)) {
+      playerDetails.removeAttribute("open");
+    }
+  });
 }

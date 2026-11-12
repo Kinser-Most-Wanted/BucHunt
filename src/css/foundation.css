@@ -3318,6 +3318,8 @@ body[data-page="player"] .player-hunt-join-controls input {
   border-radius: 0.7rem;
   background: #071a33;
   color: #f8f9fb;
+  height: 50px;
+  line-height: 50px;
 }
 body[data-page="player"] .player-hunt-join-controls input::placeholder {
   color: #77879c;

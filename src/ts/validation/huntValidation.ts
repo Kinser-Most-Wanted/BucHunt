@@ -294,11 +294,12 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
     input.maxParticipants !== undefined &&
     input.maxParticipants !== null &&
     (!Number.isSafeInteger(input.maxParticipants) ||
-      Number(input.maxParticipants) < 1)
+      Number(input.maxParticipants) < 1 ||
+      Number(input.maxParticipants) > 200)
   )
     issues.push({
       field: "maxParticipants",
-      message: "Capacity must be a positive whole number or null.",
+      message: "Capacity must be a whole number from 1 to 200 or null.",
     });
   if (
     input.participationClosed !== undefined &&

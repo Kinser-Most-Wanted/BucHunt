@@ -783,6 +783,26 @@ dialog?.addEventListener("click", (event) => {
   if (event.target === dialog) dialog.close();
 });
 
+dialog
+  ?.querySelector<HTMLElement>(".details-actions")
+  ?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const summary = target.closest("summary");
+    const action = target.closest("button, a");
+    if (!summary && !action) return;
+    const selectedMenu = target.closest<HTMLDetailsElement>(
+      "details.details-action-menu",
+    );
+    dialog
+      ?.querySelectorAll<HTMLDetailsElement>(
+        "details.details-action-menu[open]",
+      )
+      .forEach((menu) => {
+        if (menu !== selectedMenu || action) menu.open = false;
+      });
+  });
+
 export async function openHuntDetails(
   huntId: string,
   role: HuntRole,

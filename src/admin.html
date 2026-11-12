@@ -343,12 +343,13 @@
                   <option value="kahoot">Kahoot Hunt</option>
                 </select>
                 <label for="hunt-capacity"
-                  >Maximum participants (optional)</label
+                  >Maximum participants (optional; up to 200)</label
                 ><input
                   id="hunt-capacity"
                   name="maxParticipants"
                   type="number"
                   min="1"
+                  max="200"
                   step="1"
                 />
                 <label for="hunt-organization">Organization</label
@@ -532,10 +533,11 @@
                 <option value="">No organization</option>
               </select>
               <label
-                >Maximum participants (blank for unlimited)<input
+                >Maximum participants (blank for unlimited, max 200)<input
                   name="maxParticipants"
                   type="number"
                   min="1"
+                  max="200"
                   step="1"
               /></label>
               <label

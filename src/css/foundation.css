@@ -4012,7 +4012,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 .player-hunt-details
   .task-location:has(.task-location-map:not([hidden]))
   > .task-location-toggle {
-  align-self: flex-end;
+  justify-self: end;
 }
 .player-hunt-details .task-location-map {
   height: clamp(16rem, 42vw, 23rem);

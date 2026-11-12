@@ -77,10 +77,10 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(leaveHuntButton).toBeVisible();
   await expect(submitIssueButton).toBeVisible();
   expect(
-    await leaveHuntButton.evaluate(
+    await submitIssueButton.evaluate(
       (button) =>
         button.parentElement?.matches("dialog.player-hunt-details") &&
-        button.nextElementSibling?.matches('[data-testid="submit-issue"]'),
+        button.nextElementSibling?.matches('[data-testid="leave-hunt"]'),
     ),
   ).toBe(true);
   await page.getByTestId("leave-hunt").click();

@@ -1562,6 +1562,8 @@ body[data-page="admin"] dialog.hunt-details-dialog button {
     background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease;
+  min-width: 0;
+  margin: 0;
 }
 body[data-page="admin"] dialog.hunt-details-dialog button:hover:not(:disabled) {
   filter: none;

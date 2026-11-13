@@ -507,6 +507,23 @@
               >
                 <option value="">No organization</option>
               </select>
+              <label for="hunt-settings-begins-at">Begins at (local time)</label>
+              <input
+                id="hunt-settings-begins-at"
+                name="beginsAt"
+                type="datetime-local"
+                required
+                data-testid="hunt-settings-begins-at"
+              />
+              <label for="hunt-settings-ends-at">
+                Ends at (optional, local time)
+              </label>
+              <input
+                id="hunt-settings-ends-at"
+                name="endsAt"
+                type="datetime-local"
+                data-testid="hunt-settings-ends-at"
+              />
               <label
                 >Maximum participants (blank for unlimited)<input
                   name="maxParticipants"

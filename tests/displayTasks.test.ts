@@ -781,7 +781,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   expect(closeButtonBounds).toEqual({
     insideLeft: true,
     insideRight: true,
-    insideTop: true,
+    insideTop: false,
     insideBottom: true,
   });
   await expect(closeButton).not.toBeInViewport();

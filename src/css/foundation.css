@@ -1556,6 +1556,9 @@ body[data-page="admin"] button:hover:not(:disabled),
 body[data-page="player"] button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-1px);
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
 }
 body[data-page="admin"] dialog.hunt-details-dialog button {
   transition:
@@ -2928,7 +2931,7 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
   max-width: none;
   max-height: min(88dvh, 58rem);
   margin: auto;
-  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem); 
+  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;

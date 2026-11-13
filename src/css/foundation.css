@@ -2928,7 +2928,7 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
   max-width: none;
   max-height: min(88dvh, 58rem);
   margin: auto;
-  padding: clamp(1rem, 3vw, 2rem);
+  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem); 
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -2951,12 +2951,11 @@ body[data-page="player"].player-hunt-modal-open {
   background: rgb(6 9 14 / 76%);
 }
 .player-hunt-details .hunt-details-dialog-heading {
-  position: sticky;
   top: 0;
   z-index: 6;
   display: flex;
   justify-content: flex-end;
-  height: 0;
+  height: auto;
   margin: 0;
   padding: 0;
   overflow: visible;
@@ -3760,7 +3759,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 .player-hunt-details .player-hunt-intro {
   position: relative;
   margin: 1rem 0 1.4rem;
-  padding: clamp(1.2rem, 3.4vw, 2rem);
+  padding: clamp(1rem, 2.4vw, 2rem);
   overflow: hidden;
   border: 1px solid rgb(100 181 246 / 27%);
   border-left: 0.35rem solid #ffc72c;

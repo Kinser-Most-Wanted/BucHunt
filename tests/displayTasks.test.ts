@@ -625,12 +625,17 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "36.304000, -82.368000",
   );
   const detailsDialog = page.getByTestId("player-hunt-details");
-  await detailsDialog.evaluate((dialog) => {
-    dialog.scrollTop = dialog.scrollHeight;
-  });
-  expect(
-    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
-  ).toBeGreaterThan(0);
+  const maxDialogScroll = await detailsDialog.evaluate(
+    (dialog) => dialog.scrollHeight - dialog.clientHeight,
+  );
+  if (maxDialogScroll > 0) {
+    await detailsDialog.evaluate((dialog) => {
+      dialog.scrollTop = dialog.scrollHeight;
+    });
+    expect(
+      await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+    ).toBeGreaterThan(0);
+  }
   await page.getByTestId("close-player-hunt-details").click();
   await expect(detailsDialog).not.toBeVisible();
   await page

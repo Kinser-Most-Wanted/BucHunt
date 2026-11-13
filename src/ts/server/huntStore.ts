@@ -249,6 +249,8 @@ export class HuntStore {
     inputFields(fields, [
       "organizationName",
       "organizationId",
+      "beginsAt",
+      "endsAt",
       "maxParticipants",
       "participationClosed",
     ]);

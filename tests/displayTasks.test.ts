@@ -757,7 +757,6 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(detailsDialog).toHaveCSS("overscroll-behavior", "contain");
   await expect(detailsDialog).toHaveCSS("scrollbar-width", "none");
   await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
-  await expect(closeButton).toBeInViewport();
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });

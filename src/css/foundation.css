@@ -2928,7 +2928,7 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
   max-width: none;
   max-height: min(88dvh, 58rem);
   margin: auto;
-  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem); 
+  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;

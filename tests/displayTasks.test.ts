@@ -739,7 +739,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const huntStatus = page.getByTestId("player-hunt-lookup-status");
   await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(
     "position",
-    "sticky",
+    "static",
   );
   await expect(closeButton).toHaveCSS("position", "relative");
   expect(
@@ -757,6 +757,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(detailsDialog).toHaveCSS("overscroll-behavior", "contain");
   await expect(detailsDialog).toHaveCSS("scrollbar-width", "none");
   await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
+  await expect(closeButton).toBeInViewport();
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });
@@ -779,7 +780,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     insideTop: true,
     insideBottom: true,
   });
-  await expect(closeButton).toBeInViewport();
+  await expect(closeButton).not.toBeInViewport();
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");

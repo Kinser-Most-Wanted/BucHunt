@@ -400,7 +400,9 @@ function toDateTimeLocalInput(value: string | null): string {
   return localDate.toISOString().slice(0, 16);
 }
 
-function fromDateTimeLocalInput(value: FormDataEntryValue | null): string | null {
+function fromDateTimeLocalInput(
+  value: FormDataEntryValue | null,
+): string | null {
   const localValue = String(value ?? "").trim();
   if (!localValue) return null;
   const date = new Date(localValue);
@@ -600,7 +602,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
     (settings.elements.namedItem("endsAt") as HTMLInputElement).value =
       toDateTimeLocalInput(hunt.endsAt);
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
-      hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
+      hunt.maxParticipants == null ? "200" : String(hunt.maxParticipants);
     (
       settings.elements.namedItem("participationClosed") as HTMLInputElement
     ).checked = hunt.participationClosed ?? false;
@@ -615,9 +617,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       const updates: Record<string, unknown> = {
         beginsAt: fromDateTimeLocalInput(fields.get("beginsAt")),
         endsAt: fromDateTimeLocalInput(fields.get("endsAt")),
-        maxParticipants: String(fields.get("maxParticipants") ?? "").trim()
-          ? Number(fields.get("maxParticipants"))
-          : null,
+        maxParticipants: Number(fields.get("maxParticipants")) || 200,
         participationClosed: fields.has("participationClosed"),
       };
       if (role === "owner")
@@ -805,6 +805,26 @@ dialog
 dialog?.addEventListener("click", (event) => {
   if (event.target === dialog) dialog.close();
 });
+
+dialog
+  ?.querySelector<HTMLElement>(".details-actions")
+  ?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const summary = target.closest("summary");
+    const action = target.closest("button, a");
+    if (!summary && !action) return;
+    const selectedMenu = target.closest<HTMLDetailsElement>(
+      "details.details-action-menu",
+    );
+    dialog
+      ?.querySelectorAll<HTMLDetailsElement>(
+        "details.details-action-menu[open]",
+      )
+      .forEach((menu) => {
+        if (menu !== selectedMenu) menu.open = false;
+      });
+  });
 
 export async function openHuntDetails(
   huntId: string,

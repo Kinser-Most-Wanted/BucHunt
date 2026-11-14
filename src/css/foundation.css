@@ -2954,11 +2954,12 @@ body[data-page="player"].player-hunt-modal-open {
   background: rgb(6 9 14 / 76%);
 }
 .player-hunt-details .hunt-details-dialog-heading {
+  position: sticky;
   top: 0;
   z-index: 6;
   display: flex;
   justify-content: flex-end;
-  height: auto;
+  height: 0;
   margin: 0;
   padding: 0;
   overflow: visible;
@@ -4277,35 +4278,238 @@ body[data-page="admin"]
   display: grid;
   gap: 0.3rem;
 }
+.hunt-settings-form .hunt-settings-organization,
+.hunt-settings-form label:has(input[name="maxParticipants"]) {
+  color: #f4f5f9;
+  font-weight: 750;
+}
+.hunt-settings-form #hunt-settings-organization,
+.hunt-settings-form input[name="maxParticipants"] {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgb(255 199 44 / 30%);
+  border-radius: 0.7rem;
+  background: linear-gradient(145deg, #10294a, #071a33);
+  color: #f4f5f9;
+  font: inherit;
+}
+.hunt-settings-form #hunt-settings-organization:focus,
+.hunt-settings-form input[name="maxParticipants"]:focus {
+  outline: 2px solid #ffc72c;
+  outline-offset: 2px;
+}
+.hunt-settings-form .hunt-settings-lock {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgb(255 199 44 / 24%);
+  border-radius: 0.75rem;
+  background: rgb(255 199 44 / 8%);
+  color: #f4f5f9;
+  font-weight: 700;
+}
+.hunt-settings-form .hunt-settings-lock input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #ffc72c;
+}
 .hunt-issue-dialog {
   width: min(92vw, 40rem);
   max-height: 85dvh;
   overflow: auto;
-  padding: 1.5rem;
+  padding: clamp(1.1rem, 3vw, 1.5rem);
+  border: 1px solid rgb(255 199 44 / 35%);
   border-radius: 1rem;
+  background:
+    radial-gradient(ellipse at 90% 5%, rgb(255 199 44 / 9%), transparent 22rem),
+    linear-gradient(145deg, #10294a, #0b203d);
+  box-shadow: 0 1.4rem 3.8rem rgb(0 0 0 / 35%);
+  color: #f4f5f9;
 }
 .hunt-issue-dialog::backdrop {
-  background: #0009;
+  background: rgb(2 8 14 / 78%);
+  backdrop-filter: blur(4px);
+}
+.hunt-issue-dialog-header {
+  display: flex;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.hunt-issue-dialog-header h2 {
+  margin: 0.2rem 0 0;
+  color: #fff;
+  font-size: clamp(1.35rem, 3vw, 1.7rem);
+}
+.hunt-issue-dialog .hunt-issue-dialog-close {
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 0.65rem;
+  background: rgb(255 255 255 / 6%);
+  color: #f4f5f9;
+  font-size: 1.45rem;
+  line-height: 1;
 }
 .hunt-issue-dialog form {
   display: grid;
   gap: 1rem;
+  margin: 0;
 }
 .hunt-issue-dialog label {
   display: grid;
   gap: 0.4rem;
+  color: #e7edf6;
+  font-weight: 700;
+}
+.hunt-issue-dialog select,
+.hunt-issue-dialog textarea {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0.7rem;
+  background: #071a33;
+  color: #f4f5f9;
+  font: inherit;
 }
 .hunt-issue-dialog textarea {
   min-height: 8rem;
+  resize: vertical;
 }
-.hunt-issue-dialog li {
-  padding-block: 0.75rem;
+.hunt-issue-dialog textarea::placeholder {
+  color: #9eacbf;
+}
+.hunt-issue-dialog .hunt-issue-form > button[type="submit"] {
+  width: 100%;
+  min-height: 3rem;
+  margin: 0;
+  border: 1px solid #ffc72c;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #ffc72c, #ffd45c);
+  color: #041e42;
+  font-weight: 800;
+}
+.hunt-issue-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hunt-issue-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 5%);
+}
+.hunt-issue-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.hunt-issue-card-state {
+  flex: 0 0 auto;
+  color: #aebbd0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.hunt-issue-card-state[data-resolved="true"] {
+  color: #86efac;
+}
+.hunt-issue-resolve {
+  min-height: 2.35rem;
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #ffc72c;
+  border-radius: 0.55rem;
+  background: rgb(255 199 44 / 10%);
+  color: #ffd45c;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hunt-issue-resolve:disabled {
+  cursor: default;
+}
+.hunt-issue-card-title {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #ffd45c;
+}
+.hunt-issue-card-description {
+  margin: 0;
+  color: #d8e6f5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.player-submit-issue {
-  display: block;
-  margin-top: 0.75rem;
+.hunt-issue-empty {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 0.75rem;
+  color: #b9c6d7;
+  text-align: center;
+}
+.hunt-issue-status {
+  min-height: 1.25rem;
+  margin: 0;
+  color: #b9c6d7;
+}
+.hunt-issue-toast {
+  position: fixed;
+  z-index: 10000;
+  inset-inline: 1rem;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  width: fit-content;
+  max-width: min(34rem, calc(100vw - 2rem));
+  margin-inline: auto;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid rgb(134 239 172 / 42%);
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, #15345d, #0b203d);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 38%);
+  color: #bbf7d0;
+  font-weight: 800;
+  text-align: center;
+  animation: issue-toast-in 180ms ease-out;
+}
+@keyframes issue-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.player-hunt-details .player-submit-issue {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  margin: 1.2rem auto 0;
+  border: 1px solid #4db8ed;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+  color: #07182a;
+  font-weight: 800;
+}
+.player-hunt-details .player-submit-issue + .player-leave-hunt {
+  margin-top: 0.7rem;
 }
 
 .kahoot-panel {
@@ -4642,6 +4846,118 @@ body[data-page="admin"]
 
 @media (max-width: 680px) {
   .organization-hunt-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.organization-hunts-panel {
+  background: linear-gradient(145deg, rgb(21 52 93 / 78%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.85rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+}
+
+.organization-hunts-heading {
+  margin-bottom: 0.8rem;
+}
+
+.organization-hunts-heading h3 {
+  margin: 0;
+}
+
+.organization-hunts-heading p:not(.eyebrow) {
+  color: var(--muted, #aab7c8);
+  margin: 0.4rem 0 0;
+}
+
+.organization-hunts-list {
+  display: grid;
+  gap: 0.7rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.organization-monitor-hunt-card {
+  align-items: center;
+  background: linear-gradient(135deg, rgb(21 52 93 / 76%), rgb(11 32 61 / 92%));
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.8rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+}
+
+.organization-monitor-hunt-copy {
+  min-width: 0;
+}
+
+.organization-monitor-hunt-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.organization-monitor-hunt-heading h4 {
+  margin: 0;
+}
+
+.organization-monitor-hunt-copy p {
+  color: var(--muted, #aab7c8);
+  margin: 0.35rem 0 0;
+}
+
+.organization-monitor-hunt-meta {
+  font-size: 0.88rem;
+}
+
+.organization-monitor-hunt-status {
+  background: rgb(58 160 255 / 14%);
+  border: 1px solid rgb(58 160 255 / 30%);
+  border-radius: 999px;
+  color: #91caff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  text-transform: capitalize;
+}
+
+.organization-monitor-hunt-status.is-published {
+  background: rgb(66 196 126 / 13%);
+  border-color: rgb(66 196 126 / 30%);
+  color: #83e4ac;
+}
+
+.organization-monitor-hunt-status.is-archived {
+  background: rgb(255 255 255 / 7%);
+  border-color: rgb(255 255 255 / 14%);
+  color: #bdc8d6;
+}
+
+.organization-monitor-hunt-card > button {
+  background: var(--gold, #ffca28);
+  border: 0;
+  border-radius: 0.65rem;
+  color: #171717;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 700;
+  min-height: 2.65rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.organization-monitor-hunt-card > button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .organization-monitor-hunt-card {
     align-items: stretch;
     flex-direction: column;
   }

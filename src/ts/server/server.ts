@@ -648,7 +648,7 @@ export function createApplication(options: ServerOptions = {}) {
               );
             await accountProgress.join(player, hunt.id, {
               closed: current.participationClosed,
-              maximum: current.maxParticipants,
+              maximum: current.maxParticipants ?? 200,
               otherCount: (await progress.participants(hunt.id)).length,
             });
           });
@@ -683,7 +683,7 @@ export function createApplication(options: ServerOptions = {}) {
           return;
         }
         const issueMatch =
-          /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(tasks))?$/.exec(
+          /^\/api\/player\/account\/hunts\/([a-zA-Z0-9-]+)\/issues(?:\/(tasks|status))?$/.exec(
             path,
           );
         if (issueMatch) {
@@ -698,6 +698,13 @@ export function createApplication(options: ServerOptions = {}) {
           )
             throw new StoreError("forbidden", "Join this hunt first.");
           if (issueMatch[2] && method === "GET") {
+            if (issueMatch[2] === "status") {
+              json(response, 200, {
+                ok: true,
+                value: await issueReports.submissionStatus(hunt.id, player),
+              });
+              return;
+            }
             const tasks =
               hunt.huntType === "kahoot"
                 ? await kahoot.reportableTasks(hunt)
@@ -719,6 +726,7 @@ export function createApplication(options: ServerOptions = {}) {
                   ? { ...hunt, tasks: await kahoot.reportableTasks(hunt) }
                   : hunt,
                 await body(request),
+                player,
               ),
             });
             return;
@@ -919,6 +927,48 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
+        const organizationHuntsMatch =
+          /^\/api\/admin\/organizations\/([a-f0-9-]{36})\/hunts$/.exec(path);
+        if (organizationHuntsMatch && method === "GET") {
+          if (!account) {
+            json(response, 401, {
+              ok: false,
+              code: "unauthorized",
+              message: "Sign in with Google to view organization hunts.",
+            });
+            return;
+          }
+          await migrateLegacyOrganizationLinks();
+          const organization = (
+            await organizations.listForAccount(account.id)
+          ).find((entry) => entry.id === organizationHuntsMatch[1]);
+          if (!organization) {
+            json(response, 403, {
+              ok: false,
+              code: "forbidden",
+              message: "You do not have access to this organization.",
+            });
+            return;
+          }
+          const value: OrganizationHuntSummary[] = (await hunts.list())
+            .filter((hunt) => hunt.organizationId === organization.id)
+            .sort((left, right) =>
+              right.updatedAt.localeCompare(left.updatedAt),
+            )
+            .map((hunt) => ({
+              id: hunt.id,
+              name: hunt.name,
+              description: hunt.description,
+              organizationId: organization.id,
+              organizationName: organization.name,
+              role: organization.role,
+              beginsAt: hunt.beginsAt,
+              endsAt: hunt.endsAt,
+              status: hunt.status,
+            }));
+          json(response, 200, { ok: true, value });
+          return;
+        }
         if (path === "/api/admin/hunts" && method === "POST") {
           const input = await body(request);
           if (input && typeof input === "object") {
@@ -1069,6 +1119,24 @@ export function createApplication(options: ServerOptions = {}) {
             });
             return;
           }
+        }
+        const issueResolveMatch =
+          /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/issues\/([a-zA-Z0-9-]+)\/resolve$/.exec(
+            path,
+          );
+        if (issueResolveMatch && method === "POST") {
+          const hunt = await hunts.get(issueResolveMatch[1]);
+          const role = await roleForHunt(hunt, creatorId);
+          if (role !== "owner" && role !== "officer")
+            throw new StoreError(
+              "forbidden",
+              "Only Owners and Officers can resolve hunt issues.",
+            );
+          json(response, 200, {
+            ok: true,
+            value: await issueReports.resolve(hunt.id, issueResolveMatch[2]),
+          });
+          return;
         }
         const exportMatch =
           /^\/api\/admin\/hunts\/([a-zA-Z0-9-]+)\/results\/(pdf|csv)$/.exec(
@@ -1688,19 +1756,14 @@ export function createApplication(options: ServerOptions = {}) {
           });
           return;
         }
-        if (
-          hunt.maxParticipants != null ||
-          hunt.participationClosed !== undefined
-        ) {
-          await serializeAdmission(hunt.id, async () => {
-            const current = await hunts.get(hunt.id);
-            await progress.join(player, hunt.id, {
-              closed: current.participationClosed,
-              maximum: current.maxParticipants,
-              otherCount: (await accountProgress.participants(hunt.id)).length,
-            });
+        await serializeAdmission(hunt.id, async () => {
+          const current = await hunts.get(hunt.id);
+          await progress.join(player, hunt.id, {
+            closed: current.participationClosed,
+            maximum: current.maxParticipants ?? 200,
+            otherCount: (await accountProgress.participants(hunt.id)).length,
           });
-        }
+        });
         if (method === "POST" && match[2]) {
           const task = hunt.tasks.find((item) => item.id === match[2]);
           if (!task) throw new StoreError("not-found", "Task not found.");

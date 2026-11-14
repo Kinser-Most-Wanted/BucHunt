@@ -211,6 +211,30 @@
                   aria-live="polite"
                 ></p>
               </form>
+              <section
+                class="organization-hunts-panel"
+                data-testid="organization-hunts-panel"
+                aria-labelledby="organization-hunts-title"
+              >
+                <div class="organization-hunts-heading">
+                  <p class="eyebrow">ADVENTURES IN YOUR COMMUNITY</p>
+                  <h3 id="organization-hunts-title">Organization hunts</h3>
+                  <p>
+                    Open a hunt to review its active players and task progress.
+                  </p>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-hunts-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <ul
+                  class="organization-hunts-list"
+                  data-testid="organization-hunts-list"
+                  aria-label="Hunts in this organization"
+                ></ul>
+              </section>
               <h3>Members</h3>
               <ul
                 class="organization-members"
@@ -319,13 +343,15 @@
                   <option value="kahoot">Kahoot Hunt</option>
                 </select>
                 <label for="hunt-capacity"
-                  >Maximum participants (optional)</label
+                  >Maximum participants (default 200; up to 200)</label
                 ><input
                   id="hunt-capacity"
                   name="maxParticipants"
                   type="number"
                   min="1"
+                  max="200"
                   step="1"
+                  value="200"
                 />
                 <label for="hunt-organization">Organization</label
                 ><select
@@ -499,7 +525,11 @@
               class="hunt-settings-form"
               hidden
             >
-              <label for="hunt-settings-organization">Organization</label>
+              <label
+                class="hunt-settings-organization"
+                for="hunt-settings-organization"
+                >Organization</label
+              >
               <select
                 id="hunt-settings-organization"
                 name="organizationId"
@@ -527,15 +557,16 @@
                 data-testid="hunt-settings-ends-at"
               />
               <label
-                >Maximum participants (blank for unlimited)<input
+                >Maximum participants (up to 200; default 200)<input
                   name="maxParticipants"
                   type="number"
                   min="1"
+                  max="200"
                   step="1"
               /></label>
-              <label
-                ><input name="participationClosed" type="checkbox" /> Close
-                participation to new players</label
+              <label class="hunt-settings-lock"
+                ><input name="participationClosed" type="checkbox" /> Lock hunt
+                to new players</label
               >
               <button type="submit" class="action">Save hunt settings</button>
               <p role="status" data-settings-status></p>

@@ -226,6 +226,7 @@ export class HuntStore {
       "taskOrderMode",
     ]);
     const now = new Date().toISOString();
+    fields.maxParticipants ??= 200;
     const hunt = accepted(
       validateHunt({
         ...fields,
@@ -257,6 +258,11 @@ export class HuntStore {
     return this.file.update((data) => {
       const hunt = data.hunts.find((item) => item.id === id);
       if (!hunt) throw new StoreError("not-found", "Hunt not found.");
+      if (
+        Object.hasOwn(fields, "maxParticipants") &&
+        fields.maxParticipants == null
+      )
+        fields.maxParticipants = 200;
       Object.assign(hunt, fields, { updatedAt: new Date().toISOString() });
       return accepted(validateHunt(hunt));
     });

@@ -77,10 +77,10 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(leaveHuntButton).toBeVisible();
   await expect(submitIssueButton).toBeVisible();
   expect(
-    await leaveHuntButton.evaluate(
+    await submitIssueButton.evaluate(
       (button) =>
         button.parentElement?.matches("dialog.player-hunt-details") &&
-        button.nextElementSibling?.matches('[data-testid="submit-issue"]'),
+        button.nextElementSibling?.matches('[data-testid="leave-hunt"]'),
     ),
   ).toBe(true);
   await page.getByTestId("leave-hunt").click();
@@ -371,7 +371,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const hunt = {
     id: "hunt-1",
     name: "test",
-    description: "test",
+    description: `test ${"A detailed hunt description adds realistic content to the overview panel. ".repeat(24)}`,
     beginsAt: "2020-01-01T00:00:00.000Z",
     endsAt: "2099-01-01T00:00:00.000Z",
     status: "published",
@@ -625,17 +625,12 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "36.304000, -82.368000",
   );
   const detailsDialog = page.getByTestId("player-hunt-details");
-  const maxDialogScroll = await detailsDialog.evaluate(
-    (dialog) => dialog.scrollHeight - dialog.clientHeight,
-  );
-  if (maxDialogScroll > 0) {
-    await detailsDialog.evaluate((dialog) => {
-      dialog.scrollTop = dialog.scrollHeight;
-    });
-    expect(
-      await detailsDialog.evaluate((dialog) => dialog.scrollTop),
-    ).toBeGreaterThan(0);
-  }
+  await detailsDialog.evaluate((dialog) => {
+    dialog.scrollTop = dialog.scrollHeight;
+  });
+  expect(
+    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
+  ).toBeGreaterThan(0);
   await page.getByTestId("close-player-hunt-details").click();
   await expect(detailsDialog).not.toBeVisible();
   await page
@@ -664,8 +659,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   }));
   expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText("test");
-  await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
-    "test",
+  await expect(
+    playerIntro.getByTestId("player-hunt-description"),
+  ).toContainText(
+    "test A detailed hunt description adds realistic content to the overview panel.",
   );
   const taskLayout = await answerTask.evaluate((task) => {
     const location = task.querySelector(".task-location")!;
@@ -744,7 +741,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const huntStatus = page.getByTestId("player-hunt-lookup-status");
   await expect(detailsDialog.locator(".hunt-details-dialog-heading")).toHaveCSS(
     "position",
-    "static",
+    "sticky",
   );
   await expect(closeButton).toHaveCSS("position", "relative");
   expect(
@@ -781,10 +778,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   expect(closeButtonBounds).toEqual({
     insideLeft: true,
     insideRight: true,
-    insideTop: false,
+    insideTop: true,
     insideBottom: true,
   });
-  await expect(closeButton).not.toBeInViewport();
+  await expect(closeButton).toBeInViewport();
   const mapSource = await taskMap.getAttribute("src");
   expect(mapSource).not.toBeNull();
   const marker = new URL(mapSource!).searchParams.get("marker");

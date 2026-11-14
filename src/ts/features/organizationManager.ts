@@ -3,6 +3,7 @@ import type {
   OrganizationDefinition,
   OrganizationInvitationDefinition,
   OrganizationInvitationResponse,
+  OrganizationHuntSummary,
   PlayerIdentity,
 } from "../foundation/types.js";
 
@@ -150,6 +151,12 @@ export function mountOrganizationManager(
   const invitationsStatus = root.querySelector<HTMLElement>(
     '[data-testid="organization-invitations-status"]',
   );
+  const huntList = root.querySelector<HTMLUListElement>(
+    '[data-testid="organization-hunts-list"]',
+  );
+  const huntListStatus = root.querySelector<HTMLElement>(
+    '[data-testid="organization-hunts-status"]',
+  );
   if (
     !workspace ||
     !dialog ||
@@ -167,7 +174,9 @@ export function mountOrganizationManager(
     !members ||
     !invitations ||
     !invitationsPanel ||
-    !invitationsStatus
+    !invitationsStatus ||
+    !huntList ||
+    !huntListStatus
   )
     return null;
 
@@ -176,6 +185,7 @@ export function mountOrganizationManager(
   let pending: OrganizationInvitationDefinition[] = [];
   let selectedId = "";
   let promptedAccount: string | null = null;
+  let organizationHuntRequest = 0;
   const selected = () => organizations.find((org) => org.id === selectedId);
 
   const renderMembers = (organization: OrganizationDefinition): void => {
@@ -214,6 +224,72 @@ export function mountOrganizationManager(
     }
   };
 
+  const renderOrganizationHunts = async (
+    organization: OrganizationDefinition,
+  ): Promise<void> => {
+    const requestId = ++organizationHuntRequest;
+    const currentIdentity = identity;
+    if (!currentIdentity) return;
+    huntList.replaceChildren();
+    huntListStatus.textContent = "Loading organization hunts…";
+    const result = await organizationRequest<OrganizationHuntSummary[]>(
+      currentIdentity,
+      `/api/admin/organizations/${encodeURIComponent(organization.id)}/hunts`,
+    );
+    if (requestId !== organizationHuntRequest || selectedId !== organization.id)
+      return;
+    if (!result.ok) {
+      huntListStatus.textContent = result.message;
+      return;
+    }
+    if (!result.value.length) {
+      huntListStatus.textContent =
+        "No hunts are connected to this organization yet.";
+      return;
+    }
+    huntListStatus.textContent = `${result.value.length} ${result.value.length === 1 ? "hunt" : "hunts"} in ${organization.name}.`;
+    for (const hunt of result.value) {
+      const item = document.createElement("li");
+      item.className = "organization-monitor-hunt-card";
+      const copy = document.createElement("div");
+      copy.className = "organization-monitor-hunt-copy";
+      const heading = document.createElement("div");
+      heading.className = "organization-monitor-hunt-heading";
+      const title = document.createElement("h4");
+      title.textContent = hunt.name;
+      const status = document.createElement("span");
+      status.className = `organization-monitor-hunt-status is-${hunt.status}`;
+      status.textContent = hunt.status;
+      heading.append(title, status);
+      const description = document.createElement("p");
+      description.textContent = hunt.description || "A BucHunt adventure.";
+      const meta = document.createElement("p");
+      meta.className = "organization-monitor-hunt-meta";
+      const begins = new Date(hunt.beginsAt);
+      const beginsLabel = Number.isNaN(begins.getTime())
+        ? "Start date unavailable"
+        : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+            begins,
+          );
+      meta.textContent = hunt.endsAt
+        ? `Starts ${beginsLabel} · Ends ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(hunt.endsAt))}`
+        : `Starts ${beginsLabel} · No end date`;
+      copy.append(heading, description, meta);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.organizationHuntId = hunt.id;
+      button.dataset.organizationHuntRole = hunt.role;
+      button.textContent =
+        hunt.role === "contributor" ? "View hunt" : "View progress";
+      button.setAttribute(
+        "aria-label",
+        `${hunt.role === "contributor" ? "View" : "View progress for"} ${hunt.name}`,
+      );
+      item.append(copy, button);
+      huntList.append(item);
+    }
+  };
+
   const renderEditor = (): void => {
     const organization = selected();
     editor.hidden = !organization;
@@ -229,6 +305,7 @@ export function mountOrganizationManager(
     inviteForm.hidden = organization.role !== "owner";
     members.replaceChildren();
     renderMembers(organization);
+    void renderOrganizationHunts(organization);
     list
       .querySelectorAll<HTMLButtonElement>("[data-organization-id]")
       .forEach((button) => {
@@ -322,6 +399,26 @@ export function mountOrganizationManager(
     void refresh();
   });
   closeButton.addEventListener("click", () => dialog.close());
+  huntList.addEventListener("click", async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-organization-hunt-id]",
+    );
+    const huntId = button?.dataset.organizationHuntId;
+    const role = button?.dataset.organizationHuntRole;
+    if (
+      !button ||
+      !huntId ||
+      (role !== "owner" && role !== "officer" && role !== "contributor")
+    )
+      return;
+    button.disabled = true;
+    try {
+      const { openHuntDetails } = await import("./huntDetails.js");
+      await openHuntDetails(huntId, role);
+    } finally {
+      button.disabled = false;
+    }
+  });
   list.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
       "[data-organization-id]",
@@ -475,6 +572,9 @@ export function mountOrganizationManager(
         pending = [];
         list.replaceChildren();
         invitations.replaceChildren();
+        huntList.replaceChildren();
+        huntListStatus.textContent = "";
+        organizationHuntRequest++;
         if (dialog.open) dialog.close();
       } else void refresh();
     },

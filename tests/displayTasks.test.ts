@@ -659,8 +659,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   }));
   expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText("test");
-  await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
-    "test",
+  await expect(
+    playerIntro.getByTestId("player-hunt-description"),
+  ).toContainText(
+    "test A detailed hunt description adds realistic content to the overview panel.",
   );
   const taskLayout = await answerTask.evaluate((task) => {
     const location = task.querySelector(".task-location")!;

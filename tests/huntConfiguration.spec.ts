@@ -685,6 +685,29 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     "open",
     false,
   );
+  const huntSettings = page.getByTestId("hunt-settings-form");
+  const beginsAt = huntSettings.getByTestId("hunt-settings-begins-at");
+  const endsAt = huntSettings.getByTestId("hunt-settings-ends-at");
+  await expect(beginsAt).toHaveValue("2026-10-15T10:00");
+  await beginsAt.fill("2026-10-16T10:00");
+  await endsAt.fill("2026-10-18T14:30");
+  const dateUpdate = page.waitForRequest(
+    (request) =>
+      /\/api\/admin\/hunts\/[a-f0-9-]+$/.test(
+        new URL(request.url()).pathname,
+      ) && request.method() === "PATCH",
+  );
+  await huntSettings
+    .getByRole("button", { name: "Save hunt settings" })
+    .click();
+  const dateUpdateRequest = await dateUpdate;
+  expect(dateUpdateRequest.postDataJSON()).toMatchObject({
+    beginsAt: new Date("2026-10-16T10:00").toISOString(),
+    endsAt: new Date("2026-10-18T14:30").toISOString(),
+  });
+  await expect(huntSettings.locator("[data-settings-status]")).toHaveText(
+    "Hunt settings saved.",
+  );
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("hunt-edit-title")).toHaveText(

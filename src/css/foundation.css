@@ -1556,6 +1556,9 @@ body[data-page="admin"] button:hover:not(:disabled),
 body[data-page="player"] button:hover:not(:disabled) {
   filter: brightness(1.12);
   transform: translateY(-1px);
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
 }
 body[data-page="admin"] dialog.hunt-details-dialog button {
   transition:
@@ -2928,7 +2931,7 @@ body[data-page="player"] .past-hunt-filter select:focus-visible {
   max-width: none;
   max-height: min(88dvh, 58rem);
   margin: auto;
-  padding: clamp(1rem, 3vw, 2rem);
+  padding: 1rem clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -2956,7 +2959,7 @@ body[data-page="player"].player-hunt-modal-open {
   z-index: 6;
   display: flex;
   justify-content: flex-end;
-  height: 0;
+  height: 2.5rem;
   margin: 0;
   padding: 0;
   overflow: visible;
@@ -3598,6 +3601,7 @@ body[data-page="admin"] .hunt-overview-lead {
   flex-wrap: wrap;
   gap: 0.75rem 1.25rem;
   margin-bottom: 1rem;
+  margin-top: 1rem;
   padding: 0.85rem 1rem;
   border: 1px solid rgb(255 199 44 / 18%);
   border-radius: 0.7rem;
@@ -3760,7 +3764,7 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
 .player-hunt-details .player-hunt-intro {
   position: relative;
   margin: 1rem 0 1.4rem;
-  padding: clamp(1.2rem, 3.4vw, 2rem);
+  padding: clamp(1rem, 2.4vw, 2rem);
   overflow: hidden;
   border: 1px solid rgb(100 181 246 / 27%);
   border-left: 0.35rem solid #ffc72c;
@@ -3991,7 +3995,9 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   border-top: 1px solid rgb(255 255 255 / 8%);
 }
 .player-hunt-details .task-location-toggle {
+  width: 11rem;
   min-height: 2.9rem;
+  justify-content: center;
   margin: 0;
   padding: 0.72rem 1rem;
   border: 1px solid rgb(100 181 246 / 40%);
@@ -4000,11 +4006,17 @@ body[data-page="admin"] dialog.hunt-details-dialog .details-contributors {
   color: #f4f8ff;
   font-size: 0.94rem;
   font-weight: 750;
+  white-space: nowrap;
   box-shadow: inset 0 1px rgb(255 255 255 / 5%);
 }
 .player-hunt-details .task-location-toggle:hover:not(:disabled) {
   border-color: rgb(255 199 44 / 65%);
   background: #1c4b7c;
+}
+.player-hunt-details
+  .task-location:has(.task-location-map:not([hidden]))
+  > .task-location-toggle {
+  justify-self: end;
 }
 .player-hunt-details .task-location-map {
   height: clamp(16rem, 42vw, 23rem);

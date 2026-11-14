@@ -390,6 +390,25 @@ function formatDate(value: string | null): string {
       }).format(date);
 }
 
+function toDateTimeLocalInput(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const localDate = new Date(
+    date.getTime() - date.getTimezoneOffset() * 60_000,
+  );
+  return localDate.toISOString().slice(0, 16);
+}
+
+function fromDateTimeLocalInput(
+  value: FormDataEntryValue | null,
+): string | null {
+  const localValue = String(value ?? "").trim();
+  if (!localValue) return null;
+  const date = new Date(localValue);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
 function renderTask(task: TaskDefinition): HTMLLIElement {
   const item = document.createElement("li");
   item.className = "hunt-detail-task";
@@ -578,6 +597,10 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       undefined,
       hunt.organizationId ?? "",
     );
+    (settings.elements.namedItem("beginsAt") as HTMLInputElement).value =
+      toDateTimeLocalInput(hunt.beginsAt);
+    (settings.elements.namedItem("endsAt") as HTMLInputElement).value =
+      toDateTimeLocalInput(hunt.endsAt);
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
       hunt.maxParticipants == null ? "200" : String(hunt.maxParticipants);
     (
@@ -592,6 +615,8 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       button.disabled = true;
       const fields = new FormData(settings);
       const updates: Record<string, unknown> = {
+        beginsAt: fromDateTimeLocalInput(fields.get("beginsAt")),
+        endsAt: fromDateTimeLocalInput(fields.get("endsAt")),
         maxParticipants: Number(fields.get("maxParticipants")) || 200,
         participationClosed: fields.has("participationClosed"),
       };

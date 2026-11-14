@@ -110,11 +110,14 @@ export class HuntIssueStore {
     return {
       unreadCount: issues.filter((issue) => !issue.readBy.includes(reader))
         .length,
-      issues: issues.map(({ readBy, submittedBy: _submittedBy, ...issue }) => ({
-        ...issue,
-        resolved: Boolean(issue.resolved),
-        unread: !readBy.includes(reader),
-      })),
+      issues: issues.map(({ readBy, ...issue }) => {
+        delete issue.submittedBy;
+        return {
+          ...issue,
+          resolved: Boolean(issue.resolved),
+          unread: !readBy.includes(reader),
+        };
+      }),
     };
   }
   async resolve(huntId: string, issueId: string): Promise<{ resolved: true }> {

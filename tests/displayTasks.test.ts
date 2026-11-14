@@ -371,7 +371,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const hunt = {
     id: "hunt-1",
     name: "test",
-    description: "test",
+    description: `test ${"A detailed hunt description adds realistic content to the overview panel. ".repeat(24)}`,
     beginsAt: "2020-01-01T00:00:00.000Z",
     endsAt: "2099-01-01T00:00:00.000Z",
     status: "published",

@@ -396,8 +396,9 @@ test("#139 #143 #142 APIs enforce roles, admission limits, saved membership, and
     expect(
       (await f.api(player + "/issues/status", "one")).data.value,
     ).toMatchObject({ activeCount: 3, limit: 3, canSubmit: false });
+    const refreshedInbox = await f.api(admin + "/issues");
     await f.api(admin + "/issues/read", "owner", {
-      ids: inbox.data.value.issues.map((i: { id: string }) => i.id),
+      ids: refreshedInbox.data.value.issues.map((i: { id: string }) => i.id),
     });
     expect((await f.api(admin + "/issues")).data.value.unreadCount).toBe(0);
     await f.api(admin, "owner", { participationClosed: false }, "PATCH");

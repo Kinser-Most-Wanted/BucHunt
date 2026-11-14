@@ -45,6 +45,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Ensure the Stage label exists and apply it

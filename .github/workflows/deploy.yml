@@ -39,12 +39,14 @@ jobs:
       github.event_name == 'pull_request' &&
       (github.event.action == 'opened' ||
         github.event.action == 'reopened' ||
+        github.event.action == 'synchronize' ||
         github.event.action == 'edited') &&
       (github.event.pull_request.title == 'Stage' ||
         github.event.pull_request.head.ref == 'stage')
     permissions:
       contents: read
       issues: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Ensure the Stage label exists and apply it

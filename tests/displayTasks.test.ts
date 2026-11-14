@@ -625,12 +625,23 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
     "36.304000, -82.368000",
   );
   const detailsDialog = page.getByTestId("player-hunt-details");
+  await expect
+    .poll(() =>
+      detailsDialog.evaluate(
+        (dialog) => dialog.scrollHeight - dialog.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });
-  expect(
-    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
-  ).toBeGreaterThan(0);
+  await expect
+    .poll(() => detailsDialog.evaluate((dialog) => dialog.scrollTop))
+    .toBeGreaterThan(0);
   await page.getByTestId("close-player-hunt-details").click();
   await expect(detailsDialog).not.toBeVisible();
   await page
@@ -759,12 +770,23 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   await expect(detailsDialog).toHaveCSS("overscroll-behavior", "contain");
   await expect(detailsDialog).toHaveCSS("scrollbar-width", "none");
   await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
+  await expect
+    .poll(() =>
+      detailsDialog.evaluate(
+        (dialog) => dialog.scrollHeight - dialog.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });
-  expect(
-    await detailsDialog.evaluate((dialog) => dialog.scrollTop),
-  ).toBeGreaterThan(0);
+  await expect
+    .poll(() => detailsDialog.evaluate((dialog) => dialog.scrollTop))
+    .toBeGreaterThan(0);
   const closeButtonBounds = await closeButton.evaluate((button) => {
     const buttonRect = button.getBoundingClientRect();
     const dialogRect = button.closest("dialog")!.getBoundingClientRect();

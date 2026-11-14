@@ -579,7 +579,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       hunt.organizationId ?? "",
     );
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
-      hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
+      hunt.maxParticipants == null ? "200" : String(hunt.maxParticipants);
     (
       settings.elements.namedItem("participationClosed") as HTMLInputElement
     ).checked = hunt.participationClosed ?? false;
@@ -592,9 +592,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       button.disabled = true;
       const fields = new FormData(settings);
       const updates: Record<string, unknown> = {
-        maxParticipants: String(fields.get("maxParticipants") ?? "").trim()
-          ? Number(fields.get("maxParticipants"))
-          : null,
+        maxParticipants: Number(fields.get("maxParticipants")) || 200,
         participationClosed: fields.has("participationClosed"),
       };
       if (role === "owner")
@@ -782,6 +780,26 @@ dialog
 dialog?.addEventListener("click", (event) => {
   if (event.target === dialog) dialog.close();
 });
+
+dialog
+  ?.querySelector<HTMLElement>(".details-actions")
+  ?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const summary = target.closest("summary");
+    const action = target.closest("button, a");
+    if (!summary && !action) return;
+    const selectedMenu = target.closest<HTMLDetailsElement>(
+      "details.details-action-menu",
+    );
+    dialog
+      ?.querySelectorAll<HTMLDetailsElement>(
+        "details.details-action-menu[open]",
+      )
+      .forEach((menu) => {
+        if (menu !== selectedMenu) menu.open = false;
+      });
+  });
 
 export async function openHuntDetails(
   huntId: string,

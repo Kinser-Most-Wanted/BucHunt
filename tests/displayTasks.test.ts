@@ -77,10 +77,10 @@ test("players can leave and rejoin a hunt from the saved overview or admin link"
   await expect(leaveHuntButton).toBeVisible();
   await expect(submitIssueButton).toBeVisible();
   expect(
-    await leaveHuntButton.evaluate(
+    await submitIssueButton.evaluate(
       (button) =>
         button.parentElement?.matches("dialog.player-hunt-details") &&
-        button.nextElementSibling?.matches('[data-testid="submit-issue"]'),
+        button.nextElementSibling?.matches('[data-testid="leave-hunt"]'),
     ),
   ).toBe(true);
   await page.getByTestId("leave-hunt").click();
@@ -371,7 +371,7 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   const hunt = {
     id: "hunt-1",
     name: "test",
-    description: "test",
+    description: `test ${"A detailed hunt description adds realistic content to the overview panel. ".repeat(24)}`,
     beginsAt: "2020-01-01T00:00:00.000Z",
     endsAt: "2099-01-01T00:00:00.000Z",
     status: "published",
@@ -659,8 +659,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
   }));
   expect(introBounds.panelTop).toBeGreaterThanOrEqual(introBounds.dialogTop);
   await expect(playerIntro.getByTestId("player-hunt-name")).toHaveText("test");
-  await expect(playerIntro.getByTestId("player-hunt-description")).toHaveText(
-    "test",
+  await expect(
+    playerIntro.getByTestId("player-hunt-description"),
+  ).toContainText(
+    "test A detailed hunt description adds realistic content to the overview panel.",
   );
   const taskLayout = await answerTask.evaluate((task) => {
     const location = task.querySelector(".task-location")!;

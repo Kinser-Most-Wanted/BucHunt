@@ -3,8 +3,11 @@ import type {
   GoogleAuthConfig,
   HuntDefinition,
   HuntInput,
+  HuntParticipationResult,
+  ParticipantAction,
   OperationResult,
   PlayerIdentity,
+  PlayerProfile,
   PlayerHunt,
   TaskDefinition,
   TaskInput,
@@ -28,8 +31,36 @@ export interface HuntRepository {
     huntId: string,
     input: TaskInput,
   ): Promise<OperationResult<TaskDefinition>>;
+  updateTask(
+    huntId: string,
+    taskId: string,
+    input: TaskInput,
+  ): Promise<OperationResult<TaskDefinition>>;
+  deleteTask(
+    huntId: string,
+    taskId: string,
+  ): Promise<OperationResult<{ deleted: true }>>;
+  deleteHunt(
+    huntId: string,
+    confirmationName: string,
+  ): Promise<OperationResult<{ deleted: true }>>;
   getAdminHunt(huntId: string): Promise<OperationResult<HuntDefinition>>;
+  getHuntParticipationProgress(
+    huntId: string,
+  ): Promise<HuntParticipationResult>;
+  moderateHuntParticipant(
+    huntId: string,
+    participantId: string,
+    action: ParticipantAction,
+  ): Promise<OperationResult<{ removed: true }>>;
   getPlayerHunt(huntId: string): Promise<OperationResult<PlayerHunt>>;
+  getAccountProfile(
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerProfile>>;
+  saveAccountProfile(
+    displayName: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<PlayerProfile>>;
   joinHunt(
     accessCode: string,
     identity: PlayerIdentity,
@@ -38,6 +69,10 @@ export interface HuntRepository {
     huntId: string,
     identity: PlayerIdentity,
   ): Promise<OperationResult<PlayerHunt>>;
+  leaveHunt(
+    huntId: string,
+    identity: PlayerIdentity,
+  ): Promise<OperationResult<{ left: true }>>;
   answerAccountTask(
     huntId: string,
     taskId: string,

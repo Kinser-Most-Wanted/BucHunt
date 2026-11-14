@@ -91,37 +91,37 @@ pnpm build
 pnpm serve
 ```
 
-Open `http://127.0.0.1:3000/admin.html` (Hunt Studio). There is no administrator API token, no global administrator role, and no AWS access requirement for hunt creators. Anyone with a temporary creator profile can create a hunt. The server derives ownership from that profile and ignores client-supplied `ownerId` values. IDs, timestamps and draft status are generated on the server.
+Open `http://127.0.0.1:3000/admin.html` (Hunt Studio) and sign in with Google. The server derives ownership from the verified account and ignores client-supplied `ownerId` values. IDs, timestamps and draft status are generated on the server.
 
-**My hunts** lists only hunts this profile owns or contributes to. Select a hunt to load its tasks; manual hunt-ID entry is no longer needed for editing. Creating a hunt selects it automatically. The public player link still includes the hunt ID; access-code joining is later work.
+**My hunts** lists only hunts this account owns or contributes to. Its Google-derived creator ID is stable across browsers and devices. Select a hunt to load its tasks; manual hunt-ID entry is no longer needed for editing. Creating a hunt selects it automatically.
 
-Until Google sign-in is integrated, `GET /api/admin/session` automatically sets a random, HttpOnly, SameSite browser cookie. Its SHA-256 hash becomes a public `browser:<hash>` creator ID. Public IDs are safe to share and cannot be used as the private session cookie to impersonate their owners. This is a temporary browser identity, not an authenticated Google account. Clearing cookies, changing browser profiles, or moving devices loses access to that profile; no account recovery or linking is implemented yet. Google integration must verify identity on the server and explicitly link/migrate these IDs before replacing them.
+Google-authenticated requests send the ID token to the server, which validates it and derives the creator ID as `google-<SHA-256 of Google subject>`. The email is used only for the one-time migration gate and is not stored in hunt ownership. Existing browser-cookie sessions remain temporarily supported for compatibility. When a verified `codepro1012@gmail.com` account opens Hunt Studio, all hunt owners using legacy `browser:<hash>` IDs in that deployment are reassigned to that account. Hunt IDs, tasks, access codes, and player progress are preserved. The operation is idempotent and does not reassign new Google-owned hunts. Each deployment stores its JSON separately, so sign in to each deployment that needs migration.
 
-To collaborate, the contributor opens Hunt Studio and copies their creator ID. The hunt owner selects the hunt and adds that ID under **Contributors**. Contributors can retrieve the hunt's private configuration and add tasks. Only the owner can grant or remove contributor access. Grants are stored in private `hunt-contributors.json`, using `{ "schemaVersion": 1, "contributors": { "<hunt-id>": ["<creator-id>"] } }`. This keeps the existing version-1 hunt schema unchanged. The server enforces access on each request; hiding or altering controls in the browser cannot bypass it. Membership persists across application restarts and removal revokes subsequent access immediately.
+To collaborate, the hunt owner enters the contributor's Google email under **Contributors**. The private `hunt-contributors.json` store keeps pending invitations separately from active account IDs, for example `{ "schemaVersion": 1, "contributors": { "<hunt-id>": ["google-<account-hash>"] }, "invitations": { "<hunt-id>": ["person@example.com"] } }`. When that person signs in, the server compares the verified Google email, converts matching invitations to stable account IDs, and removes the pending email. Email addresses remain in this private file only while invitations are pending. BucHunt does not send invitation emails, so the owner must share the site link. Only the owner can invite, cancel, or remove collaborators. The server enforces access on each request; hiding or altering controls in the browser cannot bypass it. Membership persists across application restarts and removal revokes subsequent access immediately.
 
-Legacy hunts created with the former shared token retain their existing owner IDs and their stored data. They are not automatically claimed by the first visitor. Records owned by `sprint-admin` require a controlled one-time reassignment to the intended creator's ID by the data operator; back up the JSON and stop the writer before doing so. Never distribute the origin secret as a means to claim a hunt.
+The Baja Blast migration runs lazily on each environment's first authenticated Hunt Studio session by the named account. It only changes legacy browser owner IDs, never hunt content. Other Google-owned hunts remain with their existing accounts.
 
 By default the server writes the real `data/hunts.json` file. Set `DATA_DIRECTORY` to use another private directory. Missing stores start empty on first save; malformed stores and unsupported schema versions fail without overwriting existing bytes. Every mutation validates the complete hunt, including all embedded tasks. Concurrent mutations in the single application process are queued. Each save writes an exclusive temporary file, synchronizes it, atomically renames it, and synchronizes the containing directory on POSIX. Windows synchronizes the file but does not support this directory sync operation. Failed writes return a failed operation rather than a successful response. Do not run multiple writers against the same files or place them on a filesystem without atomic rename semantics.
 
-Player responses omit required answers and owner metadata. Correct answers update a separate private `player-progress.json`, keyed by an anonymous browser cookie and hunt ID. Completion survives reloads and server restarts. Separate browser profiles have independent completion. Clearing cookies loses access to that anonymous progress. This adds only a minimal answer flow to demonstrate #38; account-backed player identity, access-code joining, publication controls, scoring, and sequential completion enforcement remain later work.
+Player responses omit required answers and owner metadata. Signed-in player answers and joined hunts update `account-player-progress.json`, keyed by the stable Google account ID and hunt ID, so progress follows the account across browsers on that deployment. The older `player-progress.json` store remains for legacy public-hunt requests.
 
 ### HTTP operations
 
-| Method | Path                                           | Result                                               |
-| ------ | ---------------------------------------------- | ---------------------------------------------------- |
-| GET    | `/api/admin/session`                           | Start or restore the temporary creator profile       |
-| GET    | `/api/admin/hunts`                             | List only owned or contributed hunts                 |
-| GET    | `/api/admin/hunts/:id/contributors`            | List contributors (owner only)                       |
-| POST   | `/api/admin/hunts/:id/contributors`            | Add a creator ID (owner only)                        |
-| DELETE | `/api/admin/hunts/:id/contributors/:creatorId` | Revoke contributor access (owner only)               |
-| GET    | `/api/health`                                  | Application readiness response                       |
-| POST   | `/api/admin/hunts`                             | Validate and persist a new hunt                      |
-| GET    | `/api/admin/hunts/:id`                         | Retrieve private hunt/task configuration             |
-| POST   | `/api/admin/hunts/:id/tasks`                   | Validate and persist an embedded task                |
-| GET    | `/api/player/hunts/:id`                        | Public task projection and this browser's completion |
-| POST   | `/api/player/hunts/:id/tasks/:taskId/answer`   | Validate an answer and persist completion            |
+| Method | Path                                           | Result                                                                                |
+| ------ | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/session`                           | Return the verified Google creator identity; legacy cookie sessions remain compatible |
+| GET    | `/api/admin/hunts`                             | List only owned or contributed hunts                                                  |
+| GET    | `/api/admin/hunts/:id/contributors`            | List contributors (owner only)                                                        |
+| POST   | `/api/admin/hunts/:id/contributors`            | Invite a collaborator by Google email (owner only)                                    |
+| DELETE | `/api/admin/hunts/:id/contributors/:creatorId` | Cancel an invitation or revoke contributor access (owner only)                        |
+| GET    | `/api/health`                                  | Application readiness response                                                        |
+| POST   | `/api/admin/hunts`                             | Validate and persist a new hunt                                                       |
+| GET    | `/api/admin/hunts/:id`                         | Retrieve private hunt/task configuration                                              |
+| POST   | `/api/admin/hunts/:id/tasks`                   | Validate and persist an embedded task                                                 |
+| GET    | `/api/player/hunts/:id`                        | Public task projection and this browser's completion                                  |
+| POST   | `/api/player/hunts/:id/tasks/:taskId/answer`   | Validate an answer and persist completion                                             |
 
-Creator requests use the automatic private cookie. Creating a hunt requires a creator session; reading a private hunt or adding a task additionally requires ownership or contributor membership. Only owners can manage contributor membership. There is no shared creator credential. JSON bodies are limited to 64 KiB. API responses use the shared `OperationResult` shape and disable caching. Failures distinguish validation (400), authorization (401/403), missing records/routes (404), and storage failure (500). Server failures include a request ID; structured error logs omit answers, credentials, and request bodies. Static file serving excludes server code and private JSON files.
+Creator requests use the verified Google ID token when present; legacy browser-cookie sessions remain temporarily available for compatibility. Creating a hunt requires a creator session; reading a private hunt or adding a task additionally requires ownership or contributor membership. Only owners can manage contributor membership. JSON bodies are limited to 64 KiB. API responses use the shared `OperationResult` shape and disable caching. Failures distinguish validation (400), authorization (401/403), missing records/routes (404), and storage failure (500). Server failures include a request ID; structured error logs omit answers, credentials, and request bodies. Static file serving excludes server code and private JSON files.
 
 ### Deployment and verification
 
@@ -192,12 +192,12 @@ unreadable progress, and missing hunt definitions referenced by saved progress,
 return errors without inventing completion states or overwriting invalid data.
 The existing single-writer, atomic-save, and backup requirements apply.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/player/account/config` | Public Google client ID; no token or cookie required |
-| GET | `/api/player/account/hunts` | Restore this account's hunts with saved progress |
-| GET | `/api/player/account/hunts/:id` | Read tasks and this account's completion state |
-| POST | `/api/player/account/hunts/:id/tasks/:taskId/answer` | Validate `{ "answer": "..." }` and persist completion |
+| Method | Path                                                 | Purpose                                               |
+| ------ | ---------------------------------------------------- | ----------------------------------------------------- |
+| GET    | `/api/player/account/config`                         | Public Google client ID; no token or cookie required  |
+| GET    | `/api/player/account/hunts`                          | Restore this account's hunts with saved progress      |
+| GET    | `/api/player/account/hunts/:id`                      | Read tasks and this account's completion state        |
+| POST   | `/api/player/account/hunts/:id/tasks/:taskId/answer` | Validate `{ "answer": "..." }` and persist completion |
 
 Except for config, these routes require a valid Google bearer token. They return
 `OperationResult` responses with 401 for invalid/expired identity, 400 for invalid
@@ -223,3 +223,19 @@ storage failures, and cookie omission. Tests inject a local identity verifier;
 production has no HTTP or environment switch to bypass Google verification.
 Live Google/AWS verification and the team's peer reviews remain required before
 merge.
+
+## Organizations
+
+Creators can associate an optional organization name (up to 120 characters) with a hunt. Owners and Officers can edit it in the hunt overview. Players see the saved name beside the hunt details when they open or refresh the hunt. Older hunts without an organization remain supported.
+
+## Participation controls
+
+A blank maximum allows unlimited participation. A positive whole number limits active participants; leaving frees a place. Owners and Officers can close or reopen admission in hunt settings. Reopening still enforces capacity. Existing active participants can reopen or refresh their hunts even when full or closed. Players who explicitly leave must satisfy current admission rules to rejoin; their saved task completions are restored when admitted. Capacity checks and membership writes are serialized to prevent concurrent joins from exceeding the limit.
+
+## Issue reports
+
+Players can select Submit Issue below Leave Hunt, choose a task or Hunt in general, and submit up to 4000 characters. Reports store the hunt, task label, description, and creation time without storing the submitter. Owners and Officers can open Issues between Join Hunt and Export results. Unread counts are tracked separately for each administrator; opening the inbox marks only displayed reports read. New reports remain unread until viewed. Reports are persisted in hunt-issues.json under DATA_DIRECTORY and removed with a deleted hunt.
+
+## Hunt types
+
+Create a Hunt offers Traditional Hunt and Kahoot Hunt. Existing hunts default to Traditional Hunt. Kahoot Hunts use a host-controlled lobby and synchronized questions, with optional timers and a leaderboard. See [Kahoot Hunts](kahoot_hunts.md) for hosting, scoring, persistence, and reconnect behavior.

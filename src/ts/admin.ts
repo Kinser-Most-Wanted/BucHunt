@@ -1,3 +1,8 @@
+import {
+  mountOrganizationManager,
+  storedPlayerIdentity,
+} from "./features/organizationManager.js";
+
 interface GoogleIdentity {
   accounts: {
     id: {
@@ -24,36 +29,64 @@ interface GoogleIdentity {
 }
 
 const loginPanel = document.getElementById("admin-login") as HTMLElement | null;
-const googleButton = document.getElementById("google-sign-in") as HTMLElement | null;
-const adminWorkspace = document.getElementById("admin-workspace") as HTMLElement | null;
-const adminDenied = document.getElementById("admin-denied") as HTMLElement | null;
-const adminAccessPanel = document.getElementById("admin-access") as HTMLElement | null;
-const accountMenu = document.getElementById("admin-account-menu") as HTMLDetailsElement | null;
-const accountDisplayName = document.querySelector<HTMLElement>('[data-testid="admin-display-name"]');
-const accountEmailDetails = document.querySelector<HTMLElement>('[data-testid="admin-google-email"]');
-const accountEmail = document.querySelector<HTMLOutputElement>('[data-testid="admin-email-value"]');
-const accountEmailToggle = document.querySelector<HTMLButtonElement>('[data-testid="admin-email-toggle"]');
-const accountEmailCopy = document.querySelector<HTMLButtonElement>('[data-testid="admin-copy-email"]');
-const accountIdDetails = document.querySelector<HTMLElement>('[data-testid="admin-google-account-id"]');
-const accountId = document.querySelector<HTMLOutputElement>('[data-testid="admin-id-value"]');
-const accountIdToggle = document.querySelector<HTMLButtonElement>('[data-testid="admin-id-toggle"]');
-const accountIdCopy = document.querySelector<HTMLButtonElement>('[data-testid="admin-copy-id"]');
-const accountStatus = document.querySelector<HTMLElement>('[data-testid="admin-account-status"]');
+const googleButton = document.getElementById(
+  "google-sign-in",
+) as HTMLElement | null;
+const adminWorkspace = document.getElementById(
+  "admin-workspace",
+) as HTMLElement | null;
+const adminDenied = document.getElementById(
+  "admin-denied",
+) as HTMLElement | null;
+const adminAccessPanel = document.getElementById(
+  "admin-access",
+) as HTMLElement | null;
+const accountMenu = document.getElementById(
+  "admin-account-menu",
+) as HTMLDetailsElement | null;
+const accountDisplayName = document.querySelector<HTMLElement>(
+  '[data-testid="admin-display-name"]',
+);
+const accountNameEditToggle = document.querySelector<HTMLButtonElement>(
+  '[data-testid="admin-change-display-name"]',
+);
+const accountNameForm = document.querySelector<HTMLFormElement>(
+  '[data-testid="admin-account-name-form"]',
+);
+const accountNameInput = document.querySelector<HTMLInputElement>(
+  '[data-testid="admin-account-name-input"]',
+);
+const accountStatus = document.querySelector<HTMLElement>(
+  '[data-testid="admin-account-status"]',
+);
+let adminAccountNickname = "";
+let adminAccountRoleLabel = "Player";
 const isHomePage = document.body.dataset.page === "home";
 const isAdminPage = document.body.dataset.page === "admin";
+const foundationFeaturesReady = isAdminPage
+  ? new Promise<void>((resolve) => {
+      if (document.documentElement.dataset.buchuntFeaturesReady === "true") {
+        resolve();
+        return;
+      }
+      document.addEventListener("buchunt:features-ready", () => resolve(), {
+        once: true,
+      });
+    })
+  : Promise.resolve();
 const statusText = document.getElementById("admin-status") as HTMLElement;
 const signOut = document.getElementById("sign-out") as HTMLButtonElement | null;
-const homeSignInLink = document.getElementById("home-sign-in-link") as HTMLElement | null;
+const homeSignInLink = document.getElementById(
+  "home-sign-in-link",
+) as HTMLElement | null;
 const PLAYER_SESSION_KEY = "buchunt.player-session";
 const PLAYER_PROFILE_KEY_PREFIX = "buchunt.player-profile.";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let google: GoogleIdentity | undefined;
+let organizationManager: ReturnType<typeof mountOrganizationManager>;
 let verifiedCredential: string | undefined;
 function warmGoogleSignIn() {
-  return Promise.allSettled([
-    loadGoogle(),
-    request("/api/auth/config"),
-  ]);
+  return Promise.allSettled([loadGoogle(), request("/api/auth/config")]);
 }
 let homeGoogleWarmup = isHomePage ? warmGoogleSignIn() : undefined;
 async function getGoogleConfig() {
@@ -73,13 +106,30 @@ async function getGoogleConfig() {
 }
 
 function clearPlayerSession(): void {
-  try { sessionStorage.removeItem(PLAYER_SESSION_KEY); } catch { /* Storage may be unavailable. */ }
+  try {
+    localStorage.removeItem(PLAYER_SESSION_KEY);
+  } catch {
+    /* Storage may be unavailable. */
+  }
+  try {
+    sessionStorage.removeItem(PLAYER_SESSION_KEY);
+  } catch {
+    /* Storage may be unavailable. */
+  }
 }
-function rememberPlayerSession(user: { subject?: unknown; email?: unknown }, credential?: string): void {
-  if (typeof user.subject !== "string" || typeof user.email !== "string") return;
+function rememberPlayerSession(
+  user: { subject?: unknown; email?: unknown; expiresAt?: unknown },
+  credential?: string,
+): void {
+  if (typeof user.subject !== "string" || typeof user.email !== "string")
+    return;
   try {
     if (!credential) {
-      const saved = JSON.parse(sessionStorage.getItem(PLAYER_SESSION_KEY) ?? "null") as {
+      const saved = JSON.parse(
+        localStorage.getItem(PLAYER_SESSION_KEY) ??
+          sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+          "null",
+      ) as {
         provider?: unknown;
         accountId?: unknown;
         email?: unknown;
@@ -91,21 +141,115 @@ function rememberPlayerSession(user: { subject?: unknown; email?: unknown }, cre
         saved.email === user.email &&
         typeof saved.idToken === "string" &&
         saved.idToken !== "verified-server-session"
-      ) return;
+      ) {
+        localStorage.setItem(
+          PLAYER_SESSION_KEY,
+          JSON.stringify({ ...saved, expiresAt: user.expiresAt }),
+        );
+        return;
+      }
       return;
     }
-    sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify({
+    const saved = JSON.stringify({
       provider: "google",
       accountId: user.subject,
       email: user.email,
       idToken: credential,
-    }));
-  } catch { /* The server session remains authoritative if browser storage is unavailable. */ }
+      expiresAt: user.expiresAt,
+    });
+    sessionStorage.setItem(PLAYER_SESSION_KEY, saved);
+    localStorage.setItem(PLAYER_SESSION_KEY, saved);
+  } catch {
+    /* The server session remains authoritative if browser storage is unavailable. */
+  }
 }
-function setAccountMenu(user: { subject?: unknown; email?: unknown; role?: unknown }): void {
+async function loadAccountNickname(user: {
+  subject?: unknown;
+  email?: unknown;
+  role?: unknown;
+}): Promise<void> {
+  if (typeof user.subject !== "string" || typeof user.email !== "string")
+    return;
+  let identity: { accountId?: unknown; idToken?: unknown } | null = null;
+  try {
+    identity = JSON.parse(
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
+    ) as { accountId?: unknown; idToken?: unknown } | null;
+  } catch {
+    return;
+  }
+  if (
+    identity?.accountId !== user.subject ||
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
+  )
+    return;
+  const headers = {
+    Authorization: `Bearer ${identity.idToken}`,
+    "Content-Type": "application/json",
+  };
+  try {
+    const response = await fetch("/api/player/account/profile", {
+      headers,
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!response.ok) return;
+    const result = (await response.json()) as {
+      ok?: boolean;
+      value?: { displayName?: unknown };
+    };
+    let nickname =
+      typeof result.value?.displayName === "string"
+        ? result.value.displayName.trim()
+        : "";
+    if (!nickname) {
+      try {
+        nickname =
+          localStorage
+            .getItem(`${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`)
+            ?.trim() ?? "";
+      } catch {
+        nickname = "";
+      }
+      if (nickname) {
+        const saved = await fetch("/api/player/account/profile", {
+          method: "PUT",
+          headers,
+          credentials: "omit",
+          cache: "no-store",
+          body: JSON.stringify({ displayName: nickname }),
+        });
+        if (!saved.ok) return;
+      }
+    }
+    if (!nickname || !accountDisplayName) return;
+    try {
+      localStorage.setItem(
+        `${PLAYER_PROFILE_KEY_PREFIX}${user.subject}`,
+        nickname,
+      );
+    } catch {
+      // The account profile is authoritative; browser storage is only a cache.
+    }
+    adminAccountNickname = nickname;
+    if (accountNameInput) accountNameInput.value = nickname;
+    accountDisplayName.textContent = `${nickname} (${adminAccountRoleLabel})`;
+  } catch {
+    // Keep the cached nickname visible when the profile endpoint is unavailable.
+  }
+}
+function setAccountMenu(user: {
+  subject?: unknown;
+  email?: unknown;
+  role?: unknown;
+}): void {
   if (!accountMenu) return;
   const subject = typeof user.subject === "string" ? user.subject : "";
   const email = typeof user.email === "string" ? user.email : "";
+  adminAccountRoleLabel = user.role === "administrator" ? "Admin" : "Player";
   let nickname = email.split("@")[0] || "Google account";
   try {
     const savedName = localStorage
@@ -115,71 +259,23 @@ function setAccountMenu(user: { subject?: unknown; email?: unknown; role?: unkno
   } catch {
     // Use the Google account name if browser storage is unavailable.
   }
+  adminAccountNickname = nickname;
   if (accountDisplayName) {
-    accountDisplayName.textContent = `${nickname}${user.role === "administrator" ? " (Admin)" : " (Player)"}`;
+    accountDisplayName.textContent = `${nickname} (${adminAccountRoleLabel})`;
   }
-  if (accountEmail) accountEmail.textContent = email;
-  if (accountId) accountId.textContent = subject;
-  if (accountMenu) {
-    accountMenu.hidden = false;
-    accountMenu.open = false;
-  }
-  if (accountEmailDetails) accountEmailDetails.hidden = false;
-  if (accountEmail) accountEmail.hidden = true;
-  if (accountEmailToggle) {
-    accountEmailToggle.hidden = false;
-    accountEmailToggle.textContent = "Show Google account email";
-    accountEmailToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountEmailCopy) accountEmailCopy.hidden = true;
-  if (accountIdDetails) accountIdDetails.hidden = false;
-  if (accountId) accountId.hidden = true;
-  if (accountIdToggle) {
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountNameInput) accountNameInput.value = nickname;
+  accountMenu.hidden = false;
+  accountMenu.open = false;
+  if (accountNameEditToggle)
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
+  if (accountNameForm) accountNameForm.hidden = true;
   if (accountStatus) {
     accountStatus.hidden = true;
     accountStatus.textContent = "";
   }
 }
-function toggleAccountDetail(
-  value: HTMLOutputElement | null,
-  toggle: HTMLButtonElement | null,
-  copy: HTMLButtonElement | null,
-  label: string,
-): void {
-  if (!value || !toggle || !copy) return;
-  value.hidden = !value.hidden;
-  const revealed = !value.hidden;
-  copy.hidden = !revealed;
-  toggle.textContent = `${revealed ? "Hide" : "Show"} Google account ${label}`;
-  toggle.setAttribute("aria-expanded", String(revealed));
-}
-function copyAccountDetail(
-  value: HTMLOutputElement | null,
-  label: string,
-): void {
-  if (!value || !accountStatus) return;
-  void navigator.clipboard.writeText(value.textContent ?? "").then(() => {
-    accountStatus.textContent = `Google account ${label} copied.`;
-    accountStatus.hidden = false;
-  }).catch(() => {
-    accountStatus.textContent = `Could not copy the Google account ${label}.`;
-    accountStatus.hidden = false;
-  });
-}
-accountEmailToggle?.addEventListener("click", () =>
-  toggleAccountDetail(accountEmail, accountEmailToggle, accountEmailCopy, "email"),
-);
-accountIdToggle?.addEventListener("click", () =>
-  toggleAccountDetail(accountId, accountIdToggle, accountIdCopy, "ID"),
-);
-accountEmailCopy?.addEventListener("click", () => copyAccountDetail(accountEmail, "email"));
-accountIdCopy?.addEventListener("click", () => copyAccountDetail(accountId, "ID"));
 function signedOut(message: string): void {
+  organizationManager?.setIdentity(null);
   clearTimeout(expiryTimer);
   clearPlayerSession();
   if (loginPanel) loginPanel.hidden = false;
@@ -191,22 +287,9 @@ function signedOut(message: string): void {
     accountMenu.hidden = true;
     accountMenu.open = false;
   }
-  if (accountEmailDetails) accountEmailDetails.hidden = true;
-  if (accountEmail) accountEmail.hidden = true;
-  if (accountEmailToggle) {
-    accountEmailToggle.hidden = false;
-    accountEmailToggle.textContent = "Show Google account email";
-    accountEmailToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountEmailCopy) accountEmailCopy.hidden = true;
-  if (accountIdDetails) accountIdDetails.hidden = true;
-  if (accountId) accountId.hidden = true;
-  if (accountIdToggle) {
-    accountIdToggle.hidden = false;
-    accountIdToggle.textContent = "Show Google account ID";
-    accountIdToggle.setAttribute("aria-expanded", "false");
-  }
-  if (accountIdCopy) accountIdCopy.hidden = true;
+  if (accountNameForm) accountNameForm.hidden = true;
+  if (accountNameEditToggle)
+    accountNameEditToggle.setAttribute("aria-expanded", "false");
   if (accountStatus) {
     accountStatus.hidden = true;
     accountStatus.textContent = "";
@@ -214,6 +297,117 @@ function signedOut(message: string): void {
   if (homeSignInLink) homeSignInLink.hidden = false;
   statusText.textContent = message;
 }
+accountNameEditToggle?.addEventListener("click", () => {
+  if (!accountNameForm || !accountNameInput) return;
+  const opening = accountNameForm.hidden;
+  accountNameForm.hidden = !opening;
+  accountNameEditToggle.setAttribute("aria-expanded", String(opening));
+  if (accountStatus) accountStatus.hidden = true;
+  if (opening) {
+    accountNameInput.value = adminAccountNickname;
+    accountNameInput.focus();
+  }
+});
+accountNameForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = accountNameInput?.value.trim() ?? "";
+  if (!name || !accountNameInput) return;
+  let identity: { accountId?: unknown; idToken?: unknown } | null = null;
+  try {
+    identity = JSON.parse(
+      localStorage.getItem(PLAYER_SESSION_KEY) ??
+        sessionStorage.getItem(PLAYER_SESSION_KEY) ??
+        "null",
+    ) as { accountId?: unknown; idToken?: unknown } | null;
+  } catch {
+    if (accountStatus) {
+      accountStatus.textContent = "Sign in again to change your display name.";
+      accountStatus.hidden = false;
+    }
+    return;
+  }
+  if (
+    !identity ||
+    typeof identity.accountId !== "string" ||
+    typeof identity.idToken !== "string" ||
+    identity.idToken === "verified-server-session"
+  ) {
+    if (accountStatus) {
+      accountStatus.textContent = "Sign in again to change your display name.";
+      accountStatus.hidden = false;
+    }
+    return;
+  }
+  const verifiedIdentity = identity as { accountId: string; idToken: string };
+  const submitButton = accountNameForm.querySelector<HTMLButtonElement>(
+    'button[type="submit"]',
+  );
+  if (submitButton) submitButton.disabled = true;
+  if (accountStatus) accountStatus.hidden = true;
+  void fetch("/api/player/account/profile", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${verifiedIdentity.idToken}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "omit",
+    cache: "no-store",
+    body: JSON.stringify({ displayName: name }),
+  })
+    .then(async (response) => {
+      const result = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        value?: { displayName?: unknown };
+      };
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message ?? "Could not save your display name.");
+      }
+      adminAccountNickname =
+        typeof result.value?.displayName === "string"
+          ? result.value.displayName.trim()
+          : name;
+      accountNameInput.value = adminAccountNickname;
+      if (accountDisplayName) {
+        accountDisplayName.textContent = `${adminAccountNickname} (${adminAccountRoleLabel})`;
+      }
+      try {
+        localStorage.setItem(
+          `${PLAYER_PROFILE_KEY_PREFIX}${verifiedIdentity.accountId}`,
+          adminAccountNickname,
+        );
+      } catch {
+        // The account profile is authoritative; browser storage is only a cache.
+      }
+      accountNameEditToggle?.setAttribute("aria-expanded", "false");
+      if (accountNameForm) accountNameForm.hidden = true;
+      if (accountStatus) {
+        accountStatus.textContent = "Display name updated.";
+        accountStatus.hidden = false;
+      }
+    })
+    .catch((error: unknown) => {
+      if (accountStatus) {
+        accountStatus.textContent =
+          error instanceof Error
+            ? error.message
+            : "Could not save your display name. Try again.";
+        accountStatus.hidden = false;
+      }
+    })
+    .finally(() => {
+      if (submitButton) submitButton.disabled = false;
+    });
+});
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function request(path: string, body?: unknown) {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
@@ -225,26 +419,61 @@ async function request(path: string, body?: unknown) {
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401) signedOut(data.error ?? "Sign in required.");
-    throw new Error(data.error ?? "Request failed.");
+    throw new ApiError(data.error ?? "Request failed.", response.status);
   }
   return data;
 }
 async function showSession(): Promise<void> {
   const data = await request("/api/auth/session");
-  const user = data.user as { subject?: unknown; email?: unknown; role?: unknown; expiresAt?: unknown };
-  const isAdministrator = user.role === "administrator";
+  const user = data.user as {
+    subject?: unknown;
+    email?: unknown;
+    role?: unknown;
+    expiresAt?: unknown;
+  };
+  let isAdministrator = user.role === "administrator";
+  if (isAdminPage) {
+    try {
+      await request("/api/admin/capabilities");
+      isAdministrator = true;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        isAdministrator = false;
+      } else {
+        throw error;
+      }
+    }
+  }
   rememberPlayerSession(user, verifiedCredential);
   verifiedCredential = undefined;
   if (isHomePage) {
     window.location.replace("./player.html");
     return;
   }
-  if (isAdministrator && isAdminPage) await request("/api/admin/capabilities");
   if (loginPanel) loginPanel.hidden = true;
   if (googleButton) googleButton.hidden = true;
   if (adminAccessPanel) adminAccessPanel.hidden = isAdministrator;
-  if (accountMenu) setAccountMenu(user);
+  if (accountMenu)
+    setAccountMenu({
+      ...user,
+      role: isAdministrator ? "administrator" : "user",
+    });
+  if (accountMenu) {
+    void loadAccountNickname({
+      ...user,
+      role: isAdministrator ? "administrator" : "user",
+    });
+  }
+  if (isAdminPage && isAdministrator) await foundationFeaturesReady;
   if (adminWorkspace) adminWorkspace.hidden = !isAdministrator;
+  if (isAdminPage && isAdministrator) {
+    organizationManager ??= mountOrganizationManager(
+      document,
+      () => document.dispatchEvent(new Event("buchunt:organizations-changed")),
+      false,
+    );
+    organizationManager?.setIdentity(storedPlayerIdentity());
+  } else if (isAdminPage) organizationManager?.setIdentity(null);
   if (adminDenied) adminDenied.hidden = isAdministrator;
   if (homeSignInLink) homeSignInLink.hidden = true;
   statusText.textContent = isAdministrator
@@ -252,14 +481,20 @@ async function showSession(): Promise<void> {
     : "";
   clearTimeout(expiryTimer);
   if (typeof user.expiresAt === "number") {
-    expiryTimer = setTimeout(() => {
-      signedOut("Session expired. Sign in again.");
-      if (isHomePage) void prepareGoogle().catch(showError);
-    }, Math.max(0, user.expiresAt * 1000 - Date.now()));
+    expiryTimer = setTimeout(
+      () => {
+        signedOut("Session expired. Sign in again.");
+        if (isHomePage) void prepareGoogle().catch(showError);
+      },
+      Math.max(0, user.expiresAt * 1000 - Date.now()),
+    );
   }
 }
 function showError(error: unknown): void {
-  statusText.textContent = error instanceof Error ? error.message : "Unable to complete Google sign-in. Reload to try again.";
+  statusText.textContent =
+    error instanceof Error
+      ? error.message
+      : "Unable to complete Google sign-in. Reload to try again.";
 }
 async function prepareGoogle(): Promise<void> {
   if (!isHomePage || !googleButton) return;
@@ -268,15 +503,17 @@ async function prepareGoogle(): Promise<void> {
     client_id: config.clientId,
     nonce: config.nonce,
     auto_select: false,
-    callback: result => {
+    callback: (result) => {
       statusText.textContent = "Verifying Google sign-in…";
       void request("/api/auth/login", { credential: result.credential })
         .then(async () => {
           verifiedCredential = result.credential;
           await showSession();
         })
-        .catch(async error => {
-          signedOut(error instanceof Error ? error.message : "Google sign-in failed.");
+        .catch(async (error) => {
+          signedOut(
+            error instanceof Error ? error.message : "Google sign-in failed.",
+          );
           await prepareGoogle();
         })
         .catch(showError);
@@ -284,8 +521,12 @@ async function prepareGoogle(): Promise<void> {
   });
   googleButton.replaceChildren();
   google?.accounts.id.renderButton(googleButton, {
-    type: "standard", theme: "outline", size: "large",
-    shape: "pill", text: "signin_with", width: 280,
+    type: "standard",
+    theme: "outline",
+    size: "large",
+    shape: "pill",
+    text: "signin_with",
+    width: 280,
   });
 }
 signOut?.addEventListener("click", async () => {
@@ -302,15 +543,20 @@ signOut?.addEventListener("click", async () => {
   }
 });
 async function loadGoogle(): Promise<void> {
-  const existingGoogle = (window as Window & { google?: GoogleIdentity }).google;
-  if (existingGoogle) { google = existingGoogle; return; }
+  const existingGoogle = (window as Window & { google?: GoogleIdentity })
+    .google;
+  if (existingGoogle) {
+    google = existingGoogle;
+    return;
+  }
   if (google) return;
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Google sign-in could not load. Reload to try again."));
+    script.onerror = () =>
+      reject(new Error("Google sign-in could not load. Reload to try again."));
     document.head.append(script);
   });
   google = (window as Window & { google?: GoogleIdentity }).google;
@@ -320,7 +566,9 @@ async function initialize(): Promise<void> {
     await showSession();
     return;
   } catch {
-    signedOut(isHomePage ? "" : "Sign in from the BucHunt home page to continue.");
+    signedOut(
+      isHomePage ? "" : "Sign in from the BucHunt home page to continue.",
+    );
   }
   if (isHomePage) await prepareGoogle();
 }

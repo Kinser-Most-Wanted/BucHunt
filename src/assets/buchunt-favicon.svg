@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">BucHunt</title>
+  <g fill="none" stroke="#52bdf1" stroke-linecap="round" stroke-width="4">
+    <path d="M13 63C13 42 29 29 49 25" stroke-dasharray="1 9"/>
+    <path d="M77 25c21 4 37 18 38 38 1 13-4 24-14 31" stroke-dasharray="1 9"/>
+    <path d="M62 104c-14 2-26-2-34-9" stroke-dasharray="1 9"/>
+    <path d="M94 12l19 19M113 12L94 31" stroke-width="8"/>
+    <path d="M98 99a13 13 0 1 1 13 13M109 86v13h13" stroke-width="5"/>
+  </g>
+  <circle cx="19" cy="99" r="8" fill="#52bdf1"/>
+  <text x="23" y="83" fill="#fff" font-family="Arial Black,Arial,sans-serif" font-size="53" font-weight="900" letter-spacing="-7">B</text>
+  <text x="59" y="83" fill="#ffc900" font-family="Arial Black,Arial,sans-serif" font-size="53" font-weight="900" letter-spacing="-7">H</text>
+</svg>

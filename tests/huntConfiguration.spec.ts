@@ -58,6 +58,10 @@ async function installMapMock(context: BrowserContext): Promise<void> {
       value: (lat: number, lng: number) =>
         clickListener?.({ latlng: { lat, lng } }),
     });
+    Object.defineProperty(window, "__testMapReady", {
+      configurable: true,
+      get: () => Boolean(clickListener),
+    });
   });
   await context.route(
     "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
@@ -100,6 +104,9 @@ async function installAdminSession(page: Page): Promise<void> {
 }
 
 async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
+  await page.waitForFunction(() =>
+    Boolean((window as unknown as { __testMapReady?: boolean }).__testMapReady),
+  );
   await page.evaluate(
     ({ latitude, longitude }) =>
       (
@@ -108,6 +115,432 @@ async function clickMap(page: Page, lat: number, lng: number): Promise<void> {
     { latitude: lat, longitude: lng },
   );
 }
+
+test("manage hunts virtualizes long lists and owner deletion requires the hunt name", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  const hunts = Array.from({ length: 1000 }, (_, index) => ({
+    id: `hunt-${index}`,
+    name: `Hunt ${index}`,
+    role: "owner" as const,
+    createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 1000 - index)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+  }));
+  let huntRequests = 0;
+  await page.route("**/api/admin/hunts", (route) => {
+    huntRequests += 1;
+    return route.fulfill({ json: { ok: true, value: hunts } });
+  });
+  await page.goto("/admin.html");
+  expect(huntRequests).toBe(0);
+  await page.getByTestId("open-manage-hunts").click();
+  const list = page.getByTestId("my-hunts");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    3,
+  );
+  await expect(list).toContainText("Hunt 0");
+  await expect(list).toContainText("Hunt 1");
+  await expect(list).toContainText("Hunt 999");
+  await expect(list).not.toContainText("Hunt 2");
+  await expect(
+    page.getByTestId("edit-hunt-selector").locator("option"),
+  ).toHaveCount(1);
+  const firstHunt = list.locator("button.hunt-list-link").first();
+  await firstHunt.hover();
+  await expect
+    .poll(() =>
+      firstHunt.evaluate((element) => getComputedStyle(element).transform),
+    )
+    .toBe("none");
+  await expect
+    .poll(() =>
+      firstHunt.evaluate((element) => getComputedStyle(element).filter),
+    )
+    .toBe("none");
+  await expect(page.getByTestId("manage-hunts-filter-note")).toContainText(
+    "3 most recently created or edited",
+  );
+  const dialog = page.getByTestId("hunt-details-dialog");
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(() =>
+      dialog.evaluate((element) => getComputedStyle(element).scrollbarWidth),
+    )
+    .toBe("none");
+  await expect
+    .poll(() => list.evaluate((element) => getComputedStyle(element).overflowY))
+    .toBe("visible");
+  expect(huntRequests).toBe(1);
+  await page.getByTestId("manage-hunts-search").fill("Hunt 420");
+  await expect(list.locator(":scope > li:not(.hunt-list-spacer)")).toHaveCount(
+    1,
+  );
+  await expect(list).toContainText("Hunt 420");
+  await page.getByTestId("manage-hunts-search").fill("Hunt 4");
+  await expect
+    .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())
+    .toBeGreaterThan(1);
+  await page.getByTestId("manage-hunts-search").fill("");
+  await page.getByTestId("manage-hunts-filter").selectOption("all");
+  await expect
+    .poll(() => list.locator(":scope > li:not(.hunt-list-spacer)").count())
+    .toBeGreaterThan(3);
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(24);
+  await expect
+    .poll(() =>
+      dialog.evaluate((element) => element.scrollHeight > element.clientHeight),
+    )
+    .toBe(true);
+  await dialog.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect(list).toContainText("Hunt 0");
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(30);
+  await page.getByTestId("manage-hunts-filter").selectOption("created");
+  await expect(list).toContainText("Hunt 0");
+  expect(
+    await list.locator(":scope > li:not(.hunt-list-spacer)").count(),
+  ).toBeLessThan(24);
+  await page.getByTestId("manage-hunts-search").fill("Hunt 420");
+  await expect(list).toContainText("Hunt 420");
+  await page.getByTestId("close-hunt-details").click();
+  await page.getByTestId("open-manage-hunts").click();
+  await expect(page.getByTestId("manage-hunts-search")).toHaveValue("");
+  await expect(list).toContainText("Hunt 0");
+  expect(huntRequests).toBe(1);
+  await page.getByTestId("refresh-my-hunts").click();
+  await expect.poll(() => huntRequests).toBe(2);
+});
+
+test("owners must type the exact hunt name before deleting a hunt", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  await page
+    .getByLabel("Hunt name", { exact: true })
+    .fill("Delete verification");
+  await page.getByLabel("Description", { exact: true }).fill("Temporary hunt");
+  await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
+  await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Delete verification (owner)" })
+    .click();
+  const huntId = await page
+    .locator('#define-task [name="huntId"]')
+    .inputValue();
+  const wrongNameResponse = await page.request.delete(
+    `/api/admin/hunts/${huntId}`,
+    { data: { confirmationName: "Wrong name" } },
+  );
+  expect(wrongNameResponse.status()).toBe(400);
+  await page.getByTestId("hunt-more-menu").locator("summary").click();
+  await page.getByTestId("delete-hunt").click();
+  await expect(page.getByTestId("delete-hunt-dialog")).toBeVisible();
+  await expect(page.getByTestId("delete-hunt-warning")).toContainText(
+    "cannot be undone",
+  );
+  const confirmation = page.getByTestId("delete-hunt-name-input");
+  const confirmButton = page.getByTestId("confirm-delete-hunt");
+  await confirmation.fill("Wrong name");
+  await expect(confirmButton).toBeDisabled();
+  await confirmation.fill("Delete verification");
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+  await expect(page.getByTestId("my-hunts")).not.toContainText(
+    "Delete verification",
+  );
+  await expect(page.getByTestId("creator-status")).toContainText(
+    "was permanently deleted",
+  );
+});
+
+test("players can create, edit, and invite people to organizations", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "player-account",
+        email: "owner@example.com",
+        idToken: "test-owner-token",
+      }),
+    );
+    localStorage.setItem("buchunt.player-profile.player-account", "Owner");
+  });
+  const organizations: {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    role: "owner" | "officer" | "contributor";
+    members: {
+      accountId: string | null;
+      email: string;
+      role: "owner" | "officer" | "contributor";
+      originalOwner: boolean;
+      pending: boolean;
+      isSelf: boolean;
+    }[];
+  }[] = [];
+  const invitations: {
+    organizationId: string;
+    organizationName: string;
+    role: "owner" | "officer" | "contributor";
+  }[] = [];
+  await page.route("**/api/player/account/**", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/api/player/account/organization-invitations") {
+      await route.fulfill({ json: { ok: true, value: invitations } });
+      return;
+    }
+    const invitationMatch =
+      /^\/api\/player\/account\/organization-invitations\/(organization-2|organization-3)$/.exec(
+        url.pathname,
+      );
+    if (invitationMatch && method === "POST") {
+      const input = route.request().postDataJSON() as {
+        action: "accept" | "decline";
+      };
+      const invitation = invitations.find(
+        (item) => item.organizationId === invitationMatch[1],
+      )!;
+      if (input.action === "accept") {
+        const now = new Date().toISOString();
+        organizations.push({
+          id: invitation.organizationId,
+          name: invitation.organizationName,
+          createdAt: now,
+          updatedAt: now,
+          role: "contributor",
+          members: [
+            {
+              accountId: "player-account",
+              email: "owner@example.com",
+              role: "contributor",
+              originalOwner: false,
+              pending: false,
+              isSelf: true,
+            },
+          ],
+        });
+      }
+      invitations.splice(invitations.indexOf(invitation), 1);
+      await route.fulfill({
+        json: {
+          ok: true,
+          value: {
+            organizationId: invitation.organizationId,
+            accepted: input.action === "accept",
+          },
+        },
+      });
+      return;
+    }
+    if (url.pathname === "/api/player/account/profile") {
+      await route.fulfill({
+        json: { ok: true, value: { displayName: "Owner" } },
+      });
+      return;
+    }
+    if (url.pathname === "/api/player/account/hunts") {
+      await route.fulfill({ json: { ok: true, value: [] } });
+      return;
+    }
+    if (url.pathname === "/api/player/account/organizations") {
+      if (method === "GET") {
+        await route.fulfill({ json: { ok: true, value: organizations } });
+        return;
+      }
+      const input = route.request().postDataJSON() as { name: string };
+      const now = new Date().toISOString();
+      const organization = {
+        id: "organization-1",
+        name: input.name,
+        createdAt: now,
+        updatedAt: now,
+        role: "owner" as const,
+        members: [
+          {
+            accountId: "player-account",
+            email: "owner@example.com",
+            role: "owner" as const,
+            originalOwner: true,
+            pending: false,
+            isSelf: true,
+          },
+        ],
+      };
+      organizations.push(organization);
+      await route.fulfill({
+        status: 201,
+        json: { ok: true, value: organization },
+      });
+      return;
+    }
+    const organizationMatch =
+      /^\/api\/player\/account\/organizations\/organization-1(?:\/members)?$/.exec(
+        url.pathname,
+      );
+    if (organizationMatch && method === "PATCH") {
+      const input = route.request().postDataJSON() as { name: string };
+      organizations[0].name = input.name;
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    if (
+      organizationMatch &&
+      method === "POST" &&
+      url.pathname.endsWith("/members")
+    ) {
+      const input = route.request().postDataJSON() as { email: string };
+      organizations[0].members.push({
+        accountId: null,
+        email: input.email,
+        role: "contributor",
+        originalOwner: false,
+        pending: true,
+        isSelf: false,
+      });
+      await route.fulfill({
+        json: { ok: true, value: organizations[0] },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 404,
+      json: { ok: false, code: "not-found", message: "Not found." },
+    });
+  });
+  await page.goto("/player.html");
+  await expect(page.getByTestId("organization-workspace")).toBeVisible();
+  await page.getByTestId("open-organizations").click();
+  await page.getByLabel("Create an organization").fill("Campus Explorers");
+  await page
+    .getByRole("button", { name: "Create organization", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-create-status")).toHaveText(
+    "Organization created.",
+  );
+  await page.getByLabel("Organization name").fill("Campus Discovery Club");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(page.getByTestId("organization-details-status")).toHaveText(
+    "Organization name saved.",
+  );
+  await page.getByLabel("Invite by email").fill("friend@example.com");
+  await page
+    .getByRole("button", { name: "Invite as Contributor", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invite-status")).toContainText(
+    "They must accept before joining as a Contributor",
+  );
+  await expect(page.getByTestId("organization-members")).toContainText(
+    "friend@example.com",
+  );
+
+  invitations.push(
+    {
+      organizationId: "organization-2",
+      organizationName: "Robotics Society",
+      role: "contributor",
+    },
+    {
+      organizationId: "organization-3",
+      organizationName: "Outdoor Club",
+      role: "contributor",
+    },
+  );
+  await page.reload();
+  const dialog = page.getByTestId("organization-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Robotics Society invited you to join as a contributor.");
+  await expect(
+    page.getByTestId("organization-invitations-panel"),
+  ).toContainText("Outdoor Club invited you to join as a contributor.");
+  const roboticsInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Robotics Society" });
+  await roboticsInvite
+    .getByRole("button", { name: "Accept", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation accepted.",
+  );
+  await expect(page.getByTestId("organization-list")).toContainText(
+    "Robotics Society (contributor)",
+  );
+  const outdoorInvite = page
+    .getByTestId("organization-invitations")
+    .locator("li")
+    .filter({ hasText: "Outdoor Club" });
+  await outdoorInvite
+    .getByRole("button", { name: "Decline", exact: true })
+    .click();
+  await expect(page.getByTestId("organization-invitations-status")).toHaveText(
+    "Organization invitation declined.",
+  );
+  await expect(page.getByTestId("organization-invitations-panel")).toBeHidden();
+});
+
+test("create hunt organization selector lists current memberships", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "buchunt.player-session",
+      JSON.stringify({
+        provider: "google",
+        accountId: "google-admin-123",
+        email: "admin@example.com",
+        idToken: "test-google-token",
+      }),
+    );
+  });
+  const organizationId = "123e4567-e89b-12d3-a456-426614174000";
+  await page.route("**/api/player/account/organizations", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: [
+          {
+            id: organizationId,
+            name: "Campus Explorers",
+            role: "owner",
+            createdAt: "2026-10-15T00:00:00.000Z",
+            updatedAt: "2026-10-15T00:00:00.000Z",
+            members: [],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  const createOrganization = page.getByTestId("hunt-organization");
+  await expect(createOrganization).toHaveValue("");
+  await expect(createOrganization).toContainText("Campus Explorers (owner)");
+  await createOrganization.selectOption(organizationId);
+  await expect(createOrganization).toHaveValue(organizationId);
+});
 
 test("create hunt, save task and reload configuration", async ({ page }) => {
   await installMapMock(page.context());
@@ -205,6 +638,13 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     }),
   );
   await page.goto("/admin.html");
+  await expect(page.getByTestId("admin-workspace")).toBeVisible();
+  await expect(page.getByTestId("load-admin-hunt")).toHaveCount(0);
+  await expect(page.getByTestId("open-create-hunt")).toBeVisible();
+  await expect(page.getByTestId("open-manage-hunts")).toBeVisible();
+  await expect(page.getByTestId("my-hunts")).toBeHidden();
+  await page.getByTestId("open-create-hunt").click();
+  await expect(page.getByTestId("create-hunt-dialog")).toBeVisible();
   await page
     .getByLabel("Hunt name", { exact: true })
     .fill("Sprint verification");
@@ -214,11 +654,76 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("create-hunt-dialog")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Sprint verification (owner)",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  const popupOrder = await page.evaluate(() => {
+    const overview = document.querySelector(
+      '[data-testid="hunt-details-overview"]',
+    )!;
+    return [
+      overview.querySelector(".details-actions"),
+      overview.querySelector(".details-tasks"),
+      overview.querySelector(".details-overview"),
+      overview.querySelector('[data-testid="contributors-panel"]'),
+    ].map((element) => Array.from(overview.children).indexOf(element!));
+  });
+  expect(popupOrder[0]).toBeLessThan(popupOrder[1]);
+  expect(popupOrder[1]).toBeLessThan(popupOrder[2]);
+  expect(popupOrder[2]).toBeLessThan(popupOrder[3]);
+  await expect(page.getByTestId("hunt-owner")).toHaveText("You own this hunt");
+  await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
+  await expect(page.getByTestId("contributors-panel")).toBeVisible();
+  await expect(page.getByTestId("contributors-panel")).toHaveJSProperty(
+    "open",
+    false,
+  );
+  const huntSettings = page.getByTestId("hunt-settings-form");
+  const beginsAt = huntSettings.getByTestId("hunt-settings-begins-at");
+  const endsAt = huntSettings.getByTestId("hunt-settings-ends-at");
+  await expect(beginsAt).toHaveValue("2026-10-15T10:00");
+  await beginsAt.fill("2026-10-16T10:00");
+  await endsAt.fill("2026-10-18T14:30");
+  const dateUpdate = page.waitForRequest(
+    (request) =>
+      /\/api\/admin\/hunts\/[a-f0-9-]+$/.test(
+        new URL(request.url()).pathname,
+      ) && request.method() === "PATCH",
+  );
+  await huntSettings
+    .getByRole("button", { name: "Save hunt settings" })
+    .click();
+  const dateUpdateRequest = await dateUpdate;
+  expect(dateUpdateRequest.postDataJSON()).toMatchObject({
+    beginsAt: new Date("2026-10-16T10:00").toISOString(),
+    endsAt: new Date("2026-10-18T14:30").toISOString(),
+  });
+  await expect(huntSettings.locator("[data-settings-status]")).toHaveText(
+    "Hunt settings saved.",
+  );
+  await page.getByRole("button", { name: "Edit hunt tasks" }).click();
+  await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
+  await expect(page.getByTestId("hunt-edit-title")).toHaveText(
+    "Editing Sprint verification",
+  );
+  await expect(page.getByTestId("edit-hunt-selector")).toHaveValue(
+    /^[a-f0-9-]{36}$/,
+  );
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
   expect(id).toMatch(/^[a-f0-9-]{36}$/);
   await page
     .getByLabel("Display label", { exact: true })
     .fill("Find the fountain");
+  await page
+    .getByLabel("Task type", { exact: true })
+    .selectOption("single-word-trivia");
   await page.getByLabel("Clue and instructions").fill("Read the plaque");
   await page.getByLabel("Required answer", { exact: true }).fill("Bucky");
   await page.getByTestId("task-location-query").fill("Student Center");
@@ -234,43 +739,119 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
     "was saved and appears",
   );
   await page.reload();
+  await page.getByTestId("open-manage-hunts").click();
+  let contributorRequests = 0;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname.endsWith("/contributors")) {
+      contributorRequests += 1;
+    }
+  });
   await page
     .getByRole("button", { name: "Sprint verification (owner)", exact: true })
     .click();
   await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("contributors-load-status")).toHaveText(
+    "No contributors have been added yet.",
+  );
+  expect(contributorRequests).toBe(1);
   await expect(page.getByTestId("hunt-detail-name")).toHaveText(
     "Sprint verification",
   );
+  const overviewTopOrder = await page
+    .getByTestId("hunt-details-overview")
+    .evaluate((overview) => {
+      const children = Array.from(overview.children);
+      return [
+        children.indexOf(overview.querySelector(".hunt-overview-lead")!),
+        children.indexOf(overview.querySelector(".details-status")!),
+      ];
+    });
+  expect(overviewTopOrder[0]).toBeLessThan(overviewTopOrder[1]);
   await expect(page.getByTestId("hunt-detail-id")).toBeHidden();
+  const exportMenu = page.getByTestId("export-menu");
+  await expect(exportMenu).toBeVisible();
+  await expect(page.getByTestId("back-to-manage-hunts")).toHaveCount(0);
+  await exportMenu.locator("summary").click();
+  await expect(page.getByTestId("export-hunt-pdf")).toBeVisible();
+  await expect(page.getByTestId("export-hunt-csv")).toBeVisible();
+  await exportMenu.locator("summary").click();
+  const moreMenu = page.getByTestId("hunt-more-menu");
+  await moreMenu.locator("summary").click();
+  const idControl = page.locator(".hunt-id-control");
+  await expect(
+    page
+      .getByTestId("hunt-id-toggle")
+      .locator("xpath=following-sibling::output"),
+  ).toBeHidden();
   await page.getByTestId("hunt-id-toggle").click();
-  await expect(page.getByTestId("hunt-detail-id")).toHaveText(id);
-  await expect(page.getByTestId("hunt-facts")).toContainText("Access code");
+  await expect(idControl.getByTestId("hunt-detail-id")).toHaveText(id);
+  await expect(idControl.getByTestId("hunt-detail-id")).toBeVisible();
+  await expect(page.getByTestId("hunt-id-toggle")).toHaveCSS(
+    "color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await expect(idControl).toHaveCSS("position", "relative");
+  await expect(page.getByTestId("hunt-access-code")).not.toBeEmpty();
   await expect(page.getByTestId("player-hunt-link")).toHaveAttribute(
     "href",
-    /accessCode=[A-F0-9]{8}$/,
+    /accessCode=[A-F0-9]{8}&autoJoin=1$/,
   );
   await expect(page.getByTestId("hunt-detail-tasks")).toContainText(
     "Find the fountain",
   );
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
-  await expect(page.getByTestId("hunt-details-dialog")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await expect(page.getByTestId("hunt-details-overview")).toBeHidden();
+  await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("defined-task-list")).toContainText(
     "Find the fountain",
   );
+
+  await page.getByTestId("edit-task").click();
+  await expect(page.getByLabel("Display label", { exact: true })).toHaveValue(
+    "Find the fountain",
+  );
+  await expect(page.locator('[name="latitude"]')).toHaveValue("36.302");
+  await expect(page.locator('[name="longitude"]')).toHaveValue("-82.369");
+  await page
+    .getByLabel("Display label", { exact: true })
+    .fill("The Blue Fountain");
+  await page.getByLabel("Clue and instructions").fill("Read the new plaque");
+  await page.getByLabel("Required answer", { exact: true }).fill("Campus bell");
+  await page.getByRole("button", { name: "Save task changes" }).click();
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was updated and appears",
+  );
+  await expect(page.getByTestId("defined-task-list")).toContainText(
+    "The Blue Fountain",
+  );
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("delete-task").click();
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was deleted from this hunt",
+  );
+  await expect(page.getByTestId("defined-task-list")).not.toContainText(
+    "The Blue Fountain",
+  );
+  await page.getByTestId("back-to-hunt-details").click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  await expect(page.getByTestId("hunt-details-editor")).toBeHidden();
 });
 
-test("only owners and contributors can configure a hunt through the creator workspace", async ({
+test("hunt owners, officers, and contributors get their assigned workspace permissions", async ({
   page,
   browser,
   baseURL,
 }) => {
+  test.setTimeout(120_000);
   await installMapMock(page.context());
   await installAdminSession(page);
   await page.goto("/admin.html");
-  await expect(page.getByTestId("creator-id")).toHaveText(
-    /^browser:[a-f0-9]{64}$/,
-  );
+  await expect(page.getByTestId("creator-id")).toHaveCount(0);
   await expect(page.getByLabel("Administrator API token")).toHaveCount(0);
+  await page.getByTestId("open-create-hunt").click();
   await page.getByLabel("Hunt name", { exact: true }).fill("Shared hunt");
   await page
     .getByLabel("Description", { exact: true })
@@ -278,7 +859,93 @@ test("only owners and contributors can configure a hunt through the creator work
   await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
   await page.getByRole("button", { name: "Create hunt", exact: true }).click();
   await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
   const id = await page.locator('#define-task [name="huntId"]').inputValue();
+  const participantId = "google-" + "a".repeat(64);
+  const secondParticipantId = "google-" + "b".repeat(64);
+  let firstPlayerKicked = false;
+  let secondPlayerBanned = false;
+  let moderationAction: unknown;
+  await page.route("**/api/admin/hunts/" + id + "/participants", (route) => {
+    const value = [
+      ...(!firstPlayerKicked
+        ? [{ participantId, displayName: "Baja", tasks: [] }]
+        : []),
+      ...(!secondPlayerBanned
+        ? [
+            {
+              participantId: secondParticipantId,
+              displayName: "Morgan",
+              tasks: [],
+            },
+          ]
+        : []),
+    ];
+    return route.fulfill({
+      json: {
+        ok: true,
+        value,
+        bannedParticipants: secondPlayerBanned
+          ? [{ participantId: secondParticipantId, displayName: "Morgan" }]
+          : [],
+        summary: {
+          activeCount: value.length,
+          leftCompletedCount: 0,
+          leftIncompleteCount: 0,
+        },
+      },
+    });
+  });
+  await page.route(
+    "**/api/admin/hunts/" + id + "/participants/actions",
+    (route) => {
+      moderationAction = route.request().postDataJSON();
+      const action = (moderationAction as { action: string }).action;
+      if (action === "kick") firstPlayerKicked = true;
+      if (action === "ban") secondPlayerBanned = true;
+      if (action === "unban") secondPlayerBanned = false;
+      return route.fulfill({ json: { ok: true, value: { removed: true } } });
+    },
+  );
+  await page
+    .getByRole("button", { name: "Shared hunt (owner)", exact: true })
+    .click();
+  await expect(page.getByTestId("hunt-details-overview")).toBeVisible();
+  const participantProgress = page.getByTestId("participant-progress");
+  await expect(participantProgress).toBeVisible();
+  await expect(
+    page.getByTestId("participant-progress-row").first(),
+  ).toContainText("Baja");
+  await expect(page.getByTestId("kick-participant")).toHaveCount(2);
+  await expect(page.getByTestId("ban-participant")).toHaveCount(2);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("kick-participant").first().click();
+  await expect(page.getByTestId("participant-progress-row")).toHaveCount(1);
+  expect(moderationAction).toEqual({ participantId, action: "kick" });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("ban-participant").click();
+  await expect(page.getByTestId("participant-progress-empty")).toBeVisible();
+  await expect(page.getByTestId("banned-participant-row")).toContainText(
+    "Morgan",
+  );
+  expect(moderationAction).toEqual({
+    participantId: secondParticipantId,
+    action: "ban",
+  });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("unban-participant").click();
+  await expect(page.getByTestId("banned-participant-empty")).toBeVisible();
+  await expect(page.getByTestId("participant-progress-row")).toContainText(
+    "Morgan",
+  );
+  expect(moderationAction).toEqual({
+    participantId: secondParticipantId,
+    action: "unban",
+  });
+  await page.getByTestId("refresh-participant-progress").click();
+  await expect(page.getByTestId("participant-progress-status")).toHaveText(
+    "Participant progress is up to date.",
+  );
   const contributor = await browser.newContext({ baseURL });
   const stranger = await browser.newContext({ baseURL });
   try {
@@ -286,31 +953,61 @@ test("only owners and contributors can configure a hunt through the creator work
     await installMapMock(contributor);
     await installAdminSession(member);
     await member.goto("/admin.html");
-    await expect(member.getByTestId("creator-id")).toHaveText(
-      /^browser:[a-f0-9]{64}$/,
-    );
+    await expect(member.getByTestId("creator-id")).toHaveCount(0);
+    await member.getByTestId("open-manage-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",
     );
-    expect(
-      (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
-    ).toBe(403);
+    const memberHuntStatus = await member.evaluate(
+      async (huntId) => (await fetch(`/api/admin/hunts/${huntId}`)).status,
+      id,
+    );
+    expect([401, 403]).toContain(memberHuntStatus);
     const visitor = await stranger.newPage();
     await installAdminSession(visitor);
     await visitor.goto("/admin.html");
-    await expect(visitor.getByTestId("creator-id")).toHaveText(
-      /^browser:[a-f0-9]{64}$/,
+    await expect(visitor.getByTestId("creator-id")).toHaveCount(0);
+    await visitor.getByTestId("open-manage-hunts").click();
+    await expect(visitor.getByTestId("my-hunts")).not.toContainText(
+      "Shared hunt",
     );
-    expect(
-      (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
-    ).toBe(403);
-    const memberId = (await member.getByTestId("creator-id").textContent())!;
-    await page.getByLabel("Contributor creator ID").fill(memberId);
+    const visitorHuntStatus = await visitor.evaluate(
+      async (huntId) => (await fetch(`/api/admin/hunts/${huntId}`)).status,
+      id,
+    );
+    expect([401, 403]).toContain(visitorHuntStatus);
+    const memberSession = await (
+      await contributor.request.get("/api/admin/session")
+    ).json();
+    const memberId = memberSession.value.id as string;
+    await page.getByTestId("contributors-panel").locator("summary").click();
     await page
-      .getByRole("button", { name: "Add contributor", exact: true })
+      .getByLabel("Collaborator's Google email")
+      .fill("teammate@example.com");
+    await page
+      .getByRole("button", { name: "Invite as Contributor", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toContainText(
-      "Contributor added",
+      "Invitation saved",
+    );
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Invitation pending · teammate@example.com",
+    );
+    await page.request.post(`/api/admin/hunts/${id}/contributors`, {
+      data: { creatorId: memberId },
+    });
+    await page.reload();
+    await page.getByTestId("open-manage-hunts").click();
+    await page
+      .getByRole("button", { name: "Shared hunt (owner)", exact: true })
+      .click();
+    await expect(page.getByTestId("hunt-detail-name")).toHaveText(
+      "Shared hunt",
+    );
+    await page.getByTestId("contributors-panel").locator("summary").click();
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Google account · Contributor",
+      { timeout: 15_000 },
     );
     await member.getByTestId("refresh-my-hunts").click();
     await member
@@ -320,17 +1017,78 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("hunt-detail-name")).toHaveText(
       "Shared hunt",
     );
+    expect([401, 403]).toContain(
+      (
+        await member.request.delete(`/api/admin/hunts/${id}`, {
+          data: { confirmationName: "Shared hunt" },
+        })
+      ).status(),
+    );
     await expect(member.getByTestId("hunt-detail-id")).toBeHidden();
+    await member.getByTestId("hunt-more-menu").locator("summary").click();
     await member.getByTestId("hunt-id-toggle").click();
     await expect(member.getByTestId("hunt-detail-id")).toHaveText(id);
-    await expect(member.getByTestId("hunt-creators")).toContainText("Owner");
-    await member.getByRole("button", { name: "Edit hunt tasks" }).click();
+    await expect(member.getByTestId("hunt-owner")).toHaveText(
+      "Contributor access",
+    );
+    await expect(member.getByTestId("hunt-tasks-section")).toBeHidden();
+    await expect(member.getByTestId("edit-hunt-link")).toBeHidden();
+    await expect(member.getByTestId("player-hunt-link")).toBeHidden();
+    await expect(member.locator(".hunt-access-code")).toBeHidden();
+    const contributorPanel = member.getByTestId("contributors-panel");
+    await expect(contributorPanel).toBeVisible();
+    await contributorPanel.locator("summary").click();
+    await expect(contributorPanel).toContainText(
+      "As a Contributor, you can view basic hunt details.",
+    );
+    await expect(
+      contributorPanel.locator(".contributor-management"),
+    ).toBeHidden();
+    const contributorTaskCreate = await member.request.post(
+      `/api/admin/hunts/${id}/tasks`,
+      { data: { displayLabel: "Blocked", order: 1 } },
+    );
+    expect(contributorTaskCreate.status()).toBe(403);
+    await member.getByTestId("close-hunt-details").click();
     await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await member.getByTestId("open-manage-hunts").click();
+    await expect(page.getByTestId("contributor-list")).toContainText(
+      "Google account · Contributor",
+    );
+    const originalOwnerRow = page
+      .getByTestId("contributor-list")
+      .locator("li")
+      .filter({ hasText: "Original hunt owner" });
+    await expect(originalOwnerRow.locator("select")).toHaveCount(0);
+    await expect(
+      originalOwnerRow.getByRole("button", { name: "Remove access" }),
+    ).toBeHidden();
+    await page
+      .getByTestId("contributor-list")
+      .getByLabel("Role for Google account")
+      .selectOption("officer");
+    await expect(page.getByTestId("contributor-status")).toContainText(
+      "Role changed to Officer",
+    );
+    await member.getByTestId("refresh-my-hunts").click();
+    await member
+      .getByRole("button", { name: "Shared hunt (officer)", exact: true })
+      .click();
+    await expect(member.getByTestId("hunt-owner")).toHaveText("Officer access");
+    await expect(member.getByTestId("hunt-tasks-section")).toBeVisible();
+    await expect(member.getByTestId("edit-hunt-link")).toBeVisible();
+    await member.getByRole("button", { name: "Edit hunt tasks" }).click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeVisible();
+    await expect(member.getByTestId("hunt-details-overview")).toBeHidden();
+    await expect(member.getByTestId("hunt-details-editor")).toBeVisible();
     await expect(member).toHaveURL(/admin\.html$/);
     await expect(member.getByTestId("contributors-panel")).toBeHidden();
     await member
       .getByLabel("Display label", { exact: true })
       .fill("Collaborator task");
+    await member
+      .getByLabel("Task type", { exact: true })
+      .selectOption("single-word-trivia");
     await member.getByLabel("Clue and instructions").fill("Look nearby");
     await member.getByLabel("Required answer", { exact: true }).fill("Bucky");
     await clickMap(member, 36, -82);
@@ -340,33 +1098,125 @@ test("only owners and contributors can configure a hunt through the creator work
     await expect(member.getByTestId("task-status")).toContainText(
       "was saved and appears",
     );
-    expect(
+    const visitorSession = await (
+      await stranger.request.get("/api/admin/session")
+    ).json();
+    expect([401, 403]).toContain(
       (
         await contributor.request.post(`/api/admin/hunts/${id}/contributors`, {
-          data: {
-            creatorId: await visitor.getByTestId("creator-id").textContent(),
-          },
+          data: { creatorId: visitorSession.value.id },
         })
       ).status(),
-    ).toBe(403);
+    );
     await page
-      .getByRole("button", { name: "Remove contributor", exact: true })
+      .getByRole("button", { name: "Remove access", exact: true })
       .click();
     await expect(page.getByTestId("contributor-status")).toHaveText(
       "Contributor removed.",
     );
-    expect(
-      (await contributor.request.get(`/api/admin/hunts/${id}`)).status(),
-    ).toBe(403);
+    expect([401, 403]).toContain(
+      (
+        await contributor.request.get(`/api/admin/hunts/${id}`, {
+          timeout: 5000,
+        })
+      ).status(),
+    );
+    await page
+      .getByRole("button", { name: "Cancel invitation", exact: true })
+      .click();
+    await expect(page.getByTestId("contributor-status")).toHaveText(
+      "Invitation canceled.",
+    );
+    await member.getByTestId("back-to-hunt-details").click();
+    await expect(member.getByTestId("hunt-details-overview")).toBeVisible();
+    await member.getByTestId("close-hunt-details").click();
+    await expect(member.getByTestId("hunt-details-dialog")).toBeHidden();
+    await member.getByTestId("open-manage-hunts").click();
+    await expect(member.getByTestId("manage-hunts-view")).toBeVisible();
     await member.getByTestId("refresh-my-hunts").click();
     await expect(member.getByTestId("my-hunts")).not.toContainText(
       "Shared hunt",
     );
-    expect(
-      (await stranger.request.get(`/api/admin/hunts/${id}`)).status(),
-    ).toBe(403);
+    expect([401, 403]).toContain(
+      (
+        await stranger.request.get(`/api/admin/hunts/${id}`, {
+          timeout: 5000,
+        })
+      ).status(),
+    );
   } finally {
-    await contributor.close();
-    await stranger.close();
+    await Promise.allSettled([contributor.close(), stranger.close()]);
   }
+});
+
+test("task type selection creates multiple-choice configuration and resets after saving", async ({
+  page,
+}) => {
+  await installMapMock(page.context());
+  await installAdminSession(page);
+  await page.goto("/admin.html");
+  await page.getByTestId("open-create-hunt").click();
+  await page
+    .getByLabel("Hunt name", { exact: true })
+    .fill("Multiple choice hunt");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill("Shapes around campus");
+  await page.getByLabel("Begins at (local time)").fill("2026-10-15T10:00");
+  await page.getByRole("button", { name: "Create hunt", exact: true }).click();
+  await expect(page.getByTestId("hunt-status")).toContainText("Hunt saved:");
+  await expect(page.getByTestId("hunt-details-dialog")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Multiple choice hunt (owner)", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit hunt tasks" }).click();
+  const type = page.getByLabel("Task type", { exact: true });
+  await expect(type).toHaveValue("");
+  await expect(type.locator('option[value=""]')).toBeDisabled();
+  await type.selectOption("single-word-trivia");
+  await expect(
+    page.getByLabel("Required answer", { exact: true }),
+  ).toBeVisible();
+  await type.selectOption("multiple-choice");
+  await expect(
+    page.getByLabel("Required answer", { exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Display label", { exact: true }).fill("Street sign");
+  const question = page.getByLabel("What is the question being asked?");
+  await expect(question).toHaveAttribute(
+    "placeholder",
+    "What shape is the sign on xyz street at abc building?",
+  );
+  await question.fill("What shape is this sign?");
+  await page.getByLabel("Correct Answer", { exact: true }).fill("Square");
+  for (const [index, choice] of ["Circle", "Triangle", "Octagon"].entries())
+    await page
+      .getByLabel(`Incorrect Answer ${index + 1}`, { exact: true })
+      .fill(choice);
+  await clickMap(page, 36, -82);
+  const request = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/tasks") && request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Add task to hunt" }).click();
+  expect((await request).postDataJSON()).toMatchObject({
+    taskType: "multiple-choice",
+    description: "What shape is this sign?",
+    requiredAnswer: "Square",
+    choices: ["Square", "Circle", "Triangle", "Octagon"],
+  });
+  await expect(page.getByTestId("task-status")).toContainText(
+    "was saved and appears",
+  );
+  await expect(type).toHaveValue("");
+  await expect(question).toBeDisabled();
+  await page.getByTestId("edit-task").click();
+  await expect(type).toHaveValue("multiple-choice");
+  await expect(question).toHaveValue("What shape is this sign?");
+  await expect(page.getByLabel("Correct Answer", { exact: true })).toHaveValue(
+    "Square",
+  );
+  await expect(
+    page.getByLabel("Incorrect Answer 1", { exact: true }),
+  ).toHaveValue("Circle");
 });

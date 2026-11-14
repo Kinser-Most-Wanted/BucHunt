@@ -26,6 +26,46 @@ test("landing page keeps player navigation behind sign-in", async ({
   await expect(page.getByRole("navigation")).toHaveCount(0);
 });
 
+test("admin workspace waits for Hunt Studio controls to load", async ({
+  page,
+}) => {
+  let releaseBootstrap!: () => void;
+  const bootstrapReady = new Promise<void>((resolve) => {
+    releaseBootstrap = resolve;
+  });
+  const administrator = {
+    subject: "google-subject-admin",
+    email: "admin@example.com",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    role: "administrator",
+  };
+
+  await page.route("**/js/foundation/bootstrap.js", async (route) => {
+    await bootstrapReady;
+    await route.continue();
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ json: { user: administrator } }),
+  );
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      json: { administrator, capabilities: ["administrative.access"] },
+    }),
+  );
+
+  await page.goto("/admin.html", { waitUntil: "commit" });
+  await page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/admin/capabilities",
+  );
+  await expect(page.getByTestId("admin-workspace")).toBeHidden();
+
+  releaseBootstrap();
+  await expect(page.getByTestId("admin-workspace")).toBeVisible();
+  await page.getByTestId("open-create-hunt").click();
+  await expect(page.getByTestId("hunt-form")).toBeVisible();
+});
+
 test("shared Google sign-in checks the server admin role", async ({ page }) => {
   let authenticated = false;
   const administrator = {
@@ -34,6 +74,7 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     role: "administrator",
   };
+  const sessionUser = { ...administrator, role: "user" as const };
 
   await page.addInitScript(() => {
     type Callback = (response: { credential: string }) => void;
@@ -72,6 +113,19 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
     };
   });
 
+  await page.route("**/api/player/account/profile", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        value: {
+          displayName:
+            route.request().method() === "PUT"
+              ? route.request().postDataJSON().displayName
+              : null,
+        },
+      },
+    }),
+  );
   await page.route("**/api/player/account/hunts", (route) =>
     route.fulfill({ json: { ok: true, value: [] } }),
   );
@@ -88,14 +142,14 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
       await route.fulfill({
         status: authenticated ? 200 : 401,
         json: authenticated
-          ? { user: administrator }
+          ? { user: sessionUser }
           : { error: "Sign-in required." },
       });
       return;
     }
     if (path === "/api/auth/login") {
       authenticated = true;
-      await route.fulfill({ json: { user: administrator } });
+      await route.fulfill({ json: { user: sessionUser } });
       return;
     }
     if (path === "/api/auth/logout") {
@@ -127,7 +181,13 @@ test("shared Google sign-in checks the server admin role", async ({ page }) => {
   );
   await expect(page.locator("#admin-access")).toBeHidden();
   await expect(page.locator("#admin-workspace")).toBeVisible();
+  await expect(page.getByTestId("hunt-form")).toBeHidden();
+  await page.getByTestId("open-create-hunt").click();
   await expect(page.getByTestId("hunt-form")).toBeVisible();
+  await page.getByTestId("close-create-hunt").click();
+  await page.getByTestId("open-manage-hunts").click();
+  await expect(page.getByTestId("manage-hunts-view")).toBeVisible();
+  await page.getByTestId("close-hunt-details").click();
   await expect(page.getByTestId("admin-account-menu")).toBeVisible();
   await expect(page.getByTestId("admin-display-name")).toContainText("(Admin)");
   await page.getByTestId("admin-account").click();
@@ -183,6 +243,13 @@ test("non-admin Google accounts cannot view Hunt Studio tools", async ({
   };
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({ json: { user: visitor } }),
+  );
+
+  await page.route("**/api/admin/capabilities", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: "Administrator access required." },
+    }),
   );
 
   await page.goto("/admin.html");

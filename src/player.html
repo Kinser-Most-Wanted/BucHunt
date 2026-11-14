@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Player tasks | BucHunt</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/buchunt-favicon.svg" />
     <link rel="stylesheet" href="./css/foundation.css" />
   </head>
   <body data-page="player">
     <header>
-      <a class="brand" href="./index.html">
+      <a class="brand" href="./player.html">
         <img
           src="./assets/buchunt-logo.svg"
           alt="BucHunt"
@@ -28,74 +29,41 @@
             Signed in as <strong data-testid="player-display-name"></strong>
           </summary>
           <div class="player-account-dropdown">
-            <div
-              data-testid="player-google-email"
-              class="player-sensitive-detail"
+            <button
+              type="button"
+              class="account-name-edit-toggle"
+              data-testid="player-change-display-name"
+              aria-expanded="false"
+              aria-controls="player-account-name-form"
+            >
+              Change display name
+            </button>
+            <form
+              id="player-account-name-form"
+              class="account-name-edit-form"
+              data-testid="player-account-name-form"
               hidden
             >
-              <button
-                type="button"
-                data-testid="email-toggle"
-                aria-expanded="false"
-                aria-controls="player-email-value"
-              >
-                Show Google account email
+              <label for="player-account-name-input">New display name</label>
+              <input
+                id="player-account-name-input"
+                data-testid="player-account-name-input"
+                name="displayName"
+                autocomplete="nickname"
+                maxlength="40"
+                required
+              />
+              <button type="submit" class="primary-button">
+                Save display name
               </button>
-              <output
-                id="player-email-value"
-                data-testid="player-email"
+              <p
+                class="player-account-status"
+                data-testid="player-account-name-status"
+                role="status"
+                aria-live="polite"
                 hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="copy-email"
-                aria-label="Copy Google account email"
-                title="Copy email"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <div
-              data-testid="player-google-account-id"
-              class="player-sensitive-detail"
-              hidden
-            >
-              <button
-                type="button"
-                data-testid="account-id-toggle"
-                aria-expanded="false"
-                aria-controls="player-account-id-value"
-              >
-                Show Google account ID
-              </button>
-              <output
-                id="player-account-id-value"
-                data-testid="account-id-value"
-                hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="copy-account-id"
-                aria-label="Copy Google account ID"
-                title="Copy account ID"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
+              ></p>
+            </form>
             <button
               type="button"
               data-testid="player-sign-out"
@@ -119,13 +87,208 @@
       </div>
       <section id="display-tasks" data-testid="display-tasks">
         <h2 data-testid="player-heading">Sign in to see active Hunts</h2>
+        <section
+          data-testid="player-hunt-lookup"
+          class="player-hunt-lookup"
+          aria-labelledby="hunt-lookup-heading"
+          hidden
+        >
+          <div class="player-hunt-join-copy">
+            <p class="eyebrow">YOUR NEXT ADVENTURE</p>
+            <h2 id="hunt-lookup-heading">Join a Hunt</h2>
+            <p>
+              Have an access code? Enter it here to add the Hunt to your
+              dashboard and start exploring.
+            </p>
+          </div>
+          <form data-testid="player-hunt-form" class="player-hunt-join-form">
+            <label for="player-hunt-id">Hunt access code</label>
+            <div class="player-hunt-join-controls">
+              <input
+                id="player-hunt-id"
+                name="accessCode"
+                maxlength="8"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                class="hunt-access-code"
+                placeholder="ENTER 8-CHARACTER CODE"
+                required
+              />
+              <button type="submit">
+                <span>Join Hunt</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12h13M13 6l6 6-6 6"></path>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </section>
+        <section
+          class="organization-workspace"
+          data-testid="organization-workspace"
+          hidden
+        >
+          <div class="organization-workspace-copy">
+            <p class="eyebrow">YOUR COMMUNITY</p>
+            <h2>Organizations</h2>
+            <p>Create a group, invite people by email, and choose its role.</p>
+          </div>
+          <div class="organization-workspace-actions">
+            <button type="button" data-testid="open-organizations">
+              Manage organizations
+            </button>
+            <button
+              type="button"
+              data-testid="open-organization-invitations"
+              hidden
+            >
+              Organization invitations
+            </button>
+          </div>
+        </section>
+        <dialog
+          class="organization-management-dialog"
+          data-testid="organization-dialog"
+          aria-labelledby="organization-dialog-title"
+        >
+          <div class="organization-dialog-heading">
+            <div>
+              <p class="eyebrow">YOUR COMMUNITY</p>
+              <h2 id="organization-dialog-title">Manage organizations</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-organizations"
+              aria-label="Close organizations"
+            >
+              ×
+            </button>
+          </div>
+          <section
+            class="organization-invitations-panel"
+            data-testid="organization-invitations-panel"
+            aria-labelledby="organization-invitations-heading"
+            hidden
+          >
+            <p class="eyebrow">YOU’RE INVITED</p>
+            <h3 id="organization-invitations-heading">
+              Organization invitations
+            </h3>
+            <ul
+              class="organization-invitations"
+              data-testid="organization-invitations"
+              aria-label="Pending organization invitations"
+            ></ul>
+          </section>
+          <p
+            class="organization-status"
+            data-testid="organization-invitations-status"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></p>
+          <form data-testid="organization-create-form">
+            <label for="organization-create-name">Create an organization</label>
+            <div class="organization-create-controls">
+              <input
+                id="organization-create-name"
+                name="name"
+                maxlength="120"
+                required
+              />
+              <button type="submit">Create organization</button>
+            </div>
+            <p
+              class="organization-status"
+              data-testid="organization-create-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
+          <div class="organization-management-layout">
+            <ul
+              class="organization-list"
+              data-testid="organization-list"
+              aria-label="Your organizations"
+            ></ul>
+            <section
+              class="organization-editor"
+              data-testid="organization-editor"
+              hidden
+              aria-label="Selected organization"
+            >
+              <form data-testid="organization-details-form">
+                <label for="organization-edit-name">Organization name</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-edit-name"
+                    name="name"
+                    maxlength="120"
+                    required
+                  />
+                  <button type="submit">Save name</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-details-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <form data-testid="organization-invite-form">
+                <label for="organization-invite-email">Invite by email</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-invite-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                  />
+                  <button type="submit">Invite as Contributor</button>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-invite-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <h3>Members</h3>
+              <ul
+                class="organization-members"
+                data-testid="organization-members"
+                aria-label="Organization members"
+              ></ul>
+            </section>
+          </div>
+        </dialog>
+        <section
+          class="organization-hunt-discovery"
+          data-testid="organization-hunt-discovery"
+          hidden
+          aria-labelledby="organization-hunts-heading"
+        >
+          <p class="eyebrow">YOUR COMMUNITY</p>
+          <h2 id="organization-hunts-heading">Organization Hunts</h2>
+          <p>Join an adventure shared with one of your organizations.</p>
+          <p
+            class="organization-status"
+            data-testid="organization-hunts-status"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <ul
+            data-testid="organization-hunts-list"
+            aria-label="Joinable organization hunts"
+          ></ul>
+        </section>
         <form data-testid="player-name-form" class="player-name-form" hidden>
           <label for="player-display-name-input"
             >Choose your display name</label
           >
-          <p class="field-help">
-            This is the name shown on your BucHunt player page.
-          </p>
           <input
             id="player-display-name-input"
             data-testid="player-display-name-input"
@@ -156,35 +319,214 @@
           hidden
         ></p>
         <p role="status" data-testid="player-task-status" aria-live="polite">
-          No tasks loaded.
+          No hunts loaded.
         </p>
-        <ul
-          data-testid="player-hunt-list"
-          aria-label="Your Hunts"
-          class="player-hunt-list"
-        ></ul>
-        <section
-          data-testid="player-hunt-lookup"
-          class="player-hunt-lookup"
-          aria-labelledby="hunt-lookup-heading"
+        <div
+          class="player-hunt-categories"
+          data-testid="player-hunt-categories"
           hidden
         >
-          <h2 id="hunt-lookup-heading">Join a Hunt</h2>
-          <form data-testid="player-hunt-form">
-            <label for="player-hunt-id">Access code</label>
-            <input
-              id="player-hunt-id"
-              name="accessCode"
-              maxlength="8"
-              autocomplete="off"
-              required
-            />
-            <button type="submit">Join Hunt</button>
-          </form>
-          <p role="status" data-testid="player-hunt-lookup-status"></p>
-          <h3 data-testid="player-hunt-name">Selected Hunt</h3>
-          <ul data-testid="player-task-list" aria-label="Hunt tasks"></ul>
-        </section>
+          <section
+            class="player-hunt-category"
+            aria-labelledby="active-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">READY WHEN YOU ARE</p>
+                <h2 id="active-hunts-heading">Active Hunts</h2>
+              </div>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="active-hunt-count"
+                  aria-label="0 active hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">In progress</span>
+              </div>
+            </div>
+            <ul
+              data-testid="player-hunt-list"
+              aria-label="Active Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p
+              class="player-hunt-empty"
+              data-testid="active-hunts-empty"
+              hidden
+            >
+              No active Hunts right now.
+            </p>
+          </section>
+          <section
+            class="player-hunt-category"
+            aria-labelledby="future-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">COMING UP</p>
+                <h2 id="future-hunts-heading">Future Hunts</h2>
+              </div>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="future-hunt-count"
+                  aria-label="0 future hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">Starts soon</span>
+              </div>
+            </div>
+            <ul
+              data-testid="player-future-hunt-list"
+              aria-label="Future Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p
+              class="player-hunt-empty"
+              data-testid="future-hunts-empty"
+              hidden
+            >
+              No upcoming Hunts.
+            </p>
+          </section>
+          <section
+            class="player-hunt-category"
+            aria-labelledby="past-hunts-heading"
+          >
+            <div class="player-hunt-category-heading">
+              <div>
+                <p class="eyebrow">YOUR HISTORY</p>
+                <h2 id="past-hunts-heading">Past Hunts</h2>
+              </div>
+              <div class="hunt-category-indicators">
+                <span
+                  class="hunt-state-badge hunt-category-count"
+                  data-testid="past-hunt-count"
+                  aria-label="0 past hunts"
+                  >(0)</span
+                >
+                <span class="hunt-state-badge">Hunt Ended</span>
+              </div>
+            </div>
+            <label class="past-hunt-filter" for="past-hunt-filter">
+              <span>Filter past Hunts</span>
+              <select id="past-hunt-filter" data-testid="past-hunt-filter">
+                <option value="recent-3" selected>Most Recent</option>
+                <option value="all">All past Hunts</option>
+                <option value="completed">Completed</option>
+                <option value="incomplete">Incomplete</option>
+                <option value="no-tasks">No tasks</option>
+                <option value="last-7-days">Ended in the last 7 days</option>
+                <option value="last-30-days">Ended in the last 30 days</option>
+                <option value="over-30-days">Ended over 30 days ago</option>
+              </select>
+            </label>
+            <p
+              class="past-hunt-filter-note"
+              data-testid="past-hunt-filter-note"
+              aria-live="polite"
+            >
+              Showing up to 3 recent Past Hunts. Choose a filter to browse older
+              hunts.
+            </p>
+            <ul
+              data-testid="player-past-hunt-list"
+              aria-label="Past Hunts"
+              class="player-hunt-list"
+            ></ul>
+            <p class="player-hunt-empty" data-testid="past-hunts-empty" hidden>
+              No past Hunts yet.
+            </p>
+          </section>
+        </div>
+        <dialog
+          data-testid="player-hunt-details"
+          class="player-hunt-details"
+          aria-labelledby="player-hunt-name"
+        >
+          <div class="hunt-details-dialog-heading">
+            <p class="eyebrow">HUNT OVERVIEW</p>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-player-hunt-details"
+              aria-label="Close hunt details"
+            >
+              ×
+            </button>
+          </div>
+          <p
+            class="details-status"
+            data-testid="player-hunt-lookup-status"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <h2 id="player-hunt-name" data-testid="player-hunt-name">
+            Your adventure
+          </h2>
+          <p
+            class="details-description"
+            data-testid="player-hunt-description"
+          ></p>
+          <section
+            class="details-overview"
+            aria-labelledby="player-hunt-overview-heading"
+          >
+            <div class="details-section-heading">
+              <p class="eyebrow">THE BIG PICTURE</p>
+              <h3 id="player-hunt-overview-heading">Hunt overview</h3>
+            </div>
+            <dl class="hunt-facts" data-testid="player-hunt-facts"></dl>
+          </section>
+          <section class="details-tasks" aria-labelledby="player-tasks-heading">
+            <div class="details-section-heading">
+              <p class="eyebrow">THE ADVENTURE</p>
+              <h3 id="player-tasks-heading">Hunt tasks</h3>
+            </div>
+            <ol
+              data-testid="player-task-list"
+              aria-label="Hunt tasks"
+              class="hunt-detail-task-list"
+            ></ol>
+            <p class="details-muted" data-testid="player-hunt-no-tasks" hidden>
+              This Hunt has no tasks yet.
+            </p>
+          </section>
+        </dialog>
+        <dialog
+          class="player-leave-dialog"
+          data-testid="leave-hunt-dialog"
+          aria-labelledby="leave-hunt-title"
+          aria-describedby="leave-hunt-warning"
+        >
+          <div class="player-leave-content">
+            <p class="eyebrow">LEAVE THIS ADVENTURE</p>
+            <h2 id="leave-hunt-title">Leave this Hunt?</h2>
+            <p id="leave-hunt-warning" class="player-leave-warning">
+              You will leave <strong data-testid="leave-hunt-name"></strong>
+              and it will be removed from your Hunts. You can join again later.
+            </p>
+            <p
+              class="player-leave-status"
+              data-testid="leave-hunt-status"
+              role="alert"
+              hidden
+            ></p>
+            <div class="player-leave-actions">
+              <button type="button" data-testid="cancel-leave-hunt">
+                Stay in Hunt
+              </button>
+              <button
+                type="button"
+                class="player-leave-confirm"
+                data-testid="confirm-leave-hunt"
+              >
+                Leave Hunt
+              </button>
+            </div>
+          </div>
+        </dialog>
       </section>
     </main>
     <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>

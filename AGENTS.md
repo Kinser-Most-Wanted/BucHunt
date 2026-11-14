@@ -110,6 +110,18 @@ Be especially careful with:
 
 Prefer read-only checks.
 
+## Prettier Formatting Before Every Commit
+
+Before creating a commit, format every explicitly authorized changed file that Prettier supports with the exact version resolved by the repository's pnpm lockfile.
+
+1. Confirm `pnpm exec prettier --version` reports `3.9.10`.
+2. Run `pnpm exec prettier --write <authorized changed paths>`, listing only files authorized for the current task. Do not use `pnpm format` unless every path it rewrites is authorized.
+3. Run `pnpm exec prettier --check <the same authorized paths>`.
+4. Run `pnpm format:check` as a read-only, repository-wide check. If it reports unrelated failures, do not modify unauthorized files; report those failures separately.
+5. Do not commit if the formatter is unavailable or the version differs. Use Prettier 3.9.10 in an isolated scratch environment, or report the blocker before committing.
+
+For Markdown or other files not listed in `format:check`, run Prettier 3.9.10 directly on the authorized path.
+
 ## Dependency and Lock Files
 
 Never modify dependency or lock files unless explicitly authorized by exact path.

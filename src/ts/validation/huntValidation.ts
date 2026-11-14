@@ -124,7 +124,61 @@ function checkTask(
     });
     return;
   }
-  checkFields(value, taskFields, prefix, issues);
+  checkFields(
+    value,
+    [
+      ...taskFields,
+      ...(Object.hasOwn(value, "timeLimitSeconds") ? ["timeLimitSeconds"] : []),
+      ...(Object.hasOwn(value, "taskType") ? ["taskType"] : []),
+      ...(Object.hasOwn(value, "choices") ? ["choices"] : []),
+    ],
+    prefix,
+    issues,
+  );
+  if (
+    value.taskType !== undefined &&
+    value.taskType !== "single-word-trivia" &&
+    value.taskType !== "multiple-choice"
+  )
+    issues.push({
+      field: prefix + "taskType",
+      message: "Choose a supported task type.",
+    });
+  if (
+    value.timeLimitSeconds !== undefined &&
+    value.timeLimitSeconds !== null &&
+    (!Number.isInteger(value.timeLimitSeconds) ||
+      Number(value.timeLimitSeconds) < 1 ||
+      Number(value.timeLimitSeconds) > 3600)
+  )
+    issues.push({
+      field: prefix + "timeLimitSeconds",
+      message: "Timer must be 1–3600 seconds or null.",
+    });
+  if (value.taskType === "multiple-choice") {
+    const choices = value.choices;
+    if (
+      !Array.isArray(choices) ||
+      choices.length !== 4 ||
+      choices.some((choice) => typeof choice !== "string" || !choice.trim()) ||
+      new Set(
+        choices.map((choice) =>
+          typeof choice === "string" ? choice.trim().toLowerCase() : choice,
+        ),
+      ).size !== 4 ||
+      !choices.includes(value.requiredAnswer)
+    )
+      issues.push({
+        field: prefix + "choices",
+        message:
+          "Provide four distinct, nonblank choices including the correct answer.",
+      });
+  } else if (value.choices !== undefined) {
+    issues.push({
+      field: prefix + "choices",
+      message: "Choices are only supported for multiple-choice tasks.",
+    });
+  }
   for (const field of ["id", "displayLabel", "description", "requiredAnswer"])
     checkText(value[field], prefix + field, issues);
   if (value.hint !== null) checkText(value.hint, prefix + "hint", issues);
@@ -193,7 +247,68 @@ export function validateHunt(input: unknown): OperationResult<HuntDefinition> {
       issues: [{ field: "$", message: "Hunt must be an object." }],
     };
   }
-  checkFields(input, huntFields, "", issues);
+  checkFields(
+    input,
+    [
+      ...huntFields,
+      ...[
+        "organizationName",
+        "organizationId",
+        "maxParticipants",
+        "participationClosed",
+        "huntType",
+      ].filter((key) => Object.hasOwn(input, key)),
+    ],
+    "",
+    issues,
+  );
+  if (
+    input.organizationId !== undefined &&
+    input.organizationId !== null &&
+    (typeof input.organizationId !== "string" ||
+      !/^[a-f0-9-]{36}$/i.test(input.organizationId))
+  )
+    issues.push({
+      field: "organizationId",
+      message: "Organization ID must be a valid identifier.",
+    });
+  if (
+    input.organizationName !== undefined &&
+    (typeof input.organizationName !== "string" ||
+      input.organizationName.length > 120)
+  )
+    issues.push({
+      field: "organizationName",
+      message: "Organization must be at most 120 characters.",
+    });
+  if (
+    input.huntType !== undefined &&
+    input.huntType !== "traditional" &&
+    input.huntType !== "kahoot"
+  )
+    issues.push({
+      field: "huntType",
+      message: "Choose Traditional Hunt or Kahoot Hunt.",
+    });
+  if (
+    input.maxParticipants !== undefined &&
+    input.maxParticipants !== null &&
+    (!Number.isSafeInteger(input.maxParticipants) ||
+      Number(input.maxParticipants) < 1 ||
+      Number(input.maxParticipants) > 200)
+  )
+    issues.push({
+      field: "maxParticipants",
+      message: "Capacity must be a whole number from 1 to 200 or null.",
+    });
+  if (
+    input.participationClosed !== undefined &&
+    typeof input.participationClosed !== "boolean"
+  )
+    issues.push({
+      field: "participationClosed",
+      message: "Participation closed must be a boolean.",
+    });
   for (const field of ["id", "name", "description", "ownerId"])
     checkText(input[field], field, issues);
   if (

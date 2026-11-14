@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hunt Studio | BucHunt</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/buchunt-favicon.svg" />
     <link rel="stylesheet" href="./css/foundation.css" />
     <link
       rel="stylesheet"
@@ -14,7 +15,7 @@
   </head>
   <body data-page="admin">
     <header>
-      <a class="brand" href="./index.html">
+      <a class="brand" href="./player.html">
         <img
           src="./assets/buchunt-logo.svg"
           alt="BucHunt"
@@ -35,81 +36,41 @@
             Signed in as <strong data-testid="admin-display-name"></strong>
           </summary>
           <div class="player-account-dropdown">
-            <div
-              data-testid="admin-google-email"
-              class="player-sensitive-detail"
+            <button
+              type="button"
+              class="account-name-edit-toggle"
+              data-testid="admin-change-display-name"
+              aria-expanded="false"
+              aria-controls="admin-account-name-form"
+            >
+              Change display name
+            </button>
+            <form
+              id="admin-account-name-form"
+              class="account-name-edit-form"
+              data-testid="admin-account-name-form"
               hidden
             >
-              <button
-                type="button"
-                data-testid="admin-email-toggle"
-                aria-expanded="false"
-                aria-controls="admin-email-value"
-              >
-                Show Google account email
+              <label for="admin-account-name-input">New display name</label>
+              <input
+                id="admin-account-name-input"
+                data-testid="admin-account-name-input"
+                name="displayName"
+                autocomplete="nickname"
+                maxlength="40"
+                required
+              />
+              <button type="submit" class="primary-button">
+                Save display name
               </button>
-              <output
-                id="admin-email-value"
-                data-testid="admin-email-value"
+              <p
+                data-testid="admin-account-status"
+                class="player-account-status"
+                role="status"
+                aria-live="polite"
                 hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="admin-copy-email"
-                aria-label="Copy Google account email"
-                title="Copy email"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <div
-              data-testid="admin-google-account-id"
-              class="player-sensitive-detail"
-              hidden
-            >
-              <button
-                type="button"
-                data-testid="admin-id-toggle"
-                aria-expanded="false"
-                aria-controls="admin-id-value"
-              >
-                Show Google account ID
-              </button>
-              <output
-                id="admin-id-value"
-                data-testid="admin-id-value"
-                hidden
-              ></output>
-              <button
-                type="button"
-                class="copy-icon-button"
-                data-testid="admin-copy-id"
-                aria-label="Copy Google account ID"
-                title="Copy account ID"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                  <path
-                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <p
-              data-testid="admin-account-status"
-              class="player-account-status"
-              role="status"
-              aria-live="polite"
-              hidden
-            ></p>
+              ></p>
+            </form>
             <button
               id="sign-out"
               data-testid="admin-sign-out"
@@ -153,310 +114,297 @@
             coordinates that connect each task to a place.
           </p>
         </div>
-        <section
-          class="access-panel manage-hunts-panel"
-          aria-labelledby="my-hunts-heading"
+        <dialog
+          class="organization-management-dialog"
+          data-testid="organization-dialog"
+          aria-labelledby="organization-dialog-title"
         >
-          <div class="manage-hunts-heading">
+          <div class="organization-dialog-heading">
             <div>
-              <p class="eyebrow">YOUR ADVENTURES</p>
-              <h2 id="my-hunts-heading">My hunts</h2>
+              <p class="eyebrow">YOUR COMMUNITY</p>
+              <h2 id="organization-dialog-title">Manage organizations</h2>
             </div>
             <button
               type="button"
-              class="refresh-button"
-              data-testid="refresh-my-hunts"
+              class="dialog-close-button"
+              data-testid="close-organizations"
+              aria-label="Close organizations"
             >
-              ↻ Refresh
+              ×
             </button>
           </div>
-          <p class="section-copy">
-            Select a hunt to continue editing its tasks or manage its
-            contributors.
-          </p>
-          <p role="status" data-testid="creator-status"></p>
-          <ul data-testid="my-hunts" aria-label="My hunts"></ul>
-        </section>
-
-        <section
-          id="create-hunt"
-          data-testid="create-hunt"
-          class="integration-panel hunt-editor-panel"
-        >
-          <div class="section-heading">
-            <span class="step-number" aria-hidden="true">01</span>
-            <div>
-              <p class="eyebrow">START HERE</p>
-              <h2>Create a hunt</h2>
-            </div>
-          </div>
-          <p class="section-copy">
-            Set up a new adventure with a name, a time window, and a way for
-            players to explore.
-          </p>
-          <form data-testid="hunt-form">
-            <fieldset>
-              <legend>Hunt details</legend>
-              <label for="hunt-name">Hunt name</label
-              ><input id="hunt-name" name="name" required />
-              <label for="hunt-description">Description</label
-              ><textarea
-                id="hunt-description"
-                name="description"
-                required
-              ></textarea>
-              <label for="hunt-begins">Begins at (local time)</label
-              ><input
-                id="hunt-begins"
-                name="beginsAt"
-                type="datetime-local"
-                required
-              />
-              <label for="hunt-ends">Ends at (optional, local time)</label
-              ><input id="hunt-ends" name="endsAt" type="datetime-local" />
-              <label for="hunt-order">Task order</label
-              ><select id="hunt-order" name="taskOrderMode">
-                <option value="sequential">Sequential</option>
-                <option value="any">Any</option>
-              </select>
-              <button type="submit">Create hunt</button>
-            </fieldset>
-          </form>
-          <p role="status" data-testid="hunt-status">
-            Enter hunt details to begin.
-          </p>
-          <a data-testid="hunt-player-link" hidden
-            >Open this hunt in player view</a
+          <section
+            class="organization-invitations-panel"
+            data-testid="organization-invitations-panel"
+            hidden
           >
-        </section>
-        <section
-          id="define-task"
-          data-testid="define-task"
-          class="task-panel hunt-editor-panel"
-        >
-          <div class="section-heading">
-            <span class="step-number" aria-hidden="true">02</span>
-            <div>
-              <p class="eyebrow">TASK DETAILS</p>
-              <h2>Define a task</h2>
+            <p class="eyebrow">YOU’RE INVITED</p>
+            <h3>Organization invitations</h3>
+            <ul
+              class="organization-invitations"
+              data-testid="organization-invitations"
+              aria-label="Pending organization invitations"
+            ></ul>
+          </section>
+          <p
+            class="organization-status"
+            data-testid="organization-invitations-status"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></p>
+          <form data-testid="organization-create-form">
+            <label for="organization-create-name">Create an organization</label>
+            <div class="organization-create-controls">
+              <input
+                id="organization-create-name"
+                name="name"
+                maxlength="120"
+                required
+              /><button type="submit">Create organization</button>
             </div>
-          </div>
-          <p class="section-copy">
-            Choose a hunt above, then add the clues, answers, and locations that
-            bring it to life.
-          </p>
-          <form data-testid="task-form">
-            <button type="button" data-testid="load-admin-hunt">
-              Load existing hunt tasks
-            </button>
-            <fieldset>
-              <legend>What participants will discover</legend>
-              <label for="task-hunt-id">Hunt ID</label>
-              <input
-                id="task-hunt-id"
-                name="huntId"
-                autocomplete="off"
-                required
-                aria-describedby="hunt-id-help"
-                readonly
-                placeholder="Select a hunt from My hunts"
-              />
-              <span id="hunt-id-help" class="field-help">
-                Automatically set when you create or select a hunt.
-              </span>
-              <div class="field-grid">
-                <div>
-                  <label for="task-label">Display label</label>
+            <p
+              class="organization-status"
+              data-testid="organization-create-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
+          <div class="organization-management-layout">
+            <ul
+              class="organization-list"
+              data-testid="organization-list"
+              aria-label="Your organizations"
+            ></ul>
+            <section
+              class="organization-editor"
+              data-testid="organization-editor"
+              hidden
+              aria-label="Selected organization"
+            >
+              <form data-testid="organization-details-form">
+                <label for="organization-edit-name">Organization name</label>
+                <div class="organization-create-controls">
                   <input
-                    id="task-label"
-                    name="displayLabel"
+                    id="organization-edit-name"
+                    name="name"
+                    maxlength="120"
                     required
-                    maxlength="100"
-                    placeholder="e.g. The Old Fountain"
-                  />
-                </div>
-                <div>
-                  <label for="task-order">Task order</label>
-                  <input
-                    id="task-order"
-                    name="order"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value="1"
-                    required
-                  />
-                </div>
-              </div>
-              <label for="task-description">Clue and instructions</label>
-              <textarea
-                id="task-description"
-                name="description"
-                rows="3"
-                required
-                placeholder="Tell participants what to look for"
-              ></textarea>
-              <label for="task-answer">Required answer</label>
-              <input
-                id="task-answer"
-                name="requiredAnswer"
-                required
-                autocomplete="off"
-                placeholder="The answer participants must submit"
-              />
-              <section
-                class="task-location-picker"
-                aria-labelledby="task-location-heading"
-              >
-                <h3 id="task-location-heading">Choose the task location</h3>
-                <p class="field-help">
-                  Search for a place or address, or click the map. Drag the pin
-                  to fine-tune the location.
-                </p>
-                <div class="task-location-map-shell">
-                  <div
-                    class="task-location-search"
-                    data-testid="task-location-search-form"
-                    role="search"
-                  >
-                    <label for="task-location-query">Search the map</label>
-                    <input
-                      id="task-location-query"
-                      data-testid="task-location-query"
-                      type="search"
-                      autocomplete="off"
-                      placeholder="Place or address"
-                    />
-                    <button type="button">Search</button>
-                  </div>
-                  <div
-                    class="task-location-map"
-                    data-testid="task-location-map"
-                    role="region"
-                    aria-label="Interactive map for choosing the task location"
-                  ></div>
+                  /><button type="submit">Save name</button>
                 </div>
                 <p
-                  class="field-help"
-                  data-testid="task-location-status"
+                  class="organization-status"
+                  data-testid="organization-details-status"
                   role="status"
                   aria-live="polite"
-                >
-                  Loading the map…
-                </p>
-                <output
-                  class="task-location-coordinates"
-                  data-testid="task-location-coordinates"
-                  hidden
-                ></output>
-                <input type="hidden" id="task-latitude" name="latitude" />
-                <input type="hidden" id="task-longitude" name="longitude" />
-              </section>
-              <p class="field-help">
-                Coordinates are stored with the task. Location verification is
-                handled separately.
-              </p>
-              <details class="more-options">
-                <summary>More task options</summary>
-                <div class="field-grid">
-                  <div>
-                    <label for="task-points">Points</label>
-                    <input
-                      id="task-points"
-                      name="points"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value="0"
-                    />
-                  </div>
-                  <div class="checkbox-field">
-                    <input
-                      id="task-case-sensitive"
-                      name="answerCaseSensitive"
-                      type="checkbox"
-                    />
-                    <label for="task-case-sensitive"
-                      >Answer is case-sensitive</label
-                    >
-                  </div>
+                ></p>
+              </form>
+              <form data-testid="organization-invite-form">
+                <label for="organization-invite-email">Invite by email</label>
+                <div class="organization-create-controls">
+                  <input
+                    id="organization-invite-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                  /><button type="submit">Invite as Contributor</button>
                 </div>
-                <label for="task-hint">Optional hint</label>
-                <input
-                  id="task-hint"
-                  name="hint"
-                  placeholder="A gentle nudge for participants"
-                />
-              </details>
-              <button type="submit" class="primary-button">
-                Add task to hunt
-              </button>
-            </fieldset>
-          </form>
-          <p role="status" data-testid="task-status" aria-live="polite">
-            Fill in the task details to add it to a hunt.
-          </p>
-          <ul
-            class="validation-errors"
-            data-testid="validation-errors"
-            aria-live="polite"
-            aria-label="Validation errors"
-          ></ul>
-          <div class="task-list-panel" aria-live="polite">
-            <div class="task-list-heading">
-              <h3>Tasks in this hunt</h3>
-              <span class="list-caption">Updated after a successful save</span>
-            </div>
-            <ol
-              data-testid="defined-task-list"
-              aria-label="Defined hunt tasks"
-            ></ol>
+                <p
+                  class="organization-status"
+                  data-testid="organization-invite-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+              <section
+                class="organization-hunts-panel"
+                data-testid="organization-hunts-panel"
+                aria-labelledby="organization-hunts-title"
+              >
+                <div class="organization-hunts-heading">
+                  <p class="eyebrow">ADVENTURES IN YOUR COMMUNITY</p>
+                  <h3 id="organization-hunts-title">Organization hunts</h3>
+                  <p>
+                    Open a hunt to review its active players and task progress.
+                  </p>
+                </div>
+                <p
+                  class="organization-status"
+                  data-testid="organization-hunts-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <ul
+                  class="organization-hunts-list"
+                  data-testid="organization-hunts-list"
+                  aria-label="Hunts in this organization"
+                ></ul>
+              </section>
+              <h3>Members</h3>
+              <ul
+                class="organization-members"
+                data-testid="organization-members"
+                aria-label="Organization members"
+              ></ul>
+            </section>
+          </div>
+        </dialog>
+        <section
+          class="access-panel admin-hunt-actions"
+          aria-label="Hunt actions"
+        >
+          <button
+            type="button"
+            class="create-hunt-launcher"
+            data-testid="open-create-hunt"
+          >
+            <span class="create-hunt-launcher-icon" aria-hidden="true">+</span>
+            <span>
+              <strong>Create a Hunt</strong>
+              <small>Start a new campus adventure</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            class="refresh-button manage-hunts-launcher"
+            data-testid="open-manage-hunts"
+          >
+            Manage Hunts
+          </button>
+        </section>
+        <section
+          class="organization-workspace"
+          data-testid="organization-workspace"
+          hidden
+        >
+          <div class="organization-workspace-copy">
+            <p class="eyebrow">YOUR COMMUNITY</p>
+            <h2>Organizations</h2>
+            <p>
+              Create a group, invite people, and manage access to its hunts.
+            </p>
+          </div>
+          <div class="organization-workspace-actions">
+            <button
+              type="button"
+              class="refresh-button"
+              data-testid="open-organizations"
+            >
+              Manage organizations
+            </button>
+            <button
+              type="button"
+              class="refresh-button"
+              data-testid="open-organization-invitations"
+              hidden
+            >
+              Organization invitations
+            </button>
           </div>
         </section>
-        <details class="more-options" data-testid="contributors-panel" hidden>
-          <summary>Contributors</summary>
-          <p>
-            As the owner, you can let another creator manage this hunt's tasks.
-          </p>
-          <form data-testid="contributor-form">
-            <label for="contributor-id">Contributor creator ID</label
-            ><input id="contributor-id" name="creatorId" required /><button
-              type="submit"
+        <dialog
+          class="hunt-details-dialog create-hunt-dialog"
+          data-testid="create-hunt-dialog"
+          aria-labelledby="create-hunt-dialog-title"
+        >
+          <div class="hunt-details-dialog-heading">
+            <div>
+              <p class="eyebrow">START A NEW ADVENTURE</p>
+              <h2 id="create-hunt-dialog-title">Create a Hunt</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close-button"
+              data-testid="close-create-hunt"
+              aria-label="Close create hunt"
             >
-              Add contributor
+              ×
             </button>
-          </form>
-          <p role="status" data-testid="contributor-status"></p>
-          <ul
-            data-testid="contributor-list"
-            aria-label="Hunt contributors"
-          ></ul>
-        </details>
-        <details class="more-options" data-testid="creator-profile-details">
-          <summary>Creator ID and sharing</summary>
-          <p class="field-help">
-            This browser-based ID identifies hunt ownership and contributors.
-          </p>
-          <p>
-            Your creator ID:
-            <code data-testid="creator-id" style="overflow-wrap: anywhere"
-              >Starting your profile…</code
-            >
-          </p>
-          <button type="button" data-testid="copy-creator-id">
-            Copy creator ID
-          </button>
-          <p class="field-help">
-            Share your creator ID with a hunt owner if you want to contribute.
-          </p>
-        </details>
+          </div>
+          <section
+            id="create-hunt"
+            data-testid="create-hunt"
+            class="integration-panel hunt-editor-panel"
+          >
+            <div class="section-heading">
+              <span class="step-number" aria-hidden="true">01</span>
+              <div>
+                <p class="eyebrow">START HERE</p>
+                <h2>Create a hunt</h2>
+              </div>
+            </div>
+            <p class="section-copy">
+              Set up a new adventure with a name, a time window, and a way for
+              players to explore.
+            </p>
+            <form data-testid="hunt-form">
+              <fieldset>
+                <legend>Hunt details</legend>
+                <label for="hunt-name">Hunt name</label
+                ><input id="hunt-name" name="name" required />
+                <label for="hunt-type">Hunt type</label
+                ><select id="hunt-type" name="huntType">
+                  <option value="traditional">Traditional Hunt</option>
+                  <option value="kahoot">Kahoot Hunt</option>
+                </select>
+                <label for="hunt-capacity"
+                  >Maximum participants (default 200; up to 200)</label
+                ><input
+                  id="hunt-capacity"
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  max="200"
+                  step="1"
+                  value="200"
+                />
+                <label for="hunt-organization">Organization</label
+                ><select
+                  id="hunt-organization"
+                  name="organizationId"
+                  data-testid="hunt-organization"
+                >
+                  <option value="">No organization</option>
+                </select>
+                <p class="field-help">Choose an organization you belong to.</p>
+                <label for="hunt-description">Description</label
+                ><textarea
+                  id="hunt-description"
+                  name="description"
+                  required
+                ></textarea>
+                <label for="hunt-begins">Begins at (local time)</label
+                ><input
+                  id="hunt-begins"
+                  name="beginsAt"
+                  type="datetime-local"
+                  required
+                />
+                <label for="hunt-ends">Ends at (optional, local time)</label
+                ><input id="hunt-ends" name="endsAt" type="datetime-local" />
+                <label for="hunt-order">Task order</label
+                ><select id="hunt-order" name="taskOrderMode">
+                  <option value="sequential">Sequential</option>
+                  <option value="any">Any</option>
+                </select>
+                <button type="submit">Create hunt</button>
+              </fieldset>
+            </form>
+            <p role="status" data-testid="hunt-status">
+              Enter hunt details to begin.
+            </p>
+          </section>
+        </dialog>
         <dialog
           class="hunt-details-dialog"
           data-testid="hunt-details-dialog"
-          aria-labelledby="hunt-details-title"
+          aria-labelledby="manage-hunts-title"
         >
           <div class="hunt-details-dialog-heading">
-            <p class="eyebrow">HUNT OVERVIEW</p>
+            <p class="eyebrow" data-testid="hunt-dialog-mode">
+              YOUR ADVENTURES
+            </p>
             <button
               type="button"
               class="dialog-close-button"
@@ -466,99 +414,739 @@
               ×
             </button>
           </div>
-          <p
-            class="details-status"
-            data-testid="hunt-detail-status"
-            role="status"
-            aria-live="polite"
-          >
-            Loading hunt details…
-          </p>
-          <h2 id="hunt-details-title" data-testid="hunt-detail-name">
-            Your adventure
-          </h2>
-          <p
-            class="details-description"
-            data-testid="hunt-detail-description"
-          ></p>
-          <div class="details-actions">
-            <button
-              type="button"
-              class="hunt-id-toggle"
-              data-testid="hunt-id-toggle"
-              aria-expanded="false"
-              aria-controls="hunt-detail-id"
-            >
-              Reveal hunt ID
-            </button>
-            <output
-              id="hunt-detail-id"
-              data-testid="hunt-detail-id"
-              hidden
-            ></output>
-            <button
-              type="button"
-              class="action details-edit-link"
-              data-testid="edit-hunt-link"
-            >
-              Edit hunt tasks
-            </button>
-            <a
-              class="action details-player-link"
-              data-testid="player-hunt-link"
-            >
-              Preview player view
-            </a>
-          </div>
-          <section class="details-overview" aria-labelledby="overview-heading">
-            <div class="details-section-heading">
-              <p class="eyebrow">THE BIG PICTURE</p>
-              <h3 id="overview-heading">Hunt overview</h3>
+          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
+            <div class="hunt-manager-heading">
+              <div>
+                <h2 id="manage-hunts-title">Manage hunts</h2>
+              </div>
+              <button
+                type="button"
+                class="refresh-button manage-hunts-refresh"
+                data-testid="refresh-my-hunts"
+                aria-label="Refresh hunt list"
+                title="Refresh hunt list"
+              >
+                ↻
+              </button>
             </div>
-            <dl class="hunt-facts" data-testid="hunt-facts"></dl>
-          </section>
-          <section class="details-creators" aria-labelledby="creators-heading">
-            <div class="details-section-heading">
-              <p class="eyebrow">THE TEAM</p>
-              <h3 id="creators-heading">Hunt creators</h3>
+            <p class="manage-hunts-subtitle">
+              Open a hunt to manage its details and contributors.
+            </p>
+            <p role="status" data-testid="creator-status"></p>
+            <div class="manage-hunts-filter-row">
+              <label class="manage-hunts-filter" for="manage-hunts-filter">
+                Browse
+                <select
+                  id="manage-hunts-filter"
+                  data-testid="manage-hunts-filter"
+                >
+                  <option value="recent-3">Recently edited (3)</option>
+                  <option value="all">All hunts</option>
+                  <option value="edited">Recently edited</option>
+                  <option value="created">Recently created</option>
+                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-desc">Name (Z–A)</option>
+                  <option value="owned">Owned by me</option>
+                  <option value="shared">Shared with me</option>
+                </select>
+              </label>
+              <label class="manage-hunts-search" for="manage-hunts-search">
+                Search hunts
+                <input
+                  id="manage-hunts-search"
+                  data-testid="manage-hunts-search"
+                  type="search"
+                  placeholder="Find a hunt by name"
+                  autocomplete="off"
+                />
+              </label>
             </div>
-            <ul data-testid="hunt-creators" class="creator-list"></ul>
             <p
-              data-testid="contributors-load-status"
-              class="details-muted"
+              class="manage-hunts-filter-note"
+              data-testid="manage-hunts-filter-note"
+              role="status"
+            ></p>
+            <ul data-testid="my-hunts" aria-label="My hunts"></ul>
+          </div>
+          <div data-testid="hunt-details-overview">
+            <div class="hunt-overview-lead">
+              <p data-testid="hunt-owner" class="hunt-owner">
+                Owner · Creator information unavailable
+              </p>
+              <p class="hunt-access-code">
+                <span
+                  class="hunt-access-code-copy-status"
+                  data-testid="hunt-access-code-copy-status"
+                  role="status"
+                  aria-live="polite"
+                ></span>
+                <span>Access code</span>
+                <strong data-testid="hunt-access-code">Not set</strong>
+                <button
+                  type="button"
+                  class="copy-icon-button hunt-access-code-copy"
+                  data-testid="copy-hunt-access-code"
+                  aria-label="Copy access code"
+                  title="Copy access code"
+                  hidden
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                    <path
+                      d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                    ></path>
+                  </svg>
+                </button>
+              </p>
+            </div>
+            <p
+              class="details-status"
+              data-testid="hunt-detail-status"
               role="status"
               aria-live="polite"
-            ></p>
-          </section>
-          <section class="details-tasks" aria-labelledby="tasks-heading">
-            <div class="details-section-heading">
-              <p class="eyebrow">THE ADVENTURE</p>
-              <h3 id="tasks-heading">Hunt tasks</h3>
-            </div>
-            <ol
-              data-testid="hunt-detail-tasks"
-              class="hunt-detail-task-list"
-            ></ol>
-            <p data-testid="empty-tasks" class="details-muted" hidden>
-              This hunt has no tasks yet. Add its first task in Hunt Studio.
+            >
+              Loading hunt details…
             </p>
-          </section>
-          <p
-            class="details-error"
-            data-testid="hunt-detail-error"
-            role="alert"
+            <h2 id="hunt-details-title" data-testid="hunt-detail-name">
+              Your adventure
+            </h2>
+            <p
+              class="details-description"
+              data-testid="hunt-detail-description"
+            ></p>
+            <p
+              class="hunt-export-status"
+              role="status"
+              aria-live="polite"
+              data-testid="hunt-export-status"
+            ></p>
+            <section
+              data-testid="kahoot-host"
+              class="kahoot-panel"
+              hidden
+              aria-label="Kahoot host controls"
+            ></section>
+            <form
+              data-testid="hunt-settings-form"
+              class="hunt-settings-form"
+              hidden
+            >
+              <label
+                class="hunt-settings-organization"
+                for="hunt-settings-organization"
+                >Organization</label
+              >
+              <select
+                id="hunt-settings-organization"
+                name="organizationId"
+                data-testid="hunt-settings-organization"
+              >
+                <option value="">No organization</option>
+              </select>
+              <label for="hunt-settings-begins-at"
+                >Hunt start date and time (local)</label
+              >
+              <input
+                id="hunt-settings-begins-at"
+                name="beginsAt"
+                type="datetime-local"
+                required
+                data-testid="hunt-settings-begins-at"
+              />
+              <label for="hunt-settings-ends-at">
+                Hunt end date and time (optional, local)
+              </label>
+              <input
+                id="hunt-settings-ends-at"
+                name="endsAt"
+                type="datetime-local"
+                data-testid="hunt-settings-ends-at"
+              />
+              <label
+                >Maximum participants (up to 200; default 200)<input
+                  name="maxParticipants"
+                  type="number"
+                  min="1"
+                  max="200"
+                  step="1"
+              /></label>
+              <label class="hunt-settings-lock"
+                ><input name="participationClosed" type="checkbox" /> Lock hunt
+                to new players</label
+              >
+              <button type="submit" class="action">Save hunt settings</button>
+              <p role="status" data-settings-status></p>
+            </form>
+            <div class="details-actions" role="group" aria-label="Hunt actions">
+              <button
+                type="button"
+                class="action details-edit-link"
+                data-testid="edit-hunt-link"
+              >
+                Edit hunt tasks
+              </button>
+              <a
+                class="action details-player-link"
+                data-testid="player-hunt-link"
+              >
+                Join Hunt
+              </a>
+              <button
+                type="button"
+                class="action"
+                data-testid="hunt-issues-button"
+                hidden
+              >
+                Issues (0 unread)
+              </button>
+              <details
+                class="details-action-menu"
+                data-testid="export-menu"
+                hidden
+              >
+                <summary>Export results</summary>
+                <div class="details-action-menu-items">
+                  <button
+                    type="button"
+                    class="action"
+                    data-testid="export-hunt-pdf"
+                    data-export-format="pdf"
+                  >
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    class="action"
+                    data-testid="export-hunt-csv"
+                    data-export-format="csv"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              </details>
+              <details class="details-action-menu" data-testid="hunt-more-menu">
+                <summary>More actions</summary>
+                <div
+                  class="details-action-menu-items hunt-more-menu-items"
+                  data-testid="hunt-more-menu-items"
+                >
+                  <div class="hunt-id-control">
+                    <button
+                      type="button"
+                      class="action hunt-id-toggle"
+                      data-testid="hunt-id-toggle"
+                      aria-expanded="false"
+                      aria-controls="hunt-detail-id"
+                    >
+                      Reveal hunt ID
+                    </button>
+                    <output
+                      id="hunt-detail-id"
+                      data-testid="hunt-detail-id"
+                      hidden
+                    ></output>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <section
+              class="details-tasks"
+              data-testid="hunt-tasks-section"
+              aria-labelledby="tasks-heading"
+            >
+              <div class="details-section-heading">
+                <p class="eyebrow">THE ADVENTURE</p>
+                <h3 id="tasks-heading">Hunt tasks</h3>
+              </div>
+              <ol
+                data-testid="hunt-detail-tasks"
+                class="hunt-detail-task-list"
+              ></ol>
+              <p data-testid="empty-tasks" class="details-muted" hidden>
+                This hunt has no tasks yet. Add its first task in Hunt Studio.
+              </p>
+            </section>
+            <section
+              class="details-overview"
+              aria-labelledby="overview-heading"
+            >
+              <div class="details-section-heading">
+                <p class="eyebrow">THE BIG PICTURE</p>
+                <h3 id="overview-heading">Hunt overview</h3>
+              </div>
+              <dl class="hunt-facts" data-testid="hunt-facts"></dl>
+            </section>
+            <section
+              class="details-overview participant-progress"
+              data-testid="participant-progress"
+              aria-labelledby="participant-progress-heading"
+              hidden
+            >
+              <div class="details-section-heading">
+                <p class="eyebrow">THE PLAYERS</p>
+                <h3 id="participant-progress-heading">
+                  Participation and progress
+                </h3>
+              </div>
+              <dl
+                class="participant-progress-stats"
+                data-testid="participant-progress-stats"
+              >
+                <div>
+                  <dt>Actively in hunt</dt>
+                  <dd data-testid="participant-active-count">0</dd>
+                </div>
+                <div>
+                  <dt>Left after completing</dt>
+                  <dd data-testid="participant-left-completed-count">0</dd>
+                </div>
+                <div>
+                  <dt>Left incomplete</dt>
+                  <dd data-testid="participant-left-incomplete-count">0</dd>
+                </div>
+              </dl>
+              <div class="participant-progress-toolbar">
+                <p
+                  class="details-muted"
+                  data-testid="participant-progress-status"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <button
+                  type="button"
+                  class="action"
+                  data-testid="refresh-participant-progress"
+                >
+                  Refresh progress
+                </button>
+              </div>
+              <p
+                class="details-muted"
+                data-testid="participant-progress-empty"
+                hidden
+              >
+                No players are actively in this hunt.
+              </p>
+              <ul
+                class="participant-progress-list"
+                data-testid="participant-progress-list"
+              ></ul>
+              <div class="banned-participants">
+                <h4>Banned players</h4>
+                <p
+                  class="details-muted"
+                  data-testid="banned-participant-empty"
+                  hidden
+                >
+                  No players are banned from this hunt.
+                </p>
+                <ul
+                  class="banned-participant-list"
+                  data-testid="banned-participant-list"
+                ></ul>
+              </div>
+            </section>
+            <details
+              class="more-options details-contributors"
+              data-testid="contributors-panel"
+              hidden
+            >
+              <summary>Hunt team</summary>
+              <section
+                class="details-creators"
+                aria-labelledby="creators-heading"
+              >
+                <div class="details-section-heading">
+                  <p class="eyebrow">THE TEAM</p>
+                  <h3 id="creators-heading">People with access</h3>
+                </div>
+                <ul data-testid="hunt-creators" class="creator-list"></ul>
+                <p
+                  data-testid="contributors-load-status"
+                  class="details-muted"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </section>
+              <div class="contributor-management">
+                <p>
+                  New collaborators start as Contributors. Owners can promote
+                  them to Officer or Owner here.
+                </p>
+                <p class="field-help">
+                  Officers can edit hunt tasks but cannot delete the hunt or
+                  manage the team. Contributors can view basic hunt details. The
+                  original owner cannot be removed or demoted.
+                </p>
+                <form data-testid="contributor-form">
+                  <label for="contributor-email"
+                    >Collaborator's Google email</label
+                  >
+                  <input
+                    id="contributor-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                  />
+                  <button type="submit">Invite as Contributor</button>
+                </form>
+                <p class="field-help">
+                  Access is added when they sign in with this verified email.
+                  Share the Hunt Studio link with them; BucHunt does not send
+                  email.
+                </p>
+                <p role="status" data-testid="contributor-status"></p>
+                <ul
+                  data-testid="contributor-list"
+                  aria-label="Hunt contributors"
+                ></ul>
+              </div>
+            </details>
+            <p
+              class="details-error"
+              data-testid="hunt-detail-error"
+              role="alert"
+              hidden
+            ></p>
+          </div>
+
+          <div
+            class="hunt-details-editor"
+            data-testid="hunt-details-editor"
+            aria-labelledby="hunt-edit-title"
             hidden
-          ></p>
+          >
+            <div class="hunt-editor-toolbar">
+              <button
+                type="button"
+                class="action"
+                data-testid="back-to-hunt-details"
+              >
+                Back to hunt overview
+              </button>
+              <label for="edit-hunt-selector">
+                Switch hunt
+                <select
+                  data-testid="edit-hunt-selector"
+                  id="edit-hunt-selector"
+                >
+                  <option value="">Select a hunt</option>
+                </select>
+              </label>
+            </div>
+            <section
+              id="define-task"
+              data-testid="define-task"
+              class="task-panel hunt-editor-panel"
+            >
+              <div class="section-heading">
+                <span class="step-number" aria-hidden="true">02</span>
+                <div>
+                  <p class="eyebrow">TASK DETAILS</p>
+                  <h2 id="hunt-edit-title" data-testid="hunt-edit-title">
+                    Editing hunt
+                  </h2>
+                </div>
+              </div>
+              <p class="section-copy">
+                Add, update, or remove tasks for this hunt.
+              </p>
+              <form data-testid="task-form">
+                <fieldset>
+                  <legend>What participants will discover</legend>
+                  <input
+                    id="task-hunt-id"
+                    name="huntId"
+                    type="hidden"
+                    autocomplete="off"
+                    readonly
+                  />
+                  <label for="task-type">Task type</label>
+                  <select id="task-type" name="taskType" required>
+                    <option value="" disabled selected>
+                      Select a task type
+                    </option>
+                    <option value="single-word-trivia">
+                      Single-Word Trivia
+                    </option>
+                    <option value="multiple-choice">Multiple-Choice</option>
+                  </select>
+                  <div class="field-grid">
+                    <div>
+                      <label for="task-label">Display label</label>
+                      <input
+                        id="task-label"
+                        name="displayLabel"
+                        required
+                        maxlength="100"
+                        placeholder="e.g. The Old Fountain"
+                      />
+                    </div>
+                    <div>
+                      <label for="task-order">Task order</label>
+                      <input
+                        id="task-order"
+                        name="order"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="1"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div data-task-fields="single-word-trivia" hidden>
+                    <label for="task-description">Clue and instructions</label>
+                    <textarea
+                      id="task-description"
+                      name="description"
+                      rows="3"
+                      required
+                      disabled
+                      placeholder="Tell participants what to look for"
+                    ></textarea>
+                    <label for="task-answer">Required answer</label>
+                    <input
+                      id="task-answer"
+                      name="requiredAnswer"
+                      required
+                      disabled
+                      autocomplete="off"
+                      placeholder="The answer participants must submit"
+                    />
+                  </div>
+                  <div data-task-fields="multiple-choice" hidden>
+                    <label for="task-question"
+                      >What is the question being asked?</label
+                    >
+                    <input
+                      id="task-question"
+                      name="question"
+                      required
+                      disabled
+                      placeholder="What shape is the sign on xyz street at abc building?"
+                    />
+                    <label for="task-correct">Correct Answer</label>
+                    <input
+                      id="task-correct"
+                      name="correctAnswer"
+                      required
+                      disabled
+                    />
+                    <fieldset class="multiple-choice-incorrect-options">
+                      <legend>Incorrect answers</legend>
+                      <div class="field-grid">
+                        <div>
+                          <label for="task-incorrect-1"
+                            >Incorrect Answer 1</label
+                          >
+                          <input
+                            id="task-incorrect-1"
+                            name="incorrectAnswer1"
+                            required
+                            disabled
+                          />
+                        </div>
+                        <div>
+                          <label for="task-incorrect-2"
+                            >Incorrect Answer 2</label
+                          >
+                          <input
+                            id="task-incorrect-2"
+                            name="incorrectAnswer2"
+                            required
+                            disabled
+                          />
+                        </div>
+                      </div>
+                      <label for="task-incorrect-3">Incorrect Answer 3</label>
+                      <input
+                        id="task-incorrect-3"
+                        name="incorrectAnswer3"
+                        required
+                        disabled
+                      />
+                    </fieldset>
+                  </div>
+                  <section
+                    class="task-location-picker"
+                    aria-labelledby="task-location-heading"
+                  >
+                    <h3 id="task-location-heading">Choose the task location</h3>
+                    <p class="field-help">
+                      Search for a place or address, or click the map. Drag the
+                      pin to fine-tune the location.
+                    </p>
+                    <div class="task-location-map-shell">
+                      <div
+                        class="task-location-search"
+                        data-testid="task-location-search-form"
+                        role="search"
+                      >
+                        <label for="task-location-query">Search the map</label>
+                        <input
+                          id="task-location-query"
+                          data-testid="task-location-query"
+                          type="search"
+                          autocomplete="off"
+                          placeholder="Place or address"
+                        />
+                        <button type="button">Search</button>
+                      </div>
+                      <div
+                        class="task-location-map"
+                        data-testid="task-location-map"
+                        role="region"
+                        aria-label="Interactive map for choosing the task location"
+                      ></div>
+                    </div>
+                    <p
+                      class="field-help"
+                      data-testid="task-location-status"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      The map loads when the task location picker is shown.
+                    </p>
+                    <output
+                      class="task-location-coordinates"
+                      data-testid="task-location-coordinates"
+                      hidden
+                    ></output>
+                    <input type="hidden" id="task-latitude" name="latitude" />
+                    <input type="hidden" id="task-longitude" name="longitude" />
+                  </section>
+                  <p class="field-help">
+                    Coordinates are stored with the task. Location verification
+                    is handled separately.
+                  </p>
+                  <details class="more-options">
+                    <summary>More task options</summary>
+                    <div class="field-grid">
+                      <div>
+                        <label for="task-timer"
+                          >Kahoot question timer in seconds (optional)</label
+                        ><input
+                          id="task-timer"
+                          name="timeLimitSeconds"
+                          type="number"
+                          min="1"
+                          max="3600"
+                          step="1"
+                        /><label for="task-points">Points</label>
+                        <input
+                          id="task-points"
+                          name="points"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value="0"
+                        />
+                      </div>
+                      <div
+                        class="checkbox-field"
+                        data-task-fields="single-word-trivia"
+                        hidden
+                      >
+                        <input
+                          id="task-case-sensitive"
+                          name="answerCaseSensitive"
+                          type="checkbox"
+                        />
+                        <label for="task-case-sensitive"
+                          >Answer is case-sensitive</label
+                        >
+                      </div>
+                    </div>
+                    <label for="task-hint">Optional hint</label>
+                    <input
+                      id="task-hint"
+                      name="hint"
+                      placeholder="A gentle nudge for participants"
+                    />
+                  </details>
+                  <button type="submit" class="primary-button">
+                    Add task to hunt
+                  </button>
+                </fieldset>
+              </form>
+              <p role="status" data-testid="task-status" aria-live="polite">
+                Fill in the task details to add it to a hunt.
+              </p>
+              <ul
+                class="validation-errors"
+                data-testid="validation-errors"
+                aria-live="polite"
+                aria-label="Validation errors"
+              ></ul>
+              <div class="task-list-panel" aria-live="polite">
+                <div class="task-list-heading">
+                  <h3>Tasks in this hunt</h3>
+                  <span class="list-caption"
+                    >Updated after a successful save</span
+                  >
+                </div>
+                <ol
+                  data-testid="defined-task-list"
+                  aria-label="Defined hunt tasks"
+                ></ol>
+              </div>
+            </section>
+          </div>
         </dialog>
       </div>
     </main>
+    <dialog
+      class="hunt-delete-dialog"
+      data-testid="delete-hunt-dialog"
+      aria-labelledby="delete-hunt-title"
+      aria-describedby="delete-hunt-warning"
+    >
+      <form data-testid="delete-hunt-form" class="hunt-delete-form">
+        <p class="eyebrow">PERMANENT ACTION</p>
+        <h2 id="delete-hunt-title">Delete this hunt?</h2>
+        <p
+          id="delete-hunt-warning"
+          data-testid="delete-hunt-warning"
+          class="hunt-delete-warning"
+        >
+          <strong>This cannot be undone.</strong> Deleting this hunt also
+          removes its tasks, contributors, and saved player progress.
+        </p>
+        <label for="delete-hunt-name">
+          Type <strong data-testid="delete-hunt-name"></strong> to confirm
+        </label>
+        <input
+          id="delete-hunt-name"
+          data-testid="delete-hunt-name-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <p
+          class="hunt-delete-status"
+          data-testid="delete-hunt-status"
+          role="alert"
+          hidden
+        ></p>
+        <div class="hunt-delete-actions">
+          <button type="button" data-testid="cancel-delete-hunt">
+            Keep hunt
+          </button>
+          <button
+            type="submit"
+            class="hunt-delete-confirm"
+            data-testid="confirm-delete-hunt"
+            disabled
+          >
+            Delete permanently
+          </button>
+        </div>
+      </form>
+    </dialog>
     <footer>&#169; 2026 Kinser-Most-Wanted &#183; BucHunt</footer>
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-      defer
-    ></script>
     <script type="module" src="./js/admin.js"></script>
     <script type="module" src="./js/foundation/bootstrap.js"></script>
   </body>

@@ -4266,6 +4266,44 @@ body[data-page="admin"]
   display: grid;
   gap: 0.3rem;
 }
+.hunt-settings-form .hunt-settings-organization,
+.hunt-settings-form label:has(input[name="maxParticipants"]) {
+  color: #f4f5f9;
+  font-weight: 750;
+}
+.hunt-settings-form #hunt-settings-organization,
+.hunt-settings-form input[name="maxParticipants"] {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgb(255 199 44 / 30%);
+  border-radius: 0.7rem;
+  background: linear-gradient(145deg, #10294a, #071a33);
+  color: #f4f5f9;
+  font: inherit;
+}
+.hunt-settings-form #hunt-settings-organization:focus,
+.hunt-settings-form input[name="maxParticipants"]:focus {
+  outline: 2px solid #ffc72c;
+  outline-offset: 2px;
+}
+.hunt-settings-form .hunt-settings-lock {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgb(255 199 44 / 24%);
+  border-radius: 0.75rem;
+  background: rgb(255 199 44 / 8%);
+  color: #f4f5f9;
+  font-weight: 700;
+}
+.hunt-settings-form .hunt-settings-lock input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #ffc72c;
+}
 .hunt-issue-dialog {
   width: min(92vw, 40rem);
   max-height: 85dvh;
@@ -4362,6 +4400,37 @@ body[data-page="admin"]
   border-radius: 0.75rem;
   background: rgb(255 255 255 / 5%);
 }
+.hunt-issue-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.hunt-issue-card-state {
+  flex: 0 0 auto;
+  color: #aebbd0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.hunt-issue-card-state[data-resolved="true"] {
+  color: #86efac;
+}
+.hunt-issue-resolve {
+  min-height: 2.35rem;
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #ffc72c;
+  border-radius: 0.55rem;
+  background: rgb(255 199 44 / 10%);
+  color: #ffd45c;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hunt-issue-resolve:disabled {
+  cursor: default;
+}
 .hunt-issue-card-title {
   display: block;
   margin-bottom: 0.35rem;
@@ -4385,6 +4454,34 @@ body[data-page="admin"]
   min-height: 1.25rem;
   margin: 0;
   color: #b9c6d7;
+}
+.hunt-issue-toast {
+  position: fixed;
+  z-index: 10000;
+  inset-inline: 1rem;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  width: fit-content;
+  max-width: min(34rem, calc(100vw - 2rem));
+  margin-inline: auto;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid rgb(134 239 172 / 42%);
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, #15345d, #0b203d);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 38%);
+  color: #bbf7d0;
+  font-weight: 800;
+  text-align: center;
+  animation: issue-toast-in 180ms ease-out;
+}
+@keyframes issue-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .player-hunt-details .player-submit-issue {
   display: flex;

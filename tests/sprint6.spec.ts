@@ -93,6 +93,7 @@ test("organization membership governs organization hunt access and migration", a
       name: "ETSU",
     });
     expect(created.status).toBe(201);
+    expect(f.hunt.maxParticipants).toBe(200);
     const organizationId = created.data.value.id as string;
     const invited = await f.api(
       `/api/player/account/organizations/${organizationId}/members`,
@@ -360,9 +361,41 @@ test("#139 #143 #142 APIs enforce roles, admission limits, saved membership, and
         })
       ).status,
     ).toBe(201);
+    expect(
+      (
+        await f.api(player + "/issues", "one", {
+          taskId: null,
+          description: "A third issue",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await f.api(player + "/issues", "one", {
+          taskId: null,
+          description: "A fourth issue",
+        })
+      ).status,
+    ).toBe(400);
     expect((await f.api(admin + "/issues", "outsider")).status).toBe(403);
     const inbox = await f.api(admin + "/issues");
-    expect(inbox.data.value.unreadCount).toBe(2);
+    expect(inbox.data.value.unreadCount).toBe(3);
+    const resolvedId = inbox.data.value.issues[0].id as string;
+    expect(
+      (await f.api(admin + "/issues/" + resolvedId + "/resolve", "owner", {}))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await f.api(player + "/issues", "one", {
+          taskId: null,
+          description: "Replacement issue",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (await f.api(player + "/issues/status", "one")).data.value,
+    ).toMatchObject({ activeCount: 3, limit: 3, canSubmit: false });
     await f.api(admin + "/issues/read", "owner", {
       ids: inbox.data.value.issues.map((i: { id: string }) => i.id),
     });
@@ -518,8 +551,10 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     await report
       .getByRole("button", { name: "Submit Issue", exact: true })
       .click();
-    await expect(report.getByRole("status")).toHaveText("Issue submitted.");
-    await report.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(report).toHaveCount(0);
+    await expect(player.getByTestId("issue-toast")).toHaveText(
+      "Issue submitted.",
+    );
     const admin = await adminContext.newPage();
     await identity(admin, "owner", true);
     await openAdminHunt(admin, f.base);
@@ -536,6 +571,11 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     });
     await expect(inbox).toContainText("Mascot");
     await expect(inbox).toContainText("The fountain sign is missing.");
+    await inbox.getByRole("button", { name: "Mark resolved" }).click();
+    await expect(inbox).toContainText("Resolved");
+    await expect(
+      inbox.getByRole("button", { name: "Resolved", exact: true }),
+    ).toBeDisabled();
     await inbox.getByRole("button", { name: "Close", exact: true }).click();
     await expect(admin.getByTestId("hunt-issues-button")).toHaveText(
       "Issues (0 unread)",
@@ -553,7 +593,7 @@ test("#139 #142 #143 browser workflow edits settings and submits and reads a tas
     });
     await expect(organizationSelect).toContainText("Computing (owner)");
     await organizationSelect.selectOption(computing.id);
-    await settings.getByLabel("Close participation to new players").check();
+    await settings.getByLabel("Lock hunt to new players").check();
     await settings.getByRole("button", { name: "Save hunt settings" }).click();
     await expect(settings.getByRole("status")).toHaveText(
       "Hunt settings saved.",

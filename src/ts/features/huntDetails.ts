@@ -579,7 +579,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       hunt.organizationId ?? "",
     );
     (settings.elements.namedItem("maxParticipants") as HTMLInputElement).value =
-      hunt.maxParticipants == null ? "" : String(hunt.maxParticipants);
+      hunt.maxParticipants == null ? "200" : String(hunt.maxParticipants);
     (
       settings.elements.namedItem("participationClosed") as HTMLInputElement
     ).checked = hunt.participationClosed ?? false;
@@ -592,9 +592,7 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       button.disabled = true;
       const fields = new FormData(settings);
       const updates: Record<string, unknown> = {
-        maxParticipants: String(fields.get("maxParticipants") ?? "").trim()
-          ? Number(fields.get("maxParticipants"))
-          : null,
+        maxParticipants: Number(fields.get("maxParticipants")) || 200,
         participationClosed: fields.has("participationClosed"),
       };
       if (role === "owner")

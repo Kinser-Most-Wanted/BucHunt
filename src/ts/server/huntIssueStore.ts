@@ -8,6 +8,8 @@ export interface HuntIssue {
   taskId: string | null;
   taskLabel: string;
   description: string;
+  submittedBy?: string;
+  resolved?: boolean;
   createdAt: string;
   readBy: string[];
 }
@@ -26,6 +28,9 @@ function validate(value: unknown): HuntIssue[] {
         issue.description.length > 4000 ||
         typeof issue.createdAt !== "string" ||
         !Number.isFinite(Date.parse(issue.createdAt)) ||
+        (issue.submittedBy !== undefined &&
+          typeof issue.submittedBy !== "string") ||
+        (issue.resolved !== undefined && typeof issue.resolved !== "boolean") ||
         !Array.isArray(issue.readBy) ||
         issue.readBy.some((id: unknown) => typeof id !== "string"),
     )
@@ -41,6 +46,7 @@ export class HuntIssueStore {
   async submit(
     hunt: HuntDefinition,
     input: unknown,
+    submittedBy: string,
   ): Promise<{ submitted: true }> {
     if (!input || typeof input !== "object" || Array.isArray(input))
       throw new StoreError("validation", "Enter an issue description.");
@@ -67,13 +73,35 @@ export class HuntIssueStore {
       taskId: task?.id ?? null,
       taskLabel: task?.displayLabel ?? "Hunt in general",
       description: fields.description.trim(),
+      submittedBy,
+      resolved: false,
       createdAt: new Date().toISOString(),
       readBy: [],
     };
     await this.file.update((issues) => {
+      const activeCount = issues.filter(
+        (item) =>
+          item.huntId === hunt.id &&
+          item.submittedBy === submittedBy &&
+          !item.resolved,
+      ).length;
+      if (activeCount >= 3)
+        throw new StoreError(
+          "validation",
+          "You can have up to 3 unresolved issues for this hunt. Ask an admin to resolve one before submitting another.",
+        );
       issues.push(issue);
     });
     return { submitted: true };
+  }
+  async submissionStatus(huntId: string, submittedBy: string) {
+    const activeCount = (await this.file.get()).filter(
+      (issue) =>
+        issue.huntId === huntId &&
+        issue.submittedBy === submittedBy &&
+        !issue.resolved,
+    ).length;
+    return { activeCount, limit: 3, canSubmit: activeCount < 3 };
   }
   async list(huntId: string, reader: string) {
     const issues = (await this.file.get()).filter(
@@ -82,11 +110,22 @@ export class HuntIssueStore {
     return {
       unreadCount: issues.filter((issue) => !issue.readBy.includes(reader))
         .length,
-      issues: issues.map(({ readBy, ...issue }) => ({
+      issues: issues.map(({ readBy, submittedBy: _submittedBy, ...issue }) => ({
         ...issue,
+        resolved: Boolean(issue.resolved),
         unread: !readBy.includes(reader),
       })),
     };
+  }
+  async resolve(huntId: string, issueId: string): Promise<{ resolved: true }> {
+    return this.file.update((issues) => {
+      const issue = issues.find(
+        (item) => item.huntId === huntId && item.id === issueId,
+      );
+      if (!issue) throw new StoreError("not-found", "Issue not found.");
+      issue.resolved = true;
+      return { resolved: true as const };
+    });
   }
   async markRead(
     huntId: string,

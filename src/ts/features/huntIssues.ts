@@ -8,7 +8,24 @@ interface Inbox {
     taskLabel: string;
     description: string;
     unread: boolean;
+    resolved: boolean;
   }[];
+}
+interface SubmissionStatus {
+  activeCount: number;
+  limit: number;
+  canSubmit: boolean;
+}
+function issueToast(message: string): void {
+  document.querySelector(".hunt-issue-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "hunt-issue-toast";
+  toast.dataset.testid = "issue-toast";
+  toast.setAttribute("role", "status");
+  toast.setAttribute("aria-live", "polite");
+  toast.textContent = message;
+  document.body.append(toast);
+  window.setTimeout(() => toast.remove(), 2400);
 }
 function issueDialog(title: string): HTMLDialogElement {
   const dialog = document.createElement("dialog");
@@ -75,7 +92,36 @@ export function mountAdminIssues(
       const description = document.createElement("p");
       description.className = "hunt-issue-card-description";
       description.textContent = issue.description;
-      row.append(label, description);
+      const heading = document.createElement("div");
+      heading.className = "hunt-issue-card-heading";
+      const state = document.createElement("span");
+      state.className = "hunt-issue-card-state";
+      state.dataset.resolved = String(issue.resolved);
+      state.textContent = issue.resolved ? "Resolved" : "Open";
+      heading.append(label, state);
+      row.append(heading, description);
+      if (!issue.resolved) {
+        const resolve = document.createElement("button");
+        resolve.type = "button";
+        resolve.className = "hunt-issue-resolve";
+        resolve.textContent = "Mark resolved";
+        resolve.onclick = async () => {
+          resolve.disabled = true;
+          const saved = await request(
+            `/api/admin/hunts/${huntId}/issues/${issue.id}/resolve`,
+            {},
+          );
+          if (!saved.ok) {
+            resolve.disabled = false;
+            issueToast(saved.message);
+            return;
+          }
+          state.textContent = "Resolved";
+          state.dataset.resolved = "true";
+          resolve.textContent = "Resolved";
+        };
+        row.append(resolve);
+      }
       list.append(row);
     }
     if (!list.childElementCount) {
@@ -136,10 +182,16 @@ export function mountPlayerIssues(
   leave.before(button);
   button.onclick = async () => {
     button.disabled = true;
-    const tasks = await accountRequest<{ id: string; displayLabel: string }[]>(
-      `/api/player/account/hunts/${huntId}/issues/tasks`,
-      identity,
-    );
+    const [tasks, issueStatus] = await Promise.all([
+      accountRequest<{ id: string; displayLabel: string }[]>(
+        `/api/player/account/hunts/${huntId}/issues/tasks`,
+        identity,
+      ),
+      accountRequest<SubmissionStatus>(
+        `/api/player/account/hunts/${huntId}/issues/status`,
+        identity,
+      ),
+    ]);
     button.disabled = false;
     if (!root.open || !button.isConnected) return;
     const popup = issueDialog("Submit Issue");
@@ -168,6 +220,13 @@ export function mountPlayerIssues(
     status.className = "hunt-issue-status";
     status.setAttribute("role", "status");
     if (!tasks.ok) status.textContent = tasks.message;
+    if (issueStatus.ok && !issueStatus.value.canSubmit) {
+      status.textContent =
+        "You have 3 open issues for this hunt. An admin must resolve one before you can submit another.";
+      submit.disabled = true;
+      description.disabled = true;
+      select.disabled = true;
+    }
     taskLabel.append(select);
     descriptionLabel.append(description);
     form.append(taskLabel, descriptionLabel, submit, status);
@@ -181,11 +240,12 @@ export function mountPlayerIssues(
         identity,
         { taskId: select.value || null, description: description.value },
       );
-      status.textContent = result.ok ? "Issue submitted." : result.message;
       if (result.ok) {
-        description.value = "";
-        form.reset();
+        popup.close();
+        issueToast("Issue submitted.");
+        return;
       }
+      status.textContent = result.message;
       submit.disabled = false;
     };
   };

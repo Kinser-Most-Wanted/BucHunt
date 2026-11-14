@@ -632,6 +632,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       ),
     )
     .toBeGreaterThan(0);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });
@@ -773,6 +777,10 @@ test("Google sign-in lets a player open and revisit saved progress", async ({
       ),
     )
     .toBeGreaterThan(0);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
   await detailsDialog.evaluate((dialog) => {
     dialog.scrollTop = dialog.scrollHeight;
   });

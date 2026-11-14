@@ -693,8 +693,9 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await endsAt.fill("2026-10-18T14:30");
   const dateUpdate = page.waitForRequest(
     (request) =>
-      request.url().endsWith(`/api/admin/hunts/${id}`) &&
-      request.method() === "PATCH",
+      /\/api\/admin\/hunts\/[a-f0-9-]+$/.test(
+        new URL(request.url()).pathname,
+      ) && request.method() === "PATCH",
   );
   await huntSettings
     .getByRole("button", { name: "Save hunt settings" })

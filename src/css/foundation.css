@@ -2959,7 +2959,7 @@ body[data-page="player"].player-hunt-modal-open {
   z-index: 6;
   display: flex;
   justify-content: flex-end;
-  height: 0;
+  height: 2.5rem;
   margin: 0;
   padding: 0;
   overflow: visible;

@@ -12,6 +12,9 @@ test("hunt overview downloads PDF and CSV and recovers from a failed export", as
   page,
   context,
 }) => {
+  // PDF generation and browser download handling can exceed Playwright's
+  // default 30-second limit on a cold CI runner.
+  test.setTimeout(60_000);
   const directory = await mkdtemp(join(tmpdir(), "buchunt-export-ui-"));
   const app = createApplication({
     dataDirectory: directory,

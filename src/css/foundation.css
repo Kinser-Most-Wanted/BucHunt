@@ -4316,6 +4316,22 @@ body[data-page="admin"]
   height: 1.2rem;
   accent-color: #ffc72c;
 }
+.hunt-settings-date-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.hunt-settings-date-fields > div {
+  min-width: 0;
+}
+.hunt-settings-date-fields input {
+  width: 100%;
+}
+@media (max-width: 38rem) {
+  .hunt-settings-date-fields {
+    grid-template-columns: 1fr;
+  }
+}
 .hunt-issue-dialog {
   width: min(92vw, 40rem);
   max-height: 85dvh;

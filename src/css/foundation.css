@@ -2551,7 +2551,8 @@ body[data-page="admin"] dialog.hunt-details-dialog .manage-hunts-refresh {
   border-radius: 50%;
   background: rgb(255 255 255 / 5%);
   color: #e8ebf0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 body[data-page="admin"]
   dialog.hunt-details-dialog

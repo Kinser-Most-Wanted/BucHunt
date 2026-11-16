@@ -2540,6 +2540,19 @@ body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
   color: #e8ebf0;
   font-size: 1.5rem;
 }
+body[data-page="admin"] dialog.hunt-details-dialog .manage-hunts-refresh {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #e8ebf0;
+  font-size: 1.5rem;
+}
 body[data-page="admin"]
   dialog.hunt-details-dialog
   .manage-hunts-refresh[hidden] {
@@ -2547,6 +2560,11 @@ body[data-page="admin"]
 }
 
 body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover {
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .manage-hunts-refresh:hover {
   border-color: rgb(255 199 44 / 45%);
   background: rgb(255 199 44 / 9%);
   color: #ffc72c;

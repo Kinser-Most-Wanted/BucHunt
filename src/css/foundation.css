@@ -2518,6 +2518,11 @@ body[data-page="admin"]:has(dialog[open]) {
   justify-content: space-between;
   gap: 1rem;
 }
+.hunt-details-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .hunt-details-dialog-heading .eyebrow {
   margin: 0;
   color: #ffc72c;
@@ -2535,8 +2540,32 @@ body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
   color: #e8ebf0;
   font-size: 1.5rem;
 }
+body[data-page="admin"] dialog.hunt-details-dialog .manage-hunts-refresh {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 5%);
+  color: #e8ebf0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .manage-hunts-refresh[hidden] {
+  display: none;
+}
 
 body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover {
+  border-color: rgb(255 199 44 / 45%);
+  background: rgb(255 199 44 / 9%);
+  color: #ffc72c;
+}
+body[data-page="admin"] dialog.hunt-details-dialog .manage-hunts-refresh:hover {
   border-color: rgb(255 199 44 / 45%);
   background: rgb(255 199 44 / 9%);
   color: #ffc72c;
@@ -3489,37 +3518,8 @@ body[data-page="admin"] .hunt-details-dialog-heading h2 {
   letter-spacing: -0.04em;
 }
 body[data-page="admin"] .hunt-manager-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.25rem 0 0;
-}
-body[data-page="admin"] .hunt-manager-heading h2 {
-  margin: 0.15rem 0 0;
+  margin: 0.4rem 0 0;
   color: #f7f7fa;
-}
-body[data-page="admin"] .hunt-manager-heading .refresh-button {
-  margin: 0;
-}
-body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh {
-  display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 50%;
-  background: rgb(255 255 255 / 5%);
-  color: #dce4ef;
-  font-size: 1.25rem;
-  line-height: 1;
-}
-body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh:hover {
-  border-color: rgb(255 199 44 / 45%);
-  background: rgb(255 199 44 / 9%);
-  color: #ffc72c;
 }
 body[data-page="admin"] .manage-hunts-subtitle {
   margin: 0.4rem 0 0.8rem;
@@ -4315,6 +4315,22 @@ body[data-page="admin"]
   width: 1.2rem;
   height: 1.2rem;
   accent-color: #ffc72c;
+}
+.hunt-settings-date-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.hunt-settings-date-fields > div {
+  min-width: 0;
+}
+.hunt-settings-date-fields input {
+  width: 100%;
+}
+@media (max-width: 38rem) {
+  .hunt-settings-date-fields {
+    grid-template-columns: 1fr;
+  }
 }
 .hunt-issue-dialog {
   width: min(92vw, 40rem);

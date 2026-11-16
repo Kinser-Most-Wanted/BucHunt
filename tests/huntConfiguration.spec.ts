@@ -708,6 +708,33 @@ test("create hunt, save task and reload configuration", async ({ page }) => {
   await expect(huntSettings.locator("[data-settings-status]")).toHaveText(
     "Hunt settings saved.",
   );
+  const updatedDates = dateUpdateRequest.postDataJSON() as {
+    beginsAt: string;
+    endsAt: string;
+  };
+  const expectedBegins = await page.evaluate(
+    (value) =>
+      new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value)),
+    updatedDates.beginsAt,
+  );
+  const expectedEnds = await page.evaluate(
+    (value) =>
+      new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value)),
+    updatedDates.endsAt,
+  );
+  const facts = page.getByTestId("hunt-facts");
+  await expect(
+    facts.locator(".hunt-fact").filter({ hasText: "Begins" }).locator("dd"),
+  ).toHaveText(expectedBegins);
+  await expect(
+    facts.locator(".hunt-fact").filter({ hasText: "Ends" }).locator("dd"),
+  ).toHaveText(expectedEnds);
   await page.getByRole("button", { name: "Edit hunt tasks" }).click();
   await expect(page.getByTestId("hunt-details-editor")).toBeVisible();
   await expect(page.getByTestId("hunt-edit-title")).toHaveText(

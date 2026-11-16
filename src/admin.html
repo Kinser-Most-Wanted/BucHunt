@@ -405,30 +405,31 @@
             <p class="eyebrow" data-testid="hunt-dialog-mode">
               YOUR ADVENTURES
             </p>
-            <button
-              type="button"
-              class="dialog-close-button"
-              data-testid="close-hunt-details"
-              aria-label="Close hunt details"
-            >
-              ×
-            </button>
-          </div>
-          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
-            <div class="hunt-manager-heading">
-              <div>
-                <h2 id="manage-hunts-title">Manage hunts</h2>
-              </div>
+            <div class="hunt-details-dialog-actions">
               <button
                 type="button"
-                class="refresh-button manage-hunts-refresh"
+                class="manage-hunts-refresh"
                 data-testid="refresh-my-hunts"
                 aria-label="Refresh hunt list"
                 title="Refresh hunt list"
+                hidden
               >
                 ↻
               </button>
+              <button
+                type="button"
+                class="dialog-close-button"
+                data-testid="close-hunt-details"
+                aria-label="Close hunt details"
+              >
+                ×
+              </button>
             </div>
+          </div>
+          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
+            <h2 class="hunt-manager-heading" id="manage-hunts-title">
+              Manage hunts
+            </h2>
             <p class="manage-hunts-subtitle">
               Open a hunt to manage its details and contributors.
             </p>
@@ -543,25 +544,6 @@
               >
                 <option value="">No organization</option>
               </select>
-              <label for="hunt-settings-begins-at"
-                >Hunt start date and time (local)</label
-              >
-              <input
-                id="hunt-settings-begins-at"
-                name="beginsAt"
-                type="datetime-local"
-                required
-                data-testid="hunt-settings-begins-at"
-              />
-              <label for="hunt-settings-ends-at">
-                Hunt end date and time (optional, local)
-              </label>
-              <input
-                id="hunt-settings-ends-at"
-                name="endsAt"
-                type="datetime-local"
-                data-testid="hunt-settings-ends-at"
-              />
               <label
                 >Maximum participants (up to 200; default 200)<input
                   name="maxParticipants"
@@ -570,6 +552,31 @@
                   max="200"
                   step="1"
               /></label>
+              <div class="hunt-settings-date-fields">
+                <div>
+                  <label for="hunt-settings-begins-at"
+                    >Hunt start date and time (local)</label
+                  >
+                  <input
+                    id="hunt-settings-begins-at"
+                    name="beginsAt"
+                    type="datetime-local"
+                    required
+                    data-testid="hunt-settings-begins-at"
+                  />
+                </div>
+                <div>
+                  <label for="hunt-settings-ends-at">
+                    Hunt end date and time (optional, local)
+                  </label>
+                  <input
+                    id="hunt-settings-ends-at"
+                    name="endsAt"
+                    type="datetime-local"
+                    data-testid="hunt-settings-ends-at"
+                  />
+                </div>
+              </div>
               <label class="hunt-settings-lock"
                 ><input name="participationClosed" type="checkbox" /> Lock hunt
                 to new players</label

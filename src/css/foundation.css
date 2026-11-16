@@ -2518,6 +2518,11 @@ body[data-page="admin"]:has(dialog[open]) {
   justify-content: space-between;
   gap: 1rem;
 }
+.hunt-details-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .hunt-details-dialog-heading .eyebrow {
   margin: 0;
   color: #ffc72c;
@@ -2534,6 +2539,11 @@ body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button {
   background: rgb(255 255 255 / 5%);
   color: #e8ebf0;
   font-size: 1.5rem;
+}
+body[data-page="admin"]
+  dialog.hunt-details-dialog
+  .manage-hunts-refresh[hidden] {
+  display: none;
 }
 
 body[data-page="admin"] dialog.hunt-details-dialog .dialog-close-button:hover {
@@ -3489,37 +3499,8 @@ body[data-page="admin"] .hunt-details-dialog-heading h2 {
   letter-spacing: -0.04em;
 }
 body[data-page="admin"] .hunt-manager-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.25rem 0 0;
-}
-body[data-page="admin"] .hunt-manager-heading h2 {
-  margin: 0.15rem 0 0;
+  margin: 0.4rem 0 0;
   color: #f7f7fa;
-}
-body[data-page="admin"] .hunt-manager-heading .refresh-button {
-  margin: 0;
-}
-body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh {
-  display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 50%;
-  background: rgb(255 255 255 / 5%);
-  color: #dce4ef;
-  font-size: 1.25rem;
-  line-height: 1;
-}
-body[data-page="admin"] .hunt-manager-heading .manage-hunts-refresh:hover {
-  border-color: rgb(255 199 44 / 45%);
-  background: rgb(255 199 44 / 9%);
-  color: #ffc72c;
 }
 body[data-page="admin"] .manage-hunts-subtitle {
   margin: 0.4rem 0 0.8rem;

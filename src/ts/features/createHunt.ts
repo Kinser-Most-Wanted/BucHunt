@@ -71,6 +71,9 @@ export function mountCreateHunt(
   );
   if (!form || !status || !createDialog || !manageDialog || !managerView)
     return;
+  const refreshButton = manageDialog.querySelector<HTMLButtonElement>(
+    '[data-testid="refresh-my-hunts"]',
+  );
   const workspaceStatus = document.querySelector<HTMLElement>(
     '[data-testid="creator-status"]',
   )!;
@@ -171,6 +174,7 @@ export function mountCreateHunt(
     if (overviewView) overviewView.hidden = true;
     if (editorView) editorView.hidden = true;
     managerView!.hidden = false;
+    if (refreshButton) refreshButton.hidden = false;
     if (mode) mode.textContent = "YOUR ADVENTURES";
     manageDialog!.setAttribute("aria-labelledby", "manage-hunts-title");
     if (!manageDialog!.open) manageDialog!.showModal();
@@ -516,6 +520,7 @@ export function mountCreateHunt(
       managerView.hidden = false;
       if (overviewView) overviewView.hidden = true;
       if (editorView) editorView.hidden = true;
+      if (refreshButton) refreshButton.hidden = false;
       if (mode) mode.textContent = "YOUR ADVENTURES";
       manageDialog.setAttribute("aria-labelledby", "manage-hunts-title");
       deleteDialog.close();

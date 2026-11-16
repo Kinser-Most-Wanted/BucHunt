@@ -456,9 +456,13 @@ function setDialogView(view: DialogView): void {
   const mode = dialog.querySelector<HTMLElement>(
     '[data-testid="hunt-dialog-mode"]',
   );
+  const refreshButton = dialog.querySelector<HTMLButtonElement>(
+    '[data-testid="refresh-my-hunts"]',
+  );
   if (manager) manager.hidden = view !== "manage";
   if (overview) overview.hidden = view !== "overview";
   if (editor) editor.hidden = view !== "editing";
+  if (refreshButton) refreshButton.hidden = view !== "manage";
   if (mode)
     mode.textContent =
       view === "manage"

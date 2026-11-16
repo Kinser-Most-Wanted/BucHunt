@@ -405,30 +405,31 @@
             <p class="eyebrow" data-testid="hunt-dialog-mode">
               YOUR ADVENTURES
             </p>
-            <button
-              type="button"
-              class="dialog-close-button"
-              data-testid="close-hunt-details"
-              aria-label="Close hunt details"
-            >
-              ×
-            </button>
-          </div>
-          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
-            <div class="hunt-manager-heading">
-              <div>
-                <h2 id="manage-hunts-title">Manage hunts</h2>
-              </div>
+            <div class="hunt-details-dialog-actions">
               <button
                 type="button"
-                class="refresh-button manage-hunts-refresh"
+                class="dialog-close-button manage-hunts-refresh"
                 data-testid="refresh-my-hunts"
                 aria-label="Refresh hunt list"
                 title="Refresh hunt list"
+                hidden
               >
                 ↻
               </button>
+              <button
+                type="button"
+                class="dialog-close-button"
+                data-testid="close-hunt-details"
+                aria-label="Close hunt details"
+              >
+                ×
+              </button>
             </div>
+          </div>
+          <div class="hunt-manager-view" data-testid="manage-hunts-view" hidden>
+            <h2 class="hunt-manager-heading" id="manage-hunts-title">
+              Manage hunts
+            </h2>
             <p class="manage-hunts-subtitle">
               Open a hunt to manage its details and contributors.
             </p>

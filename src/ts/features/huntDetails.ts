@@ -379,6 +379,14 @@ function addFact(list: HTMLElement, label: string, value: string): void {
   list.append(item);
 }
 
+function updateFact(list: HTMLElement, label: string, value: string): void {
+  const fact = Array.from(
+    list.querySelectorAll<HTMLElement>(".hunt-fact"),
+  ).find((item) => item.querySelector("dt")?.textContent === label);
+  const detail = fact?.querySelector("dd");
+  if (detail) detail.textContent = value;
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "No end date";
   const date = new Date(value);
@@ -632,6 +640,13 @@ function renderHunt(hunt: HuntDefinition, role: HuntRole): void {
       output.textContent = result.ok ? "Hunt settings saved." : result.message;
       if (result.ok && activeHunt?.id === hunt.id) {
         activeHunt = result.value;
+        const facts = dialog.querySelector<HTMLElement>(
+          '[data-testid="hunt-facts"]',
+        );
+        if (facts) {
+          updateFact(facts, "Begins", formatDate(result.value.beginsAt));
+          updateFact(facts, "Ends", formatDate(result.value.endsAt));
+        }
         const teamPanel = dialog.querySelector<HTMLElement>(
           '[data-testid="contributors-panel"]',
         );
